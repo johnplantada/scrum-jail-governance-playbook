@@ -1,0 +1,105 @@
+# ============================================================
+# SCRUM JAIL GOVERNANCE PLAYBOOK — envelopes.yaml reference
+# ============================================================
+# An "envelope" is the box of authority you give each agent.
+# It lives inside org-chart.yaml under each department node.
+# This file explains each field so you can tune them confidently.
+#
+# PRINCIPLE: start tight, loosen deliberately.
+# The cost of a too-narrow envelope is one escalation.
+# The cost of a too-wide envelope is your agent doing something
+# you can't take back.
+
+# ── ENVELOPE FIELDS ──────────────────────────────────────────
+
+envelope_fields:
+  max_subagents:
+    type: integer
+    default: 0
+    description: >
+      How many sub-teams this agent may spin up inside its own scope,
+      WITHOUT a new Board approval. Set 0 if you don't want the agent
+      delegating at all. Set 4 for a head-of-department who needs to
+      sub-divide work. Crossing this limit requires a CHARTER to the Board.
+    guidance: >
+      Start at 0. Grant 2-4 only for departments that demonstrably need
+      parallel work (e.g. Business running SEO + content simultaneously).
+
+  daily_token_budget:
+    type: integer
+    unit: tokens
+    default: 200000
+    description: >
+      Hard cap on LLM tokens this agent may consume per calendar day.
+      The Registrar tracks usage and stops the agent when exhausted.
+    guidance: >
+      200k = light/daily agent (haiku-tier work, terse output).
+      500k = active department head (sonnet, daily cadence, multi-step reasoning).
+      300k = CEO/opus (fewer wakes, denser thinking, strategic output).
+      Never set higher than 1M without a Board-approved business case.
+
+  can_spend:
+    type: boolean
+    default: false
+    description: >
+      Whether this agent may initiate real-money transactions
+      (ads, SaaS subscriptions, contractor payments).
+    guidance: >
+      ALWAYS false for agents. Agents PROPOSE spend in a SPEND message;
+      the Chairman reacts 💰 to approve a ceiling; the agent then acts
+      within that ceiling. Agents never hold the card.
+
+  can_deploy:
+    type: boolean
+    default: false
+    description: >
+      Whether this agent may push to production without a human gate.
+    guidance: >
+      ALWAYS false. Agents open PRs and post a DEPLOY message; the
+      Chairman reacts 🚀. Only then does the deploy proceed.
+      Even "trivial" deploys go through this gate — it costs 10 seconds
+      and has caught real accidents.
+
+# ── REFERENCE ENVELOPES (copy-paste into org-chart.yaml) ────
+
+reference_envelopes:
+
+  minimal:
+    # Read-only observer or summarizer agent. Cannot spawn or spend.
+    max_subagents: 0
+    daily_token_budget: 100000
+    can_spend: false
+    can_deploy: false
+
+  light_worker:
+    # Daily task executor (haiku-tier). Runs a checklist; no sub-teams.
+    max_subagents: 0
+    daily_token_budget: 200000
+    can_spend: false
+    can_deploy: false
+
+  department_head:
+    # Active department (sonnet). Can sub-team within 4-agent cap.
+    max_subagents: 4
+    daily_token_budget: 500000
+    can_spend: false
+    can_deploy: false
+
+  ceo:
+    # Strategic leader (opus). No sub-teams — escalates to Chairman instead.
+    max_subagents: 0
+    daily_token_budget: 300000
+    can_spend: false
+    can_deploy: false
+
+# ── WHAT HAPPENS WHEN AN AGENT HITS A LIMIT ─────────────────
+#
+# max_subagents exceeded  → agent must post a CHARTER to the Board and wait
+# daily_token_budget hit  → agent sleeps until midnight UTC; posts a STATUS
+# can_spend violated      → Registrar blocks the action; agent posts a SPEND
+#                           proposal with a ceiling and waits for 💰
+# can_deploy violated     → Registrar blocks; agent posts a DEPLOY proposal
+#                           with a PR link and waits for 🚀
+#
+# These are NOT errors. They are the governance protocol working correctly.
+# Design your agents to propose-and-wait, not to retry until they get through.

@@ -1,0 +1,90 @@
+# ============================================================
+# SCRUM JAIL GOVERNANCE PLAYBOOK — org-chart.yaml template
+# ============================================================
+# Fill in the blanks marked with <ANGLE_BRACKETS>.
+# Then run: cp org-chart.yaml ../org-chart.yaml
+# The Registrar reads this file on every wake and enforces it.
+#
+# RULE: every agent has a parent; authority flows DOWN the tree.
+# The Chairman (you, the human) holds the keys. Agents propose; you approve.
+
+chairman:
+  user_id: "<YOUR_MATTERMOST_USER_ID>"   # Find this in Mattermost: Profile → ID field
+
+governance:
+  # Emoji names (rare/custom) that mean something ONLY when the chairman reacts.
+  # Use emoji the agents won't accidentally post. Custom Mattermost emoji work best.
+  charter: "classical_building"   # 🏛️  charter a new department
+  sunset:  "coffin"               # ⚰️  dissolve a department or team
+  promote: "gem"                  # 💎  raise an agent's model tier
+  fund:    "moneybag"             # 💰  approve spend up to a stated ceiling
+  ship:    "rocket"               # 🚀  approve a production deploy
+  halt:    "octagonal_sign"       # 🛑  veto / emergency stop (overrides everything)
+
+limits:
+  global_max_agents: 16           # Hard ceiling across the entire org
+
+departments:
+  # ── CEO ──────────────────────────────────────────────────────
+  - name: ceo
+    role: chief-executive         # Sets strategy, objectives, department charters
+    reports_to: board
+    channel: "board"              # Posts to the board channel; Chairman reads here
+    cadence: weekly               # How often this agent wakes
+    model: opus                   # Top-tier: CEO does planning and arbitration
+    bot_user_id: "<CEO_BOT_USER_ID>"
+    envelope:
+      max_subagents: 0            # CEO escalates; it doesn't spawn sub-teams itself
+      daily_token_budget: 300000
+      can_spend: false            # Only the Chairman can approve spend
+      can_deploy: false           # Only the Chairman can approve deploys
+    teams: []
+
+  # ── BUSINESS ─────────────────────────────────────────────────
+  - name: business
+    role: demand                  # Positioning, pricing, content, growth hypotheses
+    reports_to: ceo
+    channel: "business"
+    cadence: daily
+    model: sonnet                 # Raise to opus only on an approved business case
+    bot_user_id: "<BUSINESS_BOT_USER_ID>"
+    envelope:
+      max_subagents: 4            # May spawn SEO / content sub-teams within this cap
+      daily_token_budget: 500000
+      can_spend: false
+      can_deploy: false
+    teams: []
+
+  # ── IT ───────────────────────────────────────────────────────
+  - name: it
+    role: supply                  # Ships PRs, infra, reliability
+    reports_to: ceo
+    channel: "it"
+    cadence: daily
+    model: sonnet
+    bot_user_id: "<IT_BOT_USER_ID>"
+    envelope:
+      max_subagents: 4
+      daily_token_budget: 500000
+      can_spend: false
+      can_deploy: false
+    teams: []
+
+  # ── ADD MORE DEPARTMENTS BELOW ────────────────────────────────
+  # Each department needs a board CHARTER proposal + Chairman's 🏛️ before it's live.
+  # Copy the block above, fill in the fields, post a CHARTER to #board, wait for 🏛️.
+  #
+  # Example:
+  # - name: ops
+  #   role: operations
+  #   reports_to: ceo
+  #   channel: "ops"
+  #   cadence: daily
+  #   model: haiku                # Cheapest tier that reliably does the job
+  #   bot_user_id: "<OPS_BOT_USER_ID>"
+  #   envelope:
+  #     max_subagents: 2
+  #     daily_token_budget: 200000
+  #     can_spend: false
+  #     can_deploy: false
+  #   teams: []
