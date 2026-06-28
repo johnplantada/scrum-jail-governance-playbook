@@ -31,7 +31,9 @@ departments:
     reports_to: board
     channel: "board"              # Posts to the board channel; Chairman reads here
     cadence: weekly               # How often this agent wakes
-    model: opus                   # Top-tier: CEO does planning and arbitration
+    model: sonnet                 # Authority isn't tied to compute — most CEO cycles (routing,
+                                  # arbitration, standups) are well within sonnet. Escalate to
+                                  # opus by STAKES on a specific hard call, not by default.
     bot_user_id: "<CEO_BOT_USER_ID>"
     envelope:
       max_subagents: 0            # CEO escalates; it doesn't spawn sub-teams itself

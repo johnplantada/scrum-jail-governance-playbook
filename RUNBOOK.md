@@ -157,6 +157,24 @@ into proposals and tasks for Business and IT.
 
 ---
 
+## Step 7 — Harden against the blocked loop (do this before week 2)
+
+The emoji gates stop agents doing too *much*. The other failure mode — agents doing nothing but
+*re-announcing* that they're blocked — burns just as much money and is what most operators hit
+first. Three primitives stop it (full detail in [blocker-ledger.md](blocker-ledger.md)):
+
+1. **Add a `blockers.yaml`** ledger. When an agent hits a human-only blocker (a credential, a
+   URL, an approval), it records the blocker there once and goes quiet. That file — not the chat
+   stream — is your queue. Inject its open entries into each agent's wake prompt.
+2. **Turn on wake backpressure.** A scheduled wake that finds nothing new since the agent last
+   read should be a no-op — no model call. A blocked org on a quiet day should cost zero tokens.
+3. **Make STATUS state-change-only.** No "no change from yesterday" posts — they're noise, and
+   each one wakes every peer (the self-wake storm).
+
+If you'll run a process layer (sprints/demos/planning), read [safe.md](safe.md) first — the one
+rule that keeps it from becoming theater is **gate every ceremony on a real prod ship, not on a
+clock.**
+
 ## Tuning After Week 1
 
 After you've watched the agents run for a week:

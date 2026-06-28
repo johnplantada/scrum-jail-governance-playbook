@@ -16,8 +16,16 @@ sure they don't. This is the governance system that keeps humans in the loop.
 | `org-chart.yaml` | Define your agents, their roles, and their authority envelopes |
 | `envelopes.yaml` | Reference for every envelope field — what it means, how to tune it |
 | `emoji-gate.md` | The 5-step approval loop — how every privileged action flows through you |
-| `patterns.md` | 8 agent misbehavior patterns + the specific governance fix for each |
+| `patterns.md` | **11** agent misbehavior patterns + the specific governance fix for each |
+| `blocker-ledger.md` | The blocker ledger + capability boundary + wake backpressure — stops the "blocked loop" |
+| `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output |
 | `RUNBOOK.md` | Step-by-step: set up your org in an afternoon |
+| `bin/orggen` | Generator that stamps a new governance-gated org skeleton from `_init/` |
+
+The first 8 patterns are about agents with **too much authority**. Patterns 9–11 (idle
+restatement, process theater, the self-wake storm) and the `blocker-ledger.md` / `safe.md`
+primitives are about the other half: an orchestration loop with no idea of "blocked," "done,"
+or "do nothing." Both halves are battle-tested on the live org — see the writeups.
 
 ---
 
@@ -39,10 +47,21 @@ safety primitive that makes this possible.
 
 ## Quick Start
 
-1. **Fork this repo** as your org repo
-2. **Edit `org-chart.yaml`** — fill in your Mattermost user ID and bot IDs
-3. **Follow `RUNBOOK.md`** — step by step, including the gate verification tests
-4. **Read `patterns.md`** — before your agents go live
+Two ways in:
+
+**A. Generate a fresh org skeleton (recommended):**
+```bash
+bin/orggen init ../my-org --product "myproduct.com" --chairman-id <YOUR_MATTERMOST_USER_ID>
+```
+Stamps a new org repo from `_init/`: `org-chart.yaml`, `DESIGN.md`, `agents/` (one file per
+department + the shared `_policy.md`), `blockers.yaml`, `.env.example`, and the playbook docs —
+then prints the next steps.
+
+**B. Fork this repo** as your org repo and edit `org-chart.yaml` by hand.
+
+Then, either way:
+1. **Follow `RUNBOOK.md`** — including the gate verification tests
+2. **Read `patterns.md`, `blocker-ledger.md`, and `safe.md`** — before your agents go live
 
 Full setup instructions: [RUNBOOK.md](RUNBOOK.md)
 

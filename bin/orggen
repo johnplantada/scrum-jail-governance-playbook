@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""orggen — stamp a new governance-gated multi-agent org from this golden playbook.
+
+Mirrors the lambdagen/spagen golden-example generators: the pattern lives here, and orggen
+copies + parameterizes it into a fresh org repo. It stamps the GOVERNANCE + BEHAVIORAL layer
+(org-chart, constitution, agent mandates, blocker ledger, the playbook docs). The Go RUNTIME
+(bus / registrar / pm + scripts) is a separate dependency — orggen prints how to add it.
+
+  orggen init <target-dir> [--product NAME] [--chairman-id ID] [--departments ceo,business,it]
+
+Example:
+  bin/orggen init ../acme-org --product "acme.com" --chairman-id k7kcrm383fby3gzggytdw48m6e
+"""
+import argparse
+import os
+import shutil
+import sys
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+INIT = os.path.join(REPO, "_init")
+
+# Docs copied verbatim into the new org (the playbook it keeps next to its config).
+VERBATIM_DOCS = ["patterns.md", "safe.md", "blocker-ledger.md", "emoji-gate.md",
+                 "envelopes.yaml", "RUNBOOK.md"]
+
+# (name, role, channel, reports_to, cadence). The CEO reports to the board; the rest to the CEO.
+DEFAULT_DEPARTMENTS = [
+    ("ceo", "chief-executive", "board", "board", "weekly"),
+    ("business", "demand", "business", "ceo", "daily"),
+    ("it", "supply", "it", "ceo", "daily"),
+]
+
+
+def read(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def write(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+def fill(text, **kv):
+    for k, v in kv.items():
+        text = text.replace("{{" + k + "}}", v).replace("__" + k + "__", v)
+    return text
+
+
+def departments(spec):
+    if not spec:
+        return DEFAULT_DEPARTMENTS
+    out = []
+    for name in [s.strip() for s in spec.split(",") if s.strip()]:
+        if name == "ceo":
+            out.append(("ceo", "chief-executive", "board", "board", "weekly"))
+        else:
+            out.append((name, name, name, "ceo", "daily"))
+    if not any(d[0] == "ceo" for d in out):
+        out.insert(0, DEFAULT_DEPARTMENTS[0])
+    return out
+
+
+def cmd_init(args):
+    target = os.path.abspath(args.target)
+    if os.path.exists(target) and os.listdir(target):
+        sys.exit(f"orggen: target '{target}' exists and is not empty — refusing to overwrite.")
+    org = args.org or os.path.basename(target.rstrip("/"))
+    product = args.product or org
+    chairman = args.chairman_id or "<YOUR_MATTERMOST_USER_ID>"
+    depts = departments(args.departments)
+
+    # 1. Verbatim playbook docs.
+    for doc in VERBATIM_DOCS:
+        src = os.path.join(REPO, doc)
+        if os.path.exists(src):
+            write(os.path.join(target, doc), read(src))
+
+    # 2. org-chart.yaml — from the golden reference, with the chairman id filled if given.
+    chart = read(os.path.join(REPO, "org-chart.yaml")).replace("<YOUR_MATTERMOST_USER_ID>", chairman)
+    write(os.path.join(target, "org-chart.yaml"), chart)
+
+    # 3. Constitution + ledger + env (substituted from _init/).
+    write(os.path.join(target, "DESIGN.md"), fill(read(os.path.join(INIT, "DESIGN.md")), PRODUCT=product))
+    write(os.path.join(target, "blockers.yaml"), read(os.path.join(INIT, "blockers.yaml")))
+    write(os.path.join(target, ".env.example"), fill(read(os.path.join(INIT, ".env.example")), ORG=org))
+
+    # 4. Agents: the shared policy, the reusable template (product filled, names left as
+    #    placeholders), and one stamped mandate per department.
+    write(os.path.join(target, "agents", "_policy.md"), read(os.path.join(INIT, "agents", "_policy.md")))
+    tmpl = read(os.path.join(INIT, "agents", "department.tmpl.md"))
+    write(os.path.join(target, "agents", "department.tmpl.md"), fill(tmpl, PRODUCT=product))
+    for name, role, channel, reports_to, cadence in depts:
+        mandate = fill(tmpl, NAME=name, ROLE=role, CHANNEL=channel,
+                       REPORTS_TO=reports_to, CADENCE=cadence, PRODUCT=product)
+        write(os.path.join(target, "agents", f"{name}.md"), mandate)
+
+    # 5. A short README for the new org.
+    write(os.path.join(target, "README.md"), org_readme(org, product, depts))
+
+    print(f"✓ stamped {org} → {target}")
+    print(f"  product: {product}   chairman: {chairman}   departments: {', '.join(d[0] for d in depts)}")
+    print("\nNext steps:")
+    print("  1. Add the RUNTIME (bus / registrar / pm + scripts/) — orggen stamps governance, not")
+    print("     the Go runtime. Copy bin/ + scripts/ + services/ + compose.yaml from your runtime")
+    print("     repo (or the reference org), then `make build`.")
+    print("  2. Create a Mattermost bot per department; paste each bot_user_id into org-chart.yaml")
+    print("     and each token into .env (cp .env.example .env).")
+    print("  3. Customize agents/{ceo,business,it}.md — especially the CEO (objectives, reviews,")
+    print("     the [DEMO] relay, and PI Planning per safe.md). The stamped files are skeletons.")
+    print("  4. Follow RUNBOOK.md — run the emoji-gate verification tests before going live.")
+    print("  5. Read blocker-ledger.md + safe.md before week 2.")
+
+
+def org_readme(org, product, depts):
+    rows = "\n".join(f"| {n} | {r} | #{c} |" for n, r, c, _, _ in depts)
+    return f"""# {org} — autonomous org
+
+A governance-gated multi-agent org for **{product}**, stamped from the
+[scrum-jail-governance-playbook](https://github.com/johnplantada/scrum-jail-governance-playbook).
+
+Agents propose; the Chairman approves with an emoji; the Registrar (code) executes. See
+`DESIGN.md` for the constitution and `org-chart.yaml` for the tree + envelopes.
+
+## Departments
+
+| Agent | Role | Channel |
+|---|---|---|
+{rows}
+
+## Governance & operability docs
+- `DESIGN.md` — the constitution
+- `emoji-gate.md` — the 5-step approval loop
+- `envelopes.yaml` — authority-envelope reference
+- `patterns.md` — 11 misbehavior patterns + fixes
+- `blocker-ledger.md` — the blocker ledger + wake backpressure (stops the blocked loop)
+- `safe.md` — scaled-agile gated on shipped output
+- `RUNBOOK.md` — set up in an afternoon
+
+## Setup
+1. Add the runtime (bus/registrar/pm + scripts).
+2. Create Mattermost bots; fill `org-chart.yaml` bot ids + `.env` tokens (`cp .env.example .env`).
+3. Customize `agents/*.md`.
+4. `RUNBOOK.md` → run the gate tests → go live.
+"""
+
+
+def main():
+    p = argparse.ArgumentParser(prog="orggen", description="Stamp a governance-gated agent org.")
+    sub = p.add_subparsers(dest="cmd", required=True)
+    pi = sub.add_parser("init", help="stamp a new org skeleton into <target-dir>")
+    pi.add_argument("target", help="directory to create the new org in")
+    pi.add_argument("--org", help="org name (default: target dir name)")
+    pi.add_argument("--product", help="the product the org runs (default: org name)")
+    pi.add_argument("--chairman-id", help="your Mattermost user id (default: leave placeholder)")
+    pi.add_argument("--departments", help="comma names; ceo always included (default: ceo,business,it)")
+    pi.set_defaults(func=cmd_init)
+    args = p.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

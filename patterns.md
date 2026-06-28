@@ -61,10 +61,14 @@ consuming tokens and clogging the channel.
 don't say "if blocked, propose and stop." The retry is the agent being obedient to
 the wrong instruction.
 
-**Counter-pattern:** Write `propose-and-wait` into every agent's instruction file
-(`agents/<name>.md`). When an action is blocked, the agent posts a PROPOSAL with
-the reason it needs the action, then stops. It does not retry. The next step is
-yours — react or don't.
+**Counter-pattern:** Distinguish two kinds of blocked. For an **in-org ask** (another
+department must act), write `propose-and-wait`: post one PROPOSAL, then stop — no retry. For
+a **human-only** action the agent fundamentally cannot do (cloud credentials, money, a URL or
+mailing address, an emoji approval), don't even re-propose — record it **once** in a
+`blockers.yaml` ledger and go quiet. That ledger, not the chat stream, is the operator's
+queue. Re-announcing the same blocker every wake is itself the failure (Pattern 9); the
+ledger makes a blocker a durable latch only the human clears, and clearing it is what wakes
+the agent again (the unblock is itself new inbound). See [blocker-ledger.md](blocker-ledger.md).
 
 ---
 
@@ -76,11 +80,14 @@ burying real signals. The channel becomes unreadable.
 **Why it happens:** No cadence discipline in the agent's instructions. The agent
 treats "keep the team informed" as "post constantly."
 
-**Counter-pattern:** Each agent has a `cadence` field in `org-chart.yaml` (daily,
-weekly). The Registrar enforces wake intervals. Within a wake, the agent posts
-a single STATUS at the start and a single STATUS at the end. Use threaded replies
-for sub-discussion — not new top-level posts. If an agent is flooding, tighten
-its `daily_token_budget` — it physically cannot flood if it runs out of budget.
+**Counter-pattern:** Make STATUS **state-change-only** — an agent posts a STATUS only when
+something actually changed (a PR merged, a blocker cleared, a gate moved, a metric shifted).
+"No change from yesterday" is not a message; it is the absence of one, and a no-change cycle
+ends silently. Pair it with **wake backpressure** at the runner: a scheduled wake that finds
+nothing new since the agent last read is a no-op — the model never even starts. Use threaded
+replies for sub-discussion, not new top-level posts; tighten `daily_token_budget` as a
+backstop. (A STATUS that just restates a hold isn't only noise — it *wakes every peer*; see
+Pattern 11.)
 
 ---
 
@@ -138,17 +145,87 @@ veto finality, then restart it.
 
 ---
 
+---
+
+## Pattern 9: Idle Restatement (the blocked loop)
+
+**What it looks like:** The org is blocked on something only you can do (a credential, a URL,
+an approval). The agents *know* it — and every scheduled wake they re-read the channels,
+re-derive "still blocked on X," and post a STATUS that says so. Cycle after cycle of
+high-quality reasoning that produces no work product. In our own run this was **~25% of all
+wake cycles** — 12.5 agent-hours of model time spent re-announcing a constant.
+
+**Why it happens:** The wake loop has no concept of "blocked" or "do nothing." A scheduled
+wake runs the model, and a model that ran is expected to *emit* something — so a blocked agent
+that correctly concludes "re-posting would just be noise" posts anyway, because the loop gives
+it no other legal move.
+
+**Counter-pattern:** Give "blocked" and "do nothing" first-class representations.
+1. **A blocker ledger** (`blockers.yaml`) is the durable record of human-only blockers; agents
+   write to it once and stop, never re-post (Pattern 4). It is the operator's queue.
+2. **Wake backpressure**: before the model starts, the agent peeks its channels; if nothing is
+   new since it last read, the wake is a **no-op — no model call, no post**. It can't get
+   trapped silent, because the unblock (you clearing a blocker) is itself new inbound.
+3. **State-change-only STATUS** (Pattern 5): silence is the correct output of a hold.
+Together these convert a blocked org from an expensive narration loop into a quiet latch.
+
+---
+
+## Pattern 10: Process Theater (output blindness)
+
+**What it looks like:** The org's ceremony outruns its output. It runs sprint reviews, plans
+"Program Increments," and authors process docs — while shipping nothing to production. The
+review always concludes "executed cleanly within our constraints." In our run, the org built a
+whole scaled-agile layer and ran *PI Planning* for a product that **had never once deployed**.
+
+**Why it happens:** The org measures itself in **artifacts** (PRs merged, STATUS posted,
+tickets closed, process maps written) — every signal it can read says "healthy." The one
+signal that says *nothing is live* (the post-merge deploy result) is the only one no agent
+reads, so "merged" silently masquerades as "shipped." Ceremony triggered by a wake-count, not
+by delivery, fills the silence with more process.
+
+**Counter-pattern:** **Gate every ceremony on shipped output, not elapsed time.** Define one
+predicate — "did we actually ship to prod?" (a green deploy on `main`) — and make every
+ritual check it first. No demo, no acceptance, no PI Planning runs while that predicate is
+false. Two supporting moves: **surface deploy health loudly** (post a failed deploy into the
+team channel so "merged ≠ live" can't hide), and **work-gate** — open no new feature work
+while prod is dark, since merged-but-undeployed code only widens the activity-vs-output gap.
+See [safe.md](safe.md).
+
+---
+
+## Pattern 11: Self-Wake Storm
+
+**What it looks like:** Token spend and channel volume climb even when little is happening. The
+agents are mostly waking *each other*: one posts a no-change STATUS, which wakes its peers, who
+each post a STATUS, which wakes... In our run, **agent-triggered wakes outnumbered the
+operator's** — the swarm partly DDoSes itself.
+
+**Why it happens:** Every post in a shared/owner channel is a wake source, and a heartbeat
+STATUS is a post. Combine that with a rate-limiter that **drops** a suppressed wake (so the
+trigger is simply lost) and you get both wasted wakes *and* missed messages.
+
+**Counter-pattern:** Cut the wake *source*: state-change-only STATUS (Pattern 5) removes the
+heartbeats that do nothing but wake peers. Then make the rate-limiter **coalesce, not drop** —
+a suppressed wake schedules one delayed retry instead of vanishing, so back-pressure never
+costs you a real message. The two together shrink the wake graph to genuine signal.
+
+---
+
 ## The Pattern Behind the Patterns
 
-All 8 patterns share a root: the agent had **more authority than the operator intended**,
-either because the envelope was too wide or because the standing instructions didn't
-explicitly forbid the behavior.
+These split into **two roots**, and you need both fixes:
 
-The fix is always the same:
-1. Tighten the envelope (what the agent *can* do)
-2. Clarify the charter (what the agent *should* do)
-3. Add a gate for the specific failure mode (spend / deploy / charter)
+- **Patterns 1–8 — too much authority.** The agent could do more than you intended, because the
+  envelope was too wide or the charter didn't forbid the behavior. Fix: tighten the envelope
+  (what it *can* do), clarify the charter (what it *should* do), add a gate for the specific
+  failure mode.
+- **Patterns 9–11 — a loop with no idea of "blocked," "done," or "do nothing."** The agents
+  reason fine; the *orchestration loop* burns money because it must wake and must emit. Fix:
+  give those states first-class representations — a blocker ledger, wake backpressure,
+  state-change-only output, and ceremony gated on real shipped output.
 
-Don't try to patch agent behavior with more complex prompts. Use the governance
-primitives — envelopes, gates, and cadences — to constrain the space of possible
-actions, then let the agent operate freely within that space.
+Don't try to patch either with more complex prompts. Use the governance primitives — envelopes,
+gates, cadences, the blocker ledger, backpressure, and an output predicate — to constrain the
+space of possible actions and the conditions under which an agent acts at all, then let it
+operate freely within that space.
