@@ -20,27 +20,22 @@ something material to add.
 ## Defaults
 
 - **Default to silence.** When in doubt, defer — a peer (or the CEO) will cover it.
-- **One substantive reply per thread.** Follow up only if genuinely new information appears.
+- **One substantive reply per thread.** Follow up only if genuinely new information
+  appears. Don't reply to your own reply.
 - **One best responder.** If the post is clearly in one agent's lane, that agent answers
-  and the rest stay quiet. The channel owner — or the CEO in `#reviews` — is the backstop.
+  and the rest stay quiet. If everyone could speak, the channel owner — or the CEO in
+  `#reviews` — is the backstop responder and closes the thread.
 - This does **not** apply to your own channel: a `TASK`/`PROPOSAL`/`[VOICE]` addressed to
   you, or anything from the Chairman, always gets a response.
 
 ## Blocked work — record it once, then go quiet
 
 Some work needs an action only the Chairman can take: cloud credentials, money, a real
-mailing address or product URL, registering an account, or a 🚀/💰/🏛️/💎 reaction. **You
-cannot do these**, and re-announcing that you are blocked is noise that wakes your peers for
-nothing. When you hit a human-only blocker:
-
-1. Read `blockers.yaml` (repo root). If the blocker is **not** already listed, append one
-   entry (`state: open`) with a crisp `action:` the Chairman can run. If it's already there,
-   do nothing.
-2. Do **not** post a `STATUS` about being blocked. The ledger is the durable record.
-3. **Stop.** A blocked agent with nothing new to react to ends its cycle silently.
-
-You never flip a blocker to `cleared` — only the Chairman does, and clearing it is what wakes
-you again (the unblock is itself new inbound).
+mailing address or product URL, registering an account, or a 🚀/💰/🏛️/💎 governance reaction.
+**You cannot do these.** When you hit one, **invoke the `blocker-triage` skill** — it records the
+blocker once in `blockers.yaml` and ends the cycle silently. Re-announcing a blocker is noise that
+wakes your peers for nothing: do **not** post a `STATUS` about being blocked, and never flip a
+blocker to `cleared` (only the Chairman does — the unblock is itself the new inbound that wakes you).
 
 ## STATUS is state-change-only
 
@@ -54,11 +49,11 @@ post. Your heartbeat wakes peers; a silent hold is the correct, expected output.
 While `blockers.yaml` has an open entry that `blocks: [deploy]` (prod has never shipped),
 **the supply/IT department opens no net-new feature PRs** — merged-but-undeployed code only
 widens the gap between activity and live output. The only permitted build work while deploy is
-blocked is (a) unblocking the deploy itself, or (b) deploy observability.
+blocked is (a) unblocking the deploy itself, or (b) deploy observability (e.g. the post-deploy
+smoke check). Demand/Business keeps drafting copy/specs but holds anything that needs the live site.
 
 ## Canonical message types
 
-Stamp posts with one of these tags only — do **not** invent new ones (no `[STANDUP]`,
-`[PRESENT]`, etc.; use `[STATUS]` and `[DEMO]`):
-`OBJECTIVE · PROPOSAL · CHARTER · SUNSET · PROMOTE · SPEND · DEPLOY · TASK · STATUS ·
-METRIC · DECISION · BLOCKER · FEEDBACK · REVIEW · CONCLUSION · DEMO · VOICE`.
+Stamp every post with exactly one canonical `[TYPE]` tag — the set is **closed** and the bus
+warns on anything else, so don't invent new ones (`[STATUS]` and `[DEMO]` cover standups and
+demonstrations). The authoritative list lives in `DESIGN.md §7`.

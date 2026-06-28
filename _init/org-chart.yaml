@@ -1,0 +1,31 @@
+# ============================================================
+# {{PRODUCT}} GOVERNANCE — org-chart.yaml
+# ============================================================
+# The Registrar reads this file on every wake and enforces it. It is the single source of
+# truth for WHO exists. Fill in the <ANGLE_BRACKET> blanks (bot ids) once your Mattermost
+# bots exist, then run the registrar.
+#
+# RULE: every agent has a parent; authority flows DOWN the tree.
+# The Chairman (you, the human) holds the keys. Agents propose; you approve.
+
+chairman:
+  user_id: "{{CHAIRMAN_ID}}"   # Find this in Mattermost: Profile → ID field
+
+governance:
+  # Emoji names (rare/custom) that mean something ONLY when the chairman reacts.
+  # Use emoji the agents won't accidentally post. Custom Mattermost emoji work best.
+  charter: "classical_building"   # 🏛️  charter a new department
+  sunset:  "coffin"               # ⚰️  dissolve a department or team
+  promote: "gem"                  # 💎  raise an agent's model tier
+  fund:    "moneybag"             # 💰  approve spend up to a stated ceiling
+  ship:    "rocket"               # 🚀  approve a production deploy
+  halt:    "octagonal_sign"       # 🛑  veto / emergency stop (overrides everything)
+
+limits:
+  global_max_agents: 16           # Hard ceiling across the entire org
+
+departments:
+{{DEPARTMENTS}}
+  # ── ADD MORE DEPARTMENTS BELOW ────────────────────────────────
+  # Each department needs a board CHARTER proposal + Chairman's 🏛️ before it's live.
+  # Copy a block above, fill in the fields, post a CHARTER to #board, wait for 🏛️.

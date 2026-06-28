@@ -1,0 +1,6 @@
+# Python artifacts from bin/orggen
+__pycache__/
+*.pyc
+
+# Stamped test orgs
+/tmp-org/

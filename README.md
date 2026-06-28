@@ -51,11 +51,14 @@ Two ways in:
 
 **A. Generate a fresh org skeleton (recommended):**
 ```bash
-bin/orggen init ../my-org --product "myproduct.com" --chairman-id <YOUR_MATTERMOST_USER_ID>
+bin/orggen init ../my-org --product "myproduct.com" --goal "$10k/month" \
+  --chairman-id <YOUR_MATTERMOST_USER_ID> --departments ceo,business,it
 ```
-Stamps a new org repo from `_init/`: `org-chart.yaml`, `DESIGN.md`, `agents/` (one file per
-department + the shared `_policy.md`), `blockers.yaml`, `.env.example`, and the playbook docs —
-then prints the next steps.
+Stamps a new org repo from `_init/`: `org-chart.yaml` (its `departments:` block generated from
+`--departments`, so the chart and `agents/` always match), `DESIGN.md` (product + goal filled),
+`agents/` (one file per department + the shared `_policy.md`), `blockers.yaml`, `.env.example`,
+and the playbook docs — then prints the next steps. `--org`, `--goal`, and `--departments` are
+optional (defaults: target dir name, a placeholder goal, and `ceo,business,it`).
 
 **B. Fork this repo** as your org repo and edit `org-chart.yaml` by hand.
 

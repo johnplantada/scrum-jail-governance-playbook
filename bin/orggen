@@ -6,7 +6,7 @@ copies + parameterizes it into a fresh org repo. It stamps the GOVERNANCE + BEHA
 (org-chart, constitution, agent mandates, blocker ledger, the playbook docs). The Go RUNTIME
 (bus / registrar / pm + scripts) is a separate dependency — orggen prints how to add it.
 
-  orggen init <target-dir> [--product NAME] [--chairman-id ID] [--departments ceo,business,it]
+  orggen init <target-dir> [--org NAME] [--product NAME] [--goal GOAL] [--chairman-id ID] [--departments ceo,business,it]
 
 Example:
   bin/orggen init ../acme-org --product "acme.com" --chairman-id k7kcrm383fby3gzggytdw48m6e
@@ -62,12 +62,39 @@ def departments(spec):
     return out
 
 
+def dept_block(name, role, channel, reports_to, cadence):
+    """One org-chart departments: entry, generated from the same tuple that stamps the agent
+    mandate — so the chart and agents/ can never disagree about who exists."""
+    is_ceo = name == "ceo"
+    max_sub = 0 if is_ceo else 4
+    budget = 300000 if is_ceo else 500000
+    sub_note = ("CEO escalates; it doesn't spawn sub-teams itself" if is_ceo
+                else "May spawn sub-teams within this cap")
+    return (
+        f"  # ── {name.upper()} ────────────────────────────────\n"
+        f"  - name: {name}\n"
+        f"    role: {role}\n"
+        f"    reports_to: {reports_to}\n"
+        f'    channel: "{channel}"\n'
+        f"    cadence: {cadence}\n"
+        f"    model: sonnet                 # default tier; raise to opus only on an approved 💎 PROMOTE\n"
+        f'    bot_user_id: "<{name.upper()}_BOT_USER_ID>"\n'
+        f"    envelope:\n"
+        f"      max_subagents: {max_sub}            # {sub_note}\n"
+        f"      daily_token_budget: {budget}\n"
+        f"      can_spend: false\n"
+        f"      can_deploy: false\n"
+        f"    teams: []\n"
+    )
+
+
 def cmd_init(args):
     target = os.path.abspath(args.target)
     if os.path.exists(target) and os.listdir(target):
         sys.exit(f"orggen: target '{target}' exists and is not empty — refusing to overwrite.")
     org = args.org or os.path.basename(target.rstrip("/"))
     product = args.product or org
+    goal = args.goal or "<YOUR GOAL — e.g. $10k/month>"
     chairman = args.chairman_id or "<YOUR_MATTERMOST_USER_ID>"
     depts = departments(args.departments)
 
@@ -77,12 +104,16 @@ def cmd_init(args):
         if os.path.exists(src):
             write(os.path.join(target, doc), read(src))
 
-    # 2. org-chart.yaml — from the golden reference, with the chairman id filled if given.
-    chart = read(os.path.join(REPO, "org-chart.yaml")).replace("<YOUR_MATTERMOST_USER_ID>", chairman)
+    # 2. org-chart.yaml — from the _init template; the departments: block is generated from the
+    #    SAME dept list that stamps the agent mandates (below), so the chart and agents/ can never
+    #    disagree about who exists (org-chart.yaml is the Registrar's source of truth for that).
+    dept_blocks = "\n".join(dept_block(*d) for d in depts)
+    chart = fill(read(os.path.join(INIT, "org-chart.yaml")),
+                 PRODUCT=product, CHAIRMAN_ID=chairman, DEPARTMENTS=dept_blocks)
     write(os.path.join(target, "org-chart.yaml"), chart)
 
     # 3. Constitution + ledger + env (substituted from _init/).
-    write(os.path.join(target, "DESIGN.md"), fill(read(os.path.join(INIT, "DESIGN.md")), PRODUCT=product))
+    write(os.path.join(target, "DESIGN.md"), fill(read(os.path.join(INIT, "DESIGN.md")), PRODUCT=product, GOAL=goal))
     write(os.path.join(target, "blockers.yaml"), read(os.path.join(INIT, "blockers.yaml")))
     write(os.path.join(target, ".env.example"), fill(read(os.path.join(INIT, ".env.example")), ORG=org))
 
@@ -153,6 +184,7 @@ def main():
     pi.add_argument("target", help="directory to create the new org in")
     pi.add_argument("--org", help="org name (default: target dir name)")
     pi.add_argument("--product", help="the product the org runs (default: org name)")
+    pi.add_argument("--goal", help="the org's north-star goal, e.g. '$10k/month' (default: placeholder)")
     pi.add_argument("--chairman-id", help="your Mattermost user id (default: leave placeholder)")
     pi.add_argument("--departments", help="comma names; ceo always included (default: ceo,business,it)")
     pi.set_defaults(func=cmd_init)
