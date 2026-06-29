@@ -26,6 +26,7 @@ your afternoon.
 | `FIELD-NOTES.md` | **8 field-tested mechanisms** from the live org — backpressure numbers, the haiku pre-gate, single-flight locks, worker tool-scoping, and more |
 | `RUNBOOK.md` | Step-by-step: set up your org in an afternoon |
 | `bin/orggen` | Generator that stamps a new governance-gated org skeleton from `_init/` |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How it all fits together, with Mermaid diagrams — the gate, the patterns, `orggen`, and where this repo sits in the wider Scrum Jail ecosystem |
 
 The first 8 patterns are about agents with **too much authority**. Patterns 9–11 (idle
 restatement, process theater, the self-wake storm) and the `blocker-ledger.md` / `safe.md`
