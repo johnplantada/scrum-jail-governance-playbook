@@ -21,7 +21,7 @@ INIT = os.path.join(REPO, "_init")
 
 # Docs copied verbatim into the new org (the playbook it keeps next to its config).
 VERBATIM_DOCS = ["patterns.md", "safe.md", "blocker-ledger.md", "emoji-gate.md",
-                 "envelopes.yaml", "RUNBOOK.md"]
+                 "envelopes.yaml", "FIELD-NOTES.md", "RUNBOOK.md"]
 
 # (name, role, channel, reports_to, cadence). The CEO reports to the board; the rest to the CEO.
 DEFAULT_DEPARTMENTS = [
@@ -169,6 +169,7 @@ Agents propose; the Chairman approves with an emoji; the Registrar (code) execut
 - `patterns.md` — 11 misbehavior patterns + fixes
 - `blocker-ledger.md` — the blocker ledger + wake backpressure (stops the blocked loop)
 - `safe.md` — scaled-agile gated on shipped output
+- `FIELD-NOTES.md` — 8 field-tested runtime mechanisms from the live org
 - `RUNBOOK.md` — set up in an afternoon
 
 ## Setup

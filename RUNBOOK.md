@@ -27,7 +27,7 @@ afternoon of hunting for files that don't exist.
 | `_init/agents/` | The shared `_policy.md` + the per-department mandate template |
 | `_init/blockers.yaml` | The blocker ledger, empty and documented |
 | `_init/.env.example` | The env contract your runtime will read |
-| The docs | `emoji-gate.md`, `envelopes.yaml`, `patterns.md`, `blocker-ledger.md`, `safe.md` |
+| The docs | `emoji-gate.md`, `envelopes.yaml`, `patterns.md`, `blocker-ledger.md`, `safe.md`, `FIELD-NOTES.md` |
 
 **You build or bring (the runtime — NOT included here):**
 
@@ -143,7 +143,8 @@ from the table at the top: a `bus` helper, the Registrar, a wake runner, and
   anything). Execute org-chart changes yourself; for 💰/🚀 post the approval to
   `#decisions` and stop — the agent acts on it, and the hard backstop is that agents
   hold no spend/deploy credentials. On `posted`: wake the channel's owning agent
-  (rate-limit agent-to-agent wakes so the swarm can't DDoS itself).
+  (rate-limit agent-to-agent wakes so the swarm can't DDoS itself — the live org's
+  numbers and the full mechanism are in `FIELD-NOTES.md`).
 - **Wake runner**: per wake — check the halt flag, take a per-agent lock, peek the
   channels, no-op if nothing is new, otherwise run one headless Claude cycle with
   the agent's mandate + `_policy.md` + the open blockers as the prompt.
@@ -282,6 +283,10 @@ keep agents from acting beyond their mandate. It does not cover:
 - **What your agents should actually do** — that's your `agents/<name>.md` files
 - **Multi-tenant or team setups** — the org-chart is single-Chairman by design
 - **Security hardening** — the `.env` file and API keys need standard secrets management
+
+For the hard-won operational mechanisms the live org runs — wake backpressure numbers,
+the haiku broadcast pre-gate, single-flight locks, worker tool-scoping, deploy-hold
+hibernation, and more — see [FIELD-NOTES.md](FIELD-NOTES.md) before you build Step 4.
 
 ---
 

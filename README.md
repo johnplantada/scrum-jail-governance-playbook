@@ -23,6 +23,7 @@ your afternoon.
 | `patterns.md` | **11** agent misbehavior patterns + the specific governance fix for each |
 | `blocker-ledger.md` | The blocker ledger + capability boundary + wake backpressure — stops the "blocked loop" |
 | `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output |
+| `FIELD-NOTES.md` | **8 field-tested mechanisms** from the live org — backpressure numbers, the haiku pre-gate, single-flight locks, worker tool-scoping, and more |
 | `RUNBOOK.md` | Step-by-step: set up your org in an afternoon |
 | `bin/orggen` | Generator that stamps a new governance-gated org skeleton from `_init/` |
 
@@ -87,6 +88,8 @@ optional (defaults: target dir name, a placeholder goal, and `ceo,business,it`).
 Then, either way:
 1. **Follow `RUNBOOK.md`** — including the gate verification tests
 2. **Read `patterns.md`, `blocker-ledger.md`, and `safe.md`** — before your agents go live
+3. **Read `FIELD-NOTES.md`** when you build your runtime — it's the mechanisms the live
+   org added after going live, each one paid for by a real failure
 
 Full setup instructions: [RUNBOOK.md](RUNBOOK.md)
 
