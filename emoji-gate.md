@@ -68,6 +68,17 @@ The Registrar is deterministic code. It cannot be prompted, sweet-talked, or
 confused. If `reactor.id != chairman.user_id`, the reaction does nothing. An agent
 cannot approve its own proposal by reacting with the right emoji.
 
+**That check is only as strong as your credential hygiene.** Reactor verification
+assumes no agent can ever *post the reaction as the Chairman*. It fails quietly if a
+Chairman-capable token — a personal-access-token minted for a voice bridge, or an
+admin token that can mint one — sits in the same `.env` your wake script sources into
+every agent cycle: an agent (or a prompt-injected one) holding it can self-approve
+💰/🚀, and the gate is void *in code* while looking intact. Keep such tokens in a
+separate, never-agent-sourced file (e.g. `.env.chairman`, chmod 600), `unset` them
+defensively at the wake chokepoint, and if one ever lands in an agent-visible
+environment treat it as burned: rotate it, don't just move it. (A live audit caught
+exactly this configuration.)
+
 Be precise about what happens after the check passes, though. For org-shape actions
 (🏛️ charter, ⚰️ sunset, 💎 promote, 🛑 halt) the Registrar itself executes the change —
 it is the only thing that mutates `org-chart.yaml`. For 💰 and 🚀 it records the
