@@ -153,7 +153,9 @@ into proposals and tasks for Business and IT.
 **What to watch for in the first week:**
 - Agents posting PROPOSAL messages (good — they're asking, not acting)
 - Agents moving tasks through To-Do → Doing → Done in the project tracker
-- Any unexpected spend or deploy attempts (should be zero — the gate blocks them)
+- Any unexpected spend or deploy attempts (should be zero — not because a daemon blocks
+  them, but because agents hold no payment credentials or prod access; if an attempt
+  could ever have *succeeded*, you have a capability leak to fix, not a prompt problem)
 
 ---
 
@@ -189,8 +191,12 @@ Read their `agents/<name>.md` file. The instructions may be too broad. Narrow th
 charter, not the model tier.
 
 **If an agent is burning too many tokens:**
-Lower `daily_token_budget` in its envelope. The agent sleeps when it hits the cap
-and posts a STATUS. That's the budget gate working correctly.
+`daily_token_budget` is a declared target, not a code-enforced cap — nothing in the
+reference runtime stops an agent at N tokens. The mechanisms that actually bound cost
+are wake backpressure (a wake that finds nothing new is a no-op — zero model calls),
+state-change-only STATUS (fewer posts → fewer peer wakes), and pinning the agent to a
+cheaper model tier. Audit the spend ledger against the declared budget and tighten
+those levers.
 
 **If you want to add a department:**
 Post a CHARTER to `#board`, wait for your 🏛️ reaction, and the Registrar creates

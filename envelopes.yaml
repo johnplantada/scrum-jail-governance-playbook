@@ -30,8 +30,13 @@ envelope_fields:
     unit: tokens
     default: 200000
     description: >
-      Hard cap on LLM tokens this agent may consume per calendar day.
-      The Registrar tracks usage and stops the agent when exhausted.
+      Declared per-day token target for this agent. HONESTY NOTE: in the
+      reference runtime this is a declared policy value, not a code-enforced
+      cap — no code reads it to stop an agent mid-day. What actually bounds
+      cost in practice: wake backpressure (a no-op wake costs zero tokens),
+      state-change-only STATUS, tier-pinning, and auditing the spend ledger
+      against this number. Wire a hard check into your wake runner if you
+      need one.
     guidance: >
       200k = light/daily agent (haiku-tier work, terse output).
       500k = active department head (sonnet, daily cadence, multi-step reasoning).
@@ -42,21 +47,32 @@ envelope_fields:
     type: boolean
     default: false
     description: >
-      Whether this agent may initiate real-money transactions
-      (ads, SaaS subscriptions, contractor payments).
+      Declares whether this agent may initiate real-money transactions
+      (ads, SaaS subscriptions, contractor payments). HONESTY NOTE: this is
+      a declared hint, not a switch — no runtime code branches on it. The
+      real enforcement is capability-absence: agents hold no card, no
+      payment token, no stored payment method. Keep it false so the
+      declared policy matches the capability reality.
     guidance: >
       ALWAYS false for agents. Agents PROPOSE spend in a SPEND message;
-      the Chairman reacts 💰 to approve a ceiling; the agent then acts
-      within that ceiling. Agents never hold the card.
+      the Chairman reacts 💰 to approve a ceiling (the Registrar records
+      the approval to #decisions); the agent then acts within that
+      ceiling. Agents never hold the card — that absence, not this flag,
+      is what makes rogue spend impossible.
 
   can_deploy:
     type: boolean
     default: false
     description: >
-      Whether this agent may push to production without a human gate.
+      Declares whether this agent may push to production without a human
+      gate. HONESTY NOTE: like can_spend, this is a declared hint — no
+      runtime code branches on it. The real enforcement lives outside the
+      runtime: agents have no prod credentials, and the deploy pipeline
+      sits behind branch protection + human review on the product repo.
     guidance: >
       ALWAYS false. Agents open PRs and post a DEPLOY message; the
-      Chairman reacts 🚀. Only then does the deploy proceed.
+      Chairman reacts 🚀 (recorded to #decisions). Only then does the
+      deploy proceed — through the product repo's protected pipeline.
       Even "trivial" deploys go through this gate — it costs 10 seconds
       and has caught real accidents.
 
@@ -92,14 +108,22 @@ reference_envelopes:
     can_spend: false
     can_deploy: false
 
-# ── WHAT HAPPENS WHEN AN AGENT HITS A LIMIT ─────────────────
+# ── WHAT HAPPENS AT EACH LIMIT — AND WHAT ACTUALLY ENFORCES IT ──
 #
-# max_subagents exceeded  → agent must post a CHARTER to the Board and wait
-# daily_token_budget hit  → agent sleeps until midnight UTC; posts a STATUS
-# can_spend violated      → Registrar blocks the action; agent posts a SPEND
-#                           proposal with a ceiling and waits for 💰
-# can_deploy violated     → Registrar blocks; agent posts a DEPLOY proposal
-#                           with a PR link and waits for 🚀
+# max_subagents exceeded  → ENFORCED IN CODE: the Registrar refuses the sub-team
+#                           (hard ceiling, plus global_max_agents). The agent must
+#                           post a CHARTER to the Board and wait.
+# daily_token_budget      → NOT code-enforced (see the field note above). It is the
+#                           number you audit the spend ledger against; the mechanisms
+#                           that actually bound cost are wake backpressure and
+#                           tier-pinning.
+# can_spend / can_deploy  → hints, not switches — no runtime code branches on them.
+#                           The real backstop is capability-absence: no payment
+#                           credentials exist for an agent to use, and prod deploys
+#                           are gated by branch protection + human review outside the
+#                           runtime. The 💰/🚀 emoji gates are the human-in-the-loop
+#                           approval interface + audit trail layered on top.
 #
-# These are NOT errors. They are the governance protocol working correctly.
-# Design your agents to propose-and-wait, not to retry until they get through.
+# A refused sub-team or an unapproved proposal is NOT an error. It is the governance
+# protocol working correctly. Design your agents to propose-and-wait, not to retry
+# until they get through.

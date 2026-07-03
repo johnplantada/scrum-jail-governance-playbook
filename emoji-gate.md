@@ -28,11 +28,14 @@ departments, dissolving departments, raising an agent's model tier.
        🛑  veto — overrides everything, stops the action
        (no reaction = nothing happens; agent waits or re-proposes)
 
-4. REGISTRAR EXECUTES
+4. REGISTRAR VERIFIES & ACTS
    └── deterministic code (not an LLM) reads your reaction
-       checks: is the reactor the Chairman? is the emoji the right governance emoji?
-       if yes: executes the approved action
-       if no:  ignores the reaction (agents reacting does nothing)
+       checks: is the reactor the Chairman? the right governance emoji? the right [TYPE]?
+       🏛️/⚰️/💎: the Registrar itself executes the org change
+       💰/🚀:   the Registrar records the approval to the #decisions audit ledger;
+                the agent then acts within the approved scope (the hard backstop is
+                that agents hold no payment credentials or prod access — see below)
+       if any check fails: the reaction does nothing (agents reacting does nothing)
 
 5. AGENT CONFIRMS
    └── posts a STATUS update in its channel:
@@ -56,10 +59,20 @@ Your emoji is the signature. The governance emoji are rare/custom so you won't
 accidentally approve something. A thumbs-up or ✅ does nothing; only the specific
 governance emoji triggers the gate.
 
-**Step 4 — Registrar, Not an LLM, Executes**
+**Step 4 — Registrar, Not an LLM, Verifies**
 The Registrar is deterministic code. It cannot be prompted, sweet-talked, or
 confused. If `reactor.id != chairman.user_id`, the reaction does nothing. An agent
 cannot approve its own proposal by reacting with the right emoji.
+
+Be precise about what happens after the check passes, though. For org-shape actions
+(🏛️ charter, ⚰️ sunset, 💎 promote, 🛑 halt) the Registrar itself executes the change —
+it is the only thing that mutates `org-chart.yaml`. For 💰 and 🚀 it records the
+approval to `#decisions` and executes nothing: there is deliberately no code path from
+"Chairman reacted 💰" to "money moves." The hard enforcement for money and prod is
+**capability-absence, outside the runtime's trust domain** — agents hold no payment
+credentials, and the deploy pipeline sits behind branch protection + human review on
+the product repo. The gate's job is to be the legible approval interface and the audit
+trail on top of that.
 
 **Step 5 — Confirmation Creates the Audit Trail**
 Every action leaves a STATUS post. You can audit every spend and every deploy by
@@ -105,7 +118,7 @@ No department is created until the Chairman reacts 🏛️.
 | Mistake | What the Registrar does |
 |---|---|
 | Agent reacts with governance emoji | Nothing — reactor is not the Chairman |
-| Agent acts before emoji | Registrar blocks; posts a violation notice |
+| Agent tries to act before emoji | Nothing in the runtime intercepts it — the action fails because the agent holds no payment credential or prod access. If it *could* have succeeded, fix the capability leak, not the prompt |
 | Chairman reacts ✅ instead of 💰 | Nothing — not a governance emoji |
 | Agent re-proposes with higher ceiling | Chairman must re-react; old reaction doesn't transfer |
 | Agent posts SPEND in wrong channel | Registrar still checks; channel doesn't affect validity |

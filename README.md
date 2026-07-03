@@ -31,17 +31,35 @@ or "do nothing." Both halves are battle-tested on the live org — see the write
 
 ## The Core Idea
 
-Agents propose. You approve. The Registrar (deterministic code, not an LLM) executes.
+Agents propose. You approve. The Registrar (deterministic code, not an LLM) verifies
+your reaction and acts on it.
 
 ```
 Agent posts SPEND/DEPLOY/CHARTER proposal
   → You react with the governance emoji (💰/🚀/🏛️)
-    → Registrar executes the approved action
+    → Registrar verifies it's you, then executes the org change (🏛️/⚰️/💎/🛑)
+      or records the approval to the #decisions audit ledger (💰/🚀)
       → Agent posts STATUS confirmation
 ```
 
-No agent can act unilaterally on anything privileged. The emoji gate is the
-safety primitive that makes this possible.
+Be precise about which layer stops what — the honest version is *stronger* than the
+slogan "enforced in code":
+
+- **Enforced in Registrar code:** charter / sunset / promote / halt handling (the
+  Registrar is the only thing that mutates the org chart), the per-agent subagent
+  ceilings and global agent cap, and worker-subagent tool-scoping (no worker gets a
+  shell — asserted in CI).
+- **Not executed by the Registrar:** spend and deploy. For 💰/🚀 the Registrar verifies
+  the reactor and message type, then **records the approval to `#decisions`** — it
+  moves no money and ships no code. The hard backstop lives *outside the agents' trust
+  domain*: agents hold no payment credentials, and prod deploys are gated by branch
+  protection + human review on the product repo. There is no credential for a confused
+  agent to misuse.
+
+The emoji gate is a legible human-in-the-loop approval interface plus audit trail,
+layered on top of that capability-absence. No agent can act unilaterally on anything
+privileged — not because a daemon intercepts it, but because the capability was never
+handed out in the first place.
 
 ---
 

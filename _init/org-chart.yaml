@@ -1,9 +1,11 @@
 # ============================================================
 # {{PRODUCT}} GOVERNANCE — org-chart.yaml
 # ============================================================
-# The Registrar reads this file on every wake and enforces it. It is the single source of
-# truth for WHO exists. Fill in the <ANGLE_BRACKET> blanks (bot ids) once your Mattermost
-# bots exist, then run the registrar.
+# The Registrar reads this file and enforces the org SHAPE — it is the single source of
+# truth for WHO exists, and the spawn ceilings (max_subagents, global_max_agents) are hard
+# limits it refuses to cross. can_spend / can_deploy are declared hints (the spend/deploy
+# backstop is capability-absence outside the runtime — see envelopes.yaml). Fill in the
+# <ANGLE_BRACKET> blanks (bot ids) once your Mattermost bots exist, then run the registrar.
 #
 # RULE: every agent has a parent; authority flows DOWN the tree.
 # The Chairman (you, the human) holds the keys. Agents propose; you approve.

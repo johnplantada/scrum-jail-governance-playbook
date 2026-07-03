@@ -3,7 +3,10 @@
 # ============================================================
 # Fill in the blanks marked with <ANGLE_BRACKETS>.
 # Then run: cp org-chart.yaml ../org-chart.yaml
-# The Registrar reads this file on every wake and enforces it.
+# The Registrar reads this file and enforces the org SHAPE: who exists, the spawn
+# ceilings (max_subagents, global_max_agents), and which emoji map to which gates.
+# can_spend / can_deploy are declared hints — the hard spend/deploy backstop is
+# capability-absence outside the runtime (see envelopes.yaml).
 #
 # RULE: every agent has a parent; authority flows DOWN the tree.
 # The Chairman (you, the human) holds the keys. Agents propose; you approve.

@@ -141,8 +141,9 @@ Scheduled cadence is **1 cycle/day** per agent; reactive wake-on-post covers the
   Supports **threaded replies** (`post --reply-to <id>`) so agents hold real conversations, and
   `read --since-last --as <persona>` for cheap incremental reads.
 - **Registrar** — deterministic, event-driven on the Mattermost WebSocket. Validates Chairman
-  emoji, mutates `org-chart.yaml`, provisions/dissolves agents, enforces envelopes, posts
-  receipts. Also routes **wake-on-post**: a post in a channel wakes that channel's owner
+  emoji, mutates `org-chart.yaml`, provisions/dissolves agents, enforces the org-shape
+  ceilings (`max_subagents`, `global_max_agents`), posts receipts — and records 💰/🚀
+  approvals to `#decisions` (it does not execute spend or deploys; see §8). Also routes **wake-on-post**: a post in a channel wakes that channel's owner
   (rate-limited, with a runaway-loop breaker), so a directive propagates without waiting for
   the next scheduled cycle. The Chairman's posts bypass the guard.
 - **Agent loops** — `scripts/agent-run.sh` runs one headless Claude Code cycle per node (CEO,
@@ -219,8 +220,14 @@ actual Chairman — voice changes nothing about the safety model. This is an add
 
 - **Secrets never go in chat.** Cloud/payment keys, the codebase, PII stay in a secret store.
   The bus carries coordination, not credentials.
-- **Money & prod require a Chairman emoji**, enforced in code, not in a prompt. No agent gets
-  an unsupervised spending credential.
+- **Money & prod require a Chairman emoji.** Be precise about the layers, because the honest
+  version is stronger than "enforced in code": the Registrar *verifies* the reactor and
+  *records* each 💰/🚀 approval to `#decisions` (the audit trail) — it executes neither. The
+  hard enforcement is **capability-absence, outside the agents' trust domain**: no agent
+  holds a payment credential, and prod deploys sit behind branch protection + human review
+  on the product repo. What IS enforced in Registrar code: charter/sunset/promote/🛑 handling
+  and the spawn ceilings; worker subagents are additionally tool-scoped (no shell) with the
+  scoping asserted in CI.
 - **IT ships via PR + existing CI**, never direct to prod. **Merge to `main` requires green CI
   only — no Chairman emoji needed.** Prod deploy (the `🚀` gate) remains Chairman-only. The two
   steps are independent: merge is cheap and reversible; deploy is not.
@@ -228,7 +235,10 @@ actual Chairman — voice changes nothing about the safety model. This is an add
   checks. When CI fails, the owning department **auto-repairs and re-verifies green** *before*
   the gate request. The CEO's vision-gate relay (§9) must also assert **CI: green (verified)**
   before relaying a 🚀 to the Board.
-- **Spend ceilings** enforced by the Registrar, per the `SPEND` proposal.
+- **Spend ceilings** are part of the approval record, not a runtime meter: a `SPEND`
+  proposal states a ceiling, the 💰 approves up to that ceiling, and the approval — ceiling
+  included — lands in `#decisions`. The Registrar cannot meter external spending; the
+  auditable ceiling plus the absence of standing payment credentials is the control.
 - **The runtime checkout is shared, read-only state.** The registrar and every agent read
   `org-chart.yaml`, briefs, and scripts from it live. An agent **never** runs `git commit` /
   `git checkout` / `git branch` in the runtime dir — that collides with other agents. Org-repo

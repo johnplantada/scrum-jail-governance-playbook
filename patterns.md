@@ -11,12 +11,17 @@ have more authority than their operators intended.
 **What it looks like:** Unexpected charges appear on your card. The agent signed
 up for a SaaS tool, bought API credits, or ran a cloud job — without asking.
 
-**Why it happens:** `can_spend: true` in the envelope, or the agent found a
-way to initiate a transaction through a tool that wasn't classified as "spending."
+**Why it happens:** the agent could reach a payment credential — a stored card, a
+billing API key, a tool that wasn't classified as "spending" — so nothing physical
+stood between "the agent decided to" and "money moved."
 
-**Counter-pattern:** Set `can_spend: false` for every agent, always. Require a
-SPEND proposal message with an explicit ceiling. Only proceed after the Chairman
-reacts 💰. The agent holds no card, no token, no stored payment method.
+**Counter-pattern:** The hard fix is capability-absence: the agent holds no card, no
+payment token, no stored payment method — there is nothing for it to spend *with*.
+Layer the protocol on top: declare `can_spend: false` in the envelope (a policy hint —
+no runtime code branches on it), require a SPEND proposal with an explicit ceiling, and
+proceed only after the Chairman reacts 💰 (the Registrar records the approval to
+`#decisions` as the audit trail). If any tool within the agent's reach can move money,
+that tool is the vulnerability — remove the credential, don't patch the prompt.
 
 ---
 
@@ -25,13 +30,18 @@ reacts 💰. The agent holds no card, no token, no stored payment method.
 **What it looks like:** Production goes down after the agent pushed a PR.
 The agent believed the tests passed; they did not, or they passed on a stale branch.
 
-**Why it happens:** `can_deploy: true`, or no deploy gate enforced at the infra layer.
-The agent treated "tests green" as sufficient authorization.
+**Why it happens:** the agent held a credential that could reach production, and no
+deploy gate was enforced at the infra layer. The agent treated "tests green" as
+sufficient authorization.
 
-**Counter-pattern:** Set `can_deploy: false`. Require a DEPLOY proposal with a PR
-link and a one-line rollback plan. Deploy only after the Chairman reacts 🚀. No
-amount of test coverage substitutes for the human gate — the gate is for
-authorization, not quality assurance.
+**Counter-pattern:** Put the deploy gate *outside the agent's trust domain*: agents get
+no prod credentials, and the deploy pipeline sits behind branch protection + human
+review on the product repo — an agent cannot reach production even if it convinces
+itself it should. Layer the protocol on top: declare `can_deploy: false` (a hint, not a
+code switch), require a DEPLOY proposal with a PR link and a one-line rollback plan,
+and deploy only after the Chairman reacts 🚀 (recorded to `#decisions`). No amount of
+test coverage substitutes for the human gate — the gate is for authorization, not
+quality assurance.
 
 ---
 
