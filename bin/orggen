@@ -9,7 +9,7 @@ copies + parameterizes it into a fresh org repo. It stamps the GOVERNANCE + BEHA
   orggen init <target-dir> [--org NAME] [--product NAME] [--goal GOAL] [--chairman-id ID] [--departments ceo,business,it]
 
 Example:
-  bin/orggen init ../acme-org --product "acme.com" --chairman-id k7kcrm383fby3gzggytdw48m6e
+  bin/orggen init ../acme-org --product "acme.com" --chairman-id <YOUR_CHAIRMAN_USER_ID>
 """
 import argparse
 import os
