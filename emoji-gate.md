@@ -25,8 +25,12 @@ departments, dissolving departments, raising an agent's model tier.
        🏛️  charter a new department
        ⚰️  dissolve a department or team
        💎  raise an agent's model tier
-       🛑  veto — overrides everything, stops the action
-       (no reaction = nothing happens; agent waits or re-proposes)
+       🛑  EMERGENCY STOP — halts the ENTIRE org, not just this proposal
+           (drops a halt flag: the bus refuses to post, the tracker refuses
+           writes, every wake skips — until the operator clears the flag)
+       (no reaction = nothing happens; agent waits or re-proposes.
+        THIS is the everyday "no" — you decline a proposal by not
+        approving it, not by halting the org)
 
 4. REGISTRAR VERIFIES & ACTS
    └── deterministic code (not an LLM) reads your reaction

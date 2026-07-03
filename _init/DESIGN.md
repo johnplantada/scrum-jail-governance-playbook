@@ -67,7 +67,7 @@ never a casual ✅.
 | 💎 | Raise a department's **model tier** (e.g. Sonnet → Opus) | `PROMOTE` |
 | 💰 | Approve spend up to the stated ceiling | `SPEND` |
 | 🚀 | Approve a prod deploy (PR link) | `DEPLOY` |
-| 🛑 | Veto / emergency stop | anything |
+| 🛑 | Emergency stop — halts the entire org | anything |
 
 These six are the **entire** privileged vocabulary. Anything outside them (e.g. adopting a
 process) is a plain Chairman directive in chat, not a reaction — there is no gate for it. See
@@ -108,11 +108,13 @@ model is about how hard *this* task is. A resolver reads the tier and the agent 
 `--model`. A node moves tiers two ways:
 
 - **Down** — offload cheap text to a smaller brain (`scripts/offload.sh <tier> "<prompt>"`).
-  `haiku` is the **default** offload tier (Claude-quality, cheap); a `local` on-box model runs
-  at **zero Claude tokens** for high-volume *mechanical* text only. Pick by stakes, not raw
+  `haiku` is the **default** offload tier (Claude-quality, cheap). Pick by stakes, not raw
   price — if the cheaper output needs rework, the dearer tier was cheaper overall (the "cleanup
   tax"). The node holds the context, so it **splits a mixed job** and routes each part to its
-  cheapest fit.
+  cheapest fit. (We tried a fourth, `local` on-box tier — an Ollama 7-8B model at zero Claude
+  tokens for mechanical text. Measured, it was net-negative: its output needed Sonnet rework
+  often enough that haiku was cheaper overall, so we removed it — the cleanup tax is real.
+  Local models are reserved for embeddings, not generation.)
 - **Up** — for genuinely hard reasoning, a node runs a discrete sub-call on `opus`, or earns a
   sustained Opus brain via a `PROMOTE` the Board reacts 💎 to. The agentic loop itself always
   stays on a Claude tier; only discrete subtasks offload.
@@ -177,7 +179,9 @@ cover standups and demonstrations). `DEMO` is the pre-`🚀` gate (§12).
 
 ### §Periodic reviews
 
-Every N wakes (default 5), each department posts a `[REVIEW]` to `#reviews` covering what it
+Every N wakes (`review_interval` in `org-chart.yaml` — the live Scrum Jail org runs 20, after
+starting at 5 and finding that too frequent; the script's fallback default is 5), each
+department posts a `[REVIEW]` to `#reviews` covering what it
 accomplished, signals observed, blockers, and outlook. The counter is tracked per-agent in
 `.cycles/<name>` (gitignored); `scripts/cycle-tick.sh <name>` increments it and prints `update`
 on the Nth wake.
@@ -259,7 +263,11 @@ actual Chairman — voice changes nothing about the safety model. This is an add
 - **Work-gating on a dark prod.** While an open `blockers.yaml` entry `blocks: [deploy]`, IT
   opens **no new feature PRs** — only deploy-unblock or deploy-observability work. Merged-but-
   undeployed code only widens the gap between activity and live output.
-- **🛑 kill switch** pauses every loop.
+- **🛑 kill switch** pauses every loop — the Registrar drops a `.halt` flag file; while it
+  exists the bus refuses to post/react, the tracker refuses writes, and every scheduled
+  wake exits before the model starts. Only the operator clears the flag (there is no
+  un-halt emoji). It is a whole-org stop, not a per-proposal veto — the everyday "no" to a
+  proposal is simply not reacting.
 - **Chairman's Mattermost account is the signing key** — 2FA mandatory; a private, self-hosted
   server; only the Chairman's user ID authorizes.
 
@@ -341,7 +349,8 @@ CI status + Vision-fit); Business accepts it against the brief's acceptance crit
   only for **product-surface** work (a deployable PR). Process, manual, or internal tasks use a
   one-line "done-when" checklist, not a Definition-of-Done block.
 
-**Program Increments.** A PI = 4 iterations. `scripts/pi-tick.sh` derives the PI/iteration
+**Program Increments.** A PI = a few iterations (`pi_interval` in `org-chart.yaml`; the live
+org runs 3, i.e. 20 × 3 = 60 wakes per PI). `scripts/pi-tick.sh` derives the PI/iteration
 counters and two flags: `pi_planning_due` (by cadence) and `pi_planning_eligible` (due **and**
 `shipped=yes` in the window). **PI Planning convenes only when `pi_planning_eligible=yes`.**
 Otherwise the CEO posts a one-line `[CONCLUSION]`: *"PI N closed with zero prod ships; PI Planning

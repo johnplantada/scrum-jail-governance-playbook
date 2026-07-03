@@ -21,7 +21,8 @@ governance:
   promote: "gem"                  # 💎  raise an agent's model tier
   fund:    "moneybag"             # 💰  approve spend up to a stated ceiling
   ship:    "rocket"               # 🚀  approve a production deploy
-  halt:    "octagonal_sign"       # 🛑  veto / emergency stop (overrides everything)
+  halt:    "octagonal_sign"       # 🛑  emergency stop — halts the WHOLE org (flag file);
+                                  #     fires on any message type; operator clears it to resume
 
 limits:
   global_max_agents: 16           # Hard ceiling across the entire org

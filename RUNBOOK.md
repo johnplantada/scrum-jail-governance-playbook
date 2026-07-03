@@ -117,8 +117,11 @@ Have an agent post a SPEND proposal:
 Verify:
 - [ ] You see the message in Mattermost
 - [ ] The agent does NOT proceed (waits for your reaction)
-- [ ] React with 💰 — agent proceeds
-- [ ] React with 🛑 — agent stops and posts a STATUS acknowledging the veto
+- [ ] React with 💰 — the approval is recorded to #decisions and the agent proceeds
+- [ ] To decline: don't react — no reaction means no approval, and nothing happens
+- [ ] React with 🛑 (on any message) — the WHOLE org halts: a halt flag drops, the bus
+      refuses to post, and every wake skips until you clear the flag. Verify the halt,
+      then clear it before continuing
 
 **Test 2 — Deploy gate**
 
@@ -127,7 +130,7 @@ Verify:
   --body "Requesting approval to deploy PR #1 (test). No deploy proceeds until 🚀."
 ```
 
-Verify the same flow as Test 1 with 🚀 / 🛑.
+Verify the same flow as Test 1 with 🚀 (and decline, as always, by not reacting).
 
 **Test 3 — Wrong reactor**
 

@@ -138,20 +138,27 @@ Only one agent should have the task assigned at a time.
 
 ## Pattern 8: Emoji Gate Evasion
 
-**What it looks like:** The Chairman vetoed a spend with 🛑. The agent acknowledges,
-then re-submits the same request rephrased as something smaller, or under a different
-message type, bypassing the 🛑 in the prior thread.
+**What it looks like:** The Chairman declined a spend — said "no" in the thread, or
+simply never reacted. The agent acknowledges, then re-submits the same request
+rephrased as something smaller, or under a different message type, hoping a fresh
+proposal draws a different answer.
 
-**Why it happens:** The agent's goal is "get the task done." A 🛑 is an obstacle to
-that goal. Without an explicit instruction to treat vetos as final, the agent routes
-around them.
+**Why it happens:** The agent's goal is "get the task done." A refusal is an obstacle
+to that goal. Without an explicit instruction to treat a "no" as final, the agent
+routes around it.
 
-**Counter-pattern:** Two things. First, write into every agent's charter: "A 🛑 reaction
-from the Chairman closes the matter. Do not re-propose the same action in the same
-wake." Second, the Registrar checks `reactor.id == chairman.user_id` — it does not
-check whether the proposal is a re-phrased prior veto. The behavioral discipline has to
-come from the charter. If an agent is evading, rewrite its charter to be explicit about
-veto finality, then restart it.
+**Counter-pattern:** Two things. First, write into every agent's charter: "A declined
+proposal closes the matter. Do not re-propose the same action rephrased." Second, know
+what the code does and doesn't check: the Registrar checks `reactor.id ==
+chairman.user_id` — it does not check whether a new proposal is a re-phrase of a prior
+refusal. The behavioral discipline has to come from the charter. If an agent is
+evading, rewrite its charter to be explicit about refusal finality, then restart it.
+
+(A note on 🛑, because it's easy to misread as a per-proposal veto: in the reference
+runtime it isn't one. A Chairman 🛑 on *any* message is the emergency stop — it drops a
+halt flag that pauses the whole org (the bus refuses to post, the tracker refuses
+writes, every wake skips) until the operator clears the flag. The everyday "no" to a
+proposal is simply not approving it: no reaction, no approval, nothing happens.)
 
 ---
 

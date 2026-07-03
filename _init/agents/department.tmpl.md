@@ -27,7 +27,8 @@ approval you can't settle. Keep it purposeful, not chatter.
 You run on the lowest-cost model that reliably does your job (sub-teams default to **haiku**).
 Be terse, do one focused cycle, and stop. Two levers:
 - **Offload** cheap text to a cheaper brain by stakes: `haiku` by default for light reasoning
-  or anything that ships; reserve a `local` model for high-volume, mechanical, low-stakes text.
+  or anything that ships. (There is deliberately no local-model tier — it was tried, measured
+  net-negative, and removed; see `DESIGN.md` §5.)
 - **Subagents:** when a task has **3+ independent items**, fan out one worker subagent per item
   in parallel and synthesize; their output is invisible to the bus, so fold results into your post.
 

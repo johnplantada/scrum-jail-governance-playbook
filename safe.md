@@ -29,7 +29,9 @@ program that has incremented nothing.
 
 ## Iterations
 
-An iteration = N wakes (we use 5). It opens with objectives and closes with a review. Make the
+An iteration = N wakes (the live org started at 5 and now runs 20 — by Chairman directive, once
+reviews every 5 wakes proved too frequent; tune N to your org's tempo). It opens with
+objectives and closes with a review. Make the
 review's **first line a binary**: *"Shipped to prod this iteration? Y/N (cite the deploy)."* If
 the answer is N for three iterations running, the review degenerates to one line naming the
 single external blocker — no retro over a hold. This kills the "executed cleanly within our
