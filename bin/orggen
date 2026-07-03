@@ -132,15 +132,17 @@ def cmd_init(args):
 
     print(f"✓ stamped {org} → {target}")
     print(f"  product: {product}   chairman: {chairman}   departments: {', '.join(d[0] for d in depts)}")
-    print("\nNext steps:")
-    print("  1. Add the RUNTIME (bus / registrar / pm + scripts/) — orggen stamps governance, not")
-    print("     the Go runtime. Copy bin/ + scripts/ + services/ + compose.yaml from your runtime")
-    print("     repo (or the reference org), then `make build`.")
+    print("\nNext steps (RUNBOOK.md walks through each one):")
+    print("  1. Build or bring the RUNTIME — orggen stamps the governance layer only; no bus,")
+    print("     registrar, wake runner, or compose.yaml ships with it. RUNBOOK.md Step 4 specifies")
+    print("     each component's contract (they're small); the reference implementation runs the")
+    print("     live Scrum Jail org and is private.")
     print("  2. Create a Mattermost bot per department; paste each bot_user_id into org-chart.yaml")
     print("     and each token into .env (cp .env.example .env).")
     print("  3. Customize agents/{ceo,business,it}.md — especially the CEO (objectives, reviews,")
     print("     the [DEMO] relay, and PI Planning per safe.md). The stamped files are skeletons.")
-    print("  4. Follow RUNBOOK.md — run the emoji-gate verification tests before going live.")
+    print("  4. Follow RUNBOOK.md — run the emoji-gate verification tests (Step 5, needs your")
+    print("     runtime) before going live.")
     print("  5. Read blocker-ledger.md + safe.md before week 2.")
 
 
@@ -170,10 +172,11 @@ Agents propose; the Chairman approves with an emoji; the Registrar (code) execut
 - `RUNBOOK.md` — set up in an afternoon
 
 ## Setup
-1. Add the runtime (bus/registrar/pm + scripts).
+1. Build or bring the runtime (bus / Registrar / wake runner) — see `RUNBOOK.md` Step 4
+   for each component's contract; none ships with this repo.
 2. Create Mattermost bots; fill `org-chart.yaml` bot ids + `.env` tokens (`cp .env.example .env`).
 3. Customize `agents/*.md`.
-4. `RUNBOOK.md` → run the gate tests → go live.
+4. `RUNBOOK.md` → run the gate tests (needs the runtime) → go live.
 """
 
 

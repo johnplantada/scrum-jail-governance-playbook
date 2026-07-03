@@ -3,9 +3,13 @@
 Your agents went rogue. Or you're about to give them real authority and want to make
 sure they don't. This is the governance system that keeps humans in the loop.
 
-**Setup time**: 2-4 hours  
-**Cost**: $0 to run (your own hardware + Anthropic API key)  
-**What you get**: a running multi-agent org with emoji-gated spend, deploys, and charters
+**Setup time**: 2-4 hours for the governance layer, plus building a thin runtime  
+**Cost**: $0 of infrastructure (your own hardware; Claude usage is the running cost)  
+**What you get**: the complete governance layer for a multi-agent org — org templates, a
+generator, and the emoji-gate protocol — plus precise contracts for the thin runtime
+(bus + Registrar + wake runner) you build or bring yourself. See
+[RUNBOOK.md](RUNBOOK.md) "What This Repo Ships vs. What You Build" before planning
+your afternoon.
 
 ---
 
