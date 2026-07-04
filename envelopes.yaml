@@ -127,3 +127,39 @@ reference_envelopes:
 # A refused sub-team or an unapproved proposal is NOT an error. It is the governance
 # protocol working correctly. Design your agents to propose-and-wait, not to retry
 # until they get through.
+
+# ── AGENT-LEVEL FIELDS (outside the envelope) ────────────────
+# These sit on the department node itself, next to `model` and `bot_user_id` — not in the
+# authority envelope. Both optional.
+#
+# voice   — a TTS voice name. If you run a voice console (Chairman talks to an agent, the
+#           reply is read back), this is the voice that agent answers in. Omit if you don't.
+# active  — set false to PAUSE an agent: the Registrar stops waking it, but its node stays in
+#           the chart (channels, history, envelope intact) so re-enabling is a one-line flip.
+#           Use it for a chartered department with no live outlet yet, rather than deleting it.
+#           Default (absent) = active.
+
+# ── GLOBAL CONFIG (org-chart.yaml `global:`) ─────────────────
+# Org-wide knobs, all optional. These are policy/behavior tuning, NOT authority — an agent
+# can't widen its own authority by editing them; that's what the envelope + emoji gates are for.
+#
+# model_ids            — tier (haiku/sonnet/opus) → exact API model id. The SINGLE source of
+#                        truth for tier→model resolution. A 💎 PROMOTE changes an AGENT's tier;
+#                        editing this map changes what a tier MEANS for the whole org. Pin ids so
+#                        a provider's silent default can't drift you onto a different model.
+# pm_stages            — the ordered kanban columns (e.g. To-Do, Doing, Staged, Demo, Done),
+#                        defined in ONE place. The Demo column is the [DEMO]-gate queue (safe.md).
+# review_interval      — wakes per SAFe iteration (safe.md). pi_interval — iterations per PI.
+# broadcast_channels   — channels whose posts wake more than their owner.
+# review_reviewers /   — trim the broadcast fan-out: which departments get an IMMEDIATE wake from
+# broadcast_reviewers    a #reviews / #feedback post (everyone else catches it on their next
+#                        natural cycle). This is the knob that tames the self-wake storm
+#                        (patterns.md Pattern 11); unset = wake all.
+# broadcast_stagger_seconds — spacing between broadcast wakes, departments first, CEO last, so
+#                        each recipient's pre-gate can see the earlier replies and defer.
+# collab_channel /     — the collaboration workspace (FIELD-NOTES §5): where the CEO posts a
+# collab_participants /   [DELEGATE], the pair converge directly, and a thread runs up to
+# collab_max_turns        collab_max_turns replies before escalating to the CEO as arbiter.
+# voice_default        — default agent the voice console talks to.
+# memory_channels_extra — extra channels the semantic-memory layer ingests that no department
+#                        owns (the rest are derived from the chart automatically).

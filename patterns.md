@@ -1,8 +1,10 @@
 # Agent Misbehavior Patterns — and How to Govern Them
 
-Eight patterns that burn operators. Each one has a specific governance fix.
+Eleven patterns that burn operators. Each one has a specific governance fix.
 These aren't hypothetical — they're the failure modes that show up when agents
-have more authority than their operators intended.
+have more authority than their operators intended (Patterns 1–8), or when the
+orchestration loop has no idea of "blocked," "done," or "do nothing" (Patterns
+9–11). See "The Pattern Behind the Patterns" at the end.
 
 ---
 

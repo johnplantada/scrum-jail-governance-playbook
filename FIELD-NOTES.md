@@ -93,6 +93,11 @@ Double Execution (Pattern 7) at the infrastructure layer, where no charter can f
   owner-channel task) exits 75 so the dispatcher knows to re-trigger it rather than
   drop it. A contended wake also never advances read watermarks, so its messages are
   re-read by whoever runs next.
+- **Bound the cycle so the lock always frees.** The TTL protects against a *dead* holder;
+  a wall-clock timeout on the cycle itself (the live org uses ~25 min + a max-turn count)
+  protects against a *live-but-wedged* one — a hung cycle posts a TIMEOUT banner, writes a
+  zero-cost error row to the spend ledger, exits non-zero, and its exit trap frees the lock.
+  Between the two, no single agent can wedge itself out of its own schedule.
 
 ---
 
@@ -225,6 +230,64 @@ off to save money. Every number the governance layer talks about (the declared
 `daily_token_budget`, an offload's claimed savings, the pre-gate's 75:1 ratio) is
 auditable against this ledger. That's the standard: a mechanism that claims to save
 tokens must log the evidence.
+
+---
+
+## 9. Model-tier pinning — a tier is a name; its meaning lives in one map
+
+**The failure it forecloses:** the org talks in *tiers* everywhere — `model: sonnet` in the
+chart, "sonnet" in the spend ledger, a 💎 PROMOTE that raises an agent to opus. But "sonnet" is
+not a model; it's a label that has to resolve to an *exact* API id at the call boundary. Let
+each caller resolve it however it likes and a provider's silent default (or a half-updated
+script) can drift two agents onto two different models while both logs still say "sonnet" —
+untraceable, and it corrupts every per-model cost number.
+
+**How it works:** one map — `global.model_ids` in `org-chart.yaml` — is the single place a tier
+becomes an id (`sonnet → claude-sonnet-5`, …). A tiny resolver reads it at the CLI/SDK boundary
+and nowhere else; anything already shaped like a full id passes through unchanged (so you can pin
+an exact id in an emergency without touching the chart). Everything else keeps speaking tiers.
+The governance payoff is the clean split this creates: a **💎 PROMOTE** changes *one agent's*
+tier (a node edit the Registrar makes); editing the **map** upgrades what a tier *means* for the
+whole org — moving every "sonnet" agent onto a new model in one line. Two different changes, two
+different authorities, one obvious place each lives.
+
+---
+
+## 10. The Warden — the gates you can't put in the Registrar, enforced anyway
+
+**The failure:** some rules aren't a reaction the Registrar can verify — they're *process*
+invariants. A `[DEMO]` that cites no passing `[CODEREVIEW]`. A deploy relay that skips its demo
+citation. A STATUS that just restates a hold ([patterns.md](patterns.md) Pattern 9). A bare
+"PR #66" with no link. Prose rules in a mandate get followed until they don't, and nobody
+notices the drift.
+
+**How it works:** a deterministic, non-LLM checker (the **Warden**) reads the channels on a
+cadence and matches a fixed set of rules against what agents actually posted — not what their
+charters *say* they'll do. A match builds a rap sheet; enough weight (or any severe rule) posts a
+single `[WARDEN]` alert to `#board`. It's the same philosophy as the emoji gate — *enforcement in
+code, not in a prompt* — applied to the invariants that are about message shape and sequence
+rather than a Chairman reaction. Keep it deterministic on purpose: a warden that needs a model to
+judge a violation is just another agent to argue with. The rules it checks are exactly the ones
+you'd otherwise re-explain in every mandate and still watch decay.
+
+---
+
+## 11. Typed handoffs — the messages a machine reads carry a schema, not prose
+
+**The failure:** the handoffs that drive automation — "we agreed on X," "here's the demo," "the
+review passed" — started as free prose. Then a reconciler, a demo gate, and a review gate had to
+*parse* that prose to know what merged, what to deploy, whether the code passed. Parsing English
+is where a governance gate quietly starts guessing.
+
+**How it works:** the message types a machine consumes — in the live org `[AGREEMENT]`, `[DEMO]`,
+`[CODEREVIEW]` — carry a **fenced YAML payload with required keys** (a `[CODEREVIEW]` carries
+`pr`, `head_sha`, `verdict`, `review_url`, …), schema-defined in exactly one place and mirrored
+into the shared agent policy. The bus warns on a malformed payload and the Warden (§10) cites it,
+so each gate reads *fields*, not sentences: a `[DEMO]` names the review post id it cites, a deploy
+relay names the demo id — the citations **chain**, and every link is a key lookup, not a
+paraphrase. Human-facing messages (`STATUS`, `FEEDBACK`) stay prose; only the few an automated
+gate acts on get a schema. Don't build a parser for the prose — add a schema to the messages that
+feed a gate.
 
 ---
 
