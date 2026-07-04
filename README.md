@@ -22,8 +22,8 @@ your afternoon.
 | `emoji-gate.md` | The 5-step approval loop — how every privileged action flows through you |
 | `patterns.md` | **11** agent misbehavior patterns + the specific governance fix for each |
 | `blocker-ledger.md` | The blocker ledger + capability boundary + wake backpressure — stops the "blocked loop" |
-| `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output |
-| `FIELD-NOTES.md` | **8 field-tested mechanisms** from the live org — backpressure numbers, the haiku pre-gate, single-flight locks, worker tool-scoping, and more |
+| `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output; the `[CODEREVIEW]` + `[DEMO]` gates before a 🚀 |
+| `FIELD-NOTES.md` | **11 field-tested mechanisms** from the live org — backpressure numbers, the haiku pre-gate, single-flight locks, worker tool-scoping, model-tier pinning, the Warden, typed handoffs, and more |
 | `RUNBOOK.md` | Step-by-step: set up your org in an afternoon |
 | `bin/orggen` | Generator that stamps a new governance-gated org skeleton from `_init/` |
 

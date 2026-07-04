@@ -37,12 +37,31 @@ the answer is N for three iterations running, the review degenerates to one line
 single external blocker — no retro over a hold. This kills the "executed cleanly within our
 constraints" report that lets a stuck org feel productive.
 
+## The `[CODEREVIEW]` gate — correctness, before the demo
+
+The `[DEMO]` proves a change *reaches a user*; it does not prove the *code* is correct or safe.
+Add one gate in front of it for product-surface work: an independent **Reviewer** —
+structurally separate from whoever authored the code (**author ≠ reviewer**) — gives every
+product-surface PR a `PASS` / `CHANGES-REQUESTED` verdict before it can be demoed or deployed.
+Three rules keep it honest:
+
+- **Anchor the verdict to evidence, not vibes.** Bind it to the PR's current **head SHA** and a
+  green code-review CI run on that SHA — a new push invalidates a stale PASS. The review itself
+  happens *on the PR* (inline `file:line` comments), where the code is.
+- **A demo may cite only a PASS.** The `[DEMO]` carries the passing review's id; a relay that
+  skips it (or cites an unaccepted one) is a process violation your warden can catch.
+- **Ship it dormant.** The gate is dormant until a `reviewer` department is chartered (🏛️) — no
+  reviewer in the chart, no citation required — then binding. Until then, don't pretend to have it.
+
+This is the "author ≠ reviewer" separation the emoji gate already applies to spend and deploy,
+extended to code correctness. It's a message type + a convention, not a parser.
+
 ## The `[DEMO]` gate — the one gate worth adding
 
 A `[DEMO]` is a worked demonstration that a change meets agreed **acceptance criteria**. Make it
 the prerequisite for a deploy request: no product-surface PR reaches a 🚀 without a
-demand-side-**accepted** `[DEMO]`, and the approval relay cites the accepted demo's id. Two
-rules keep it honest:
+demand-side-**accepted** `[DEMO]` (which cites its passing `[CODEREVIEW]`), and the approval
+relay cites the accepted demo's id. Two rules keep it honest:
 
 - **A demo proves a feature reaches a user, so it's produced at deploy time, for deployable work
   only.** While prod is dark, an accepted PR *merges* (green CI) and **queues** — it does not
@@ -54,6 +73,14 @@ rules keep it honest:
   resent — and a tell that the process is running ahead of the substance.)
 
 A `[DEMO]` needs no special tooling — it's a message type, a convention. Don't build a parser.
+
+**Let the tracker hold the queue.** Give the board a fixed, ordered set of columns so a
+change can't silently skip the gate. The live org runs **To-Do → Doing → Staged → Demo → Done**:
+`Staged` = PR open, awaiting merge; `Demo` = merged to main, awaiting the first prod deploy (or
+awaiting demand-side acceptance of the `[DEMO]`); `Done` = shipped (or, for non-product tasks,
+completed). Define the stage list in **one place** and have your docs and lint reference it —
+the column *is* the queue, so a merged-but-undeployed PR visibly waits in `Demo` instead of
+being quietly treated as shipped.
 
 ## Program Increments — gate the planning, not just the cadence
 

@@ -28,6 +28,52 @@ governance:
 limits:
   global_max_agents: 16           # Hard ceiling across the entire org
 
+# ── GLOBAL CONFIG (all optional) ─────────────────────────────
+# Org-wide knobs the runtime reads. Every key is optional — omit one to take its default
+# (usually the old, wake-everyone behavior). Field reference: envelopes.yaml § global config.
+global:
+  # Model tier → exact API model id. The ONE place tier→model resolution lives. Everything
+  # else (spend ledger, wake banners, 💎 PROMOTE) keeps speaking in tiers; a 💎 changes an
+  # AGENT's tier, editing THIS map upgrades what a tier MEANS org-wide. Pin ids so a silent
+  # provider default can't drift your org onto a different model.
+  model_ids:
+    haiku:  "<haiku-model-id>"     # e.g. claude-haiku-4-5
+    sonnet: "<sonnet-model-id>"    # e.g. claude-sonnet-5
+    opus:   "<opus-model-id>"      # e.g. claude-opus-4-8
+
+  # Canonical pm/kanban workflow stages, in order — the ONLY place the list is defined.
+  # The Demo column is the [DEMO]-gate queue (safe.md).
+  pm_stages: [To-Do, Doing, Staged, Demo, Done]
+
+  # SAFe cadence (safe.md). An iteration = review_interval wakes; a PI = pi_interval iterations.
+  review_interval: 20            # wakes per iteration (start ~5; raise once it proves too frequent)
+  pi_interval: 3                 # iterations per PI (20 × 3 = 60 wakes per PI)
+
+  # Broadcast channels wake the whole org by default. Trim the fan-out to cut the self-wake
+  # storm (patterns.md Pattern 11): list which departments get an IMMEDIATE wake from a
+  # broadcast; everyone else picks the thread up on their next natural cycle. Unset = wake all.
+  feedback_channel: feedback
+  review_channel: reviews
+  broadcast_channels: [feedback, reviews]
+  review_reviewers: [business, it]
+  broadcast_reviewers:
+    feedback: [business, it]
+  broadcast_stagger_seconds: 30  # wake recipients this far apart, departments first, CEO last
+
+  # Collaboration workspace (FIELD-NOTES §5): the CEO posts one [DELEGATE], the pair converge
+  # DIRECTLY (each reply wakes only the peer), then post one [AGREEMENT] back. A thread runs up
+  # to collab_max_turns before a still-open one escalates to the CEO (the arbiter).
+  collab_channel: projects
+  collab_participants: [business, it]
+  collab_max_turns: 8
+
+  # Voice console (optional): default agent the Chairman's voice console talks to.
+  voice_default: ceo
+
+  # Extra channels the semantic-memory layer ingests that no department owns (department /
+  # feedback / review / collab channels are derived from the chart automatically).
+  memory_channels_extra: [decisions, metrics]
+
 departments:
   # ── CEO ──────────────────────────────────────────────────────
   - name: ceo
@@ -39,6 +85,9 @@ departments:
                                   # arbitration, standups) are well within sonnet. Escalate to
                                   # opus by STAKES on a specific hard call, not by default.
     bot_user_id: "<CEO_BOT_USER_ID>"
+    # voice: "<TTS_VOICE_NAME>"   # optional — the voice console reads this agent's replies in this voice
+    # active: true                # optional — set false to PAUSE an agent (the Registrar won't wake it),
+                                  # e.g. a department with no live outlet yet. Default: active.
     envelope:
       max_subagents: 0            # CEO escalates; it doesn't spawn sub-teams itself
       daily_token_budget: 300000
@@ -80,6 +129,26 @@ departments:
   # Each department needs a board CHARTER proposal + Chairman's 🏛️ before it's live.
   # Copy the block above, fill in the fields, post a CHARTER to #board, wait for 🏛️.
   #
+  # ── REVIEWER — the [CODEREVIEW] gate (dormant until chartered) ──
+  # An independent code reviewer, structurally separate from IT (author ≠ reviewer). The
+  # [CODEREVIEW] gate (safe.md / emoji-gate.md) is DORMANT until this department exists: with no
+  # reviewer bot id in the chart, no review citation is required. Charter it with 🏛️ once you
+  # have product-surface PRs worth gating. Uncomment to enable:
+  # - name: reviewer
+  #   role: code-review
+  #   reports_to: ceo
+  #   channel: "it"               # posts [CODEREVIEW] here; the review itself lives on the PR
+  #   cadence: on-demand
+  #   model: sonnet
+  #   bot_user_id: "<REVIEWER_BOT_USER_ID>"
+  #   envelope:
+  #     max_subagents: 0
+  #     daily_token_budget: 300000
+  #     can_spend: false
+  #     can_deploy: false
+  #   teams: []
+  #
+  # ── A GENERIC EXTRA DEPARTMENT ────────────────────────────────
   # Example:
   # - name: ops
   #   role: operations

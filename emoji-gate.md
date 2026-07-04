@@ -95,6 +95,32 @@ searching `#board` for STATUS posts after a 💰 or 🚀 reaction.
 
 ---
 
+## Before the 🚀: the code-review and demo gates
+
+A production deploy is the one privileged action with **pre-conditions the Registrar
+doesn't check** — they're enforced by convention + a process warden, not by the emoji
+gate itself. For a product-surface change, the 🚀 is the *last* step of a short chain,
+not the first:
+
+1. **`[CODEREVIEW]`** — an independent **Reviewer** department (structurally separate
+   from whoever wrote the code: **author ≠ reviewer**) reviews the PR and posts a
+   `PASS` / `CHANGES-REQUESTED` verdict, bound to the PR's **head SHA** and anchored to a
+   green code-review CI run on that SHA. A demo may cite only a `PASS`.
+2. **`[DEMO]`** — the demand side accepts a worked demonstration that the change meets
+   its acceptance criteria; the demo cites the passing `[CODEREVIEW]`. See
+   [safe.md](safe.md).
+3. **🚀** — the deploy-approval relay cites the *accepted* `[DEMO]` id. The Chairman
+   reacts 🚀; the Registrar records it to `#decisions` exactly as before.
+
+Both gates ship **dormant** and become binding only when there's something to gate: the
+`[CODEREVIEW]` gate is dormant until a `reviewer` department is chartered (🏛️), and the
+whole demo/review layer is dormant while the output predicate says nothing has shipped
+(safe.md). This is the emoji gate's answer to "green tests aren't authorization" — the
+🚀 stays a pure human authorization, with correctness (review) and user-value (demo)
+proven *before* it, by parties who don't approve their own work.
+
+---
+
 ## Message Templates
 
 ### SPEND proposal (agent posts this)
@@ -111,6 +137,7 @@ No spend proceeds until the Chairman reacts 💰.
 [DEPLOY] Requesting approval to deploy PR #<N> to production.
 PR: <URL>
 What it changes: <one sentence>
+Demo: <accepted [DEMO] post id — which itself cites a passing [CODEREVIEW]>
 Rollback plan: <one sentence — or "revert the PR">
 No deploy proceeds until the Chairman reacts 🚀.
 ```
