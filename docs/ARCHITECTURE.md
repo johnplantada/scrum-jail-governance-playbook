@@ -129,7 +129,7 @@ An envelope has four fields (full reference + presets in [`envelopes.yaml`](../e
 | Field | Meaning | Hitting the limit is the *protocol*, not an error |
 |---|---|---|
 | `max_subagents` | how many sub-teams this node may spawn | exceed it → post a `[CHARTER]` to the Board, wait for 🏛️ |
-| `daily_token_budget` | soft spend ceiling in tokens | hit it → sleep until reset, post a `[STATUS]` |
+| `daily_token_budget` | declared per-day token target — *not* code-enforced (see [`envelopes.yaml`](../envelopes.yaml)) | audited against the spend ledger; cost is actually bounded by wake backpressure + tier-pinning |
 | `can_spend` | almost always `false` | attempt → must post `[SPEND]`, wait for 💰 |
 | `can_deploy` | almost always `false` | attempt → must post `[DEPLOY]`, wait for 🚀 |
 
@@ -142,7 +142,7 @@ The six governance emoji and the `[TYPE]` each may act on:
 | 💎 | `gem` | promote a node's model tier | `[PROMOTE]` |
 | 💰 | `moneybag` | fund (record spend approval) | `[SPEND]` |
 | 🚀 | `rocket` | ship (record deploy approval) | `[DEPLOY]` |
-| 🛑 | `octagonal_sign` | halt / veto | *any* message |
+| 🛑 | `octagonal_sign` | emergency stop — halts the **whole org** (not a per-proposal veto) | *any* message |
 
 ---
 
@@ -226,11 +226,18 @@ process layer is awake. Full rules in [`safe.md`](../safe.md).
 flowchart TD
     Cer["Any ceremony begins"] --> Pred{"last-ship.sh:<br/>green prod deploy on main?"}
     Pred -->|"shipped = no"| Dormant["Process layer dormant:<br/>no demo · no acceptance · no PI planning<br/>accepted PRs merge on green CI, queue in Demo column"]
-    Pred -->|"shipped = yes"| Active["[DEMO] → Business accepts → CEO relays DEPLOY → Chairman 🚀<br/>PI planning only if due AND shipped-in-window"]
+    Pred -->|"shipped = yes"| Active["[CODEREVIEW] (Reviewer, author≠reviewer) → [DEMO] → Business accepts → CEO relays DEPLOY → Chairman 🚀<br/>PI planning only if due AND shipped-in-window"]
 ```
 
 This is why the capabilities can ship **dormant** behind a 🏛️ charter: until the org actually
 ships something, no one runs a planning meeting about it.
+
+Two gates sit in front of any product-surface deploy (see [`safe.md`](../safe.md) /
+[`emoji-gate.md`](../emoji-gate.md)): a **`[CODEREVIEW]`** from an independent **Reviewer**
+department — structurally separate from whoever wrote the code (**author ≠ reviewer**),
+head-SHA-bound, and dormant until a `reviewer` is chartered — proves the code is *correct*, and
+the **`[DEMO]`** proves it *reaches a user*. Only an accepted demo (citing its passing review)
+earns the 🚀.
 
 ---
 
@@ -246,7 +253,7 @@ flowchart LR
     Args["orggen init &lt;target&gt;<br/>--departments ceo,business,it"] --> Tup["departments(): list of<br/>(name, role, channel, reports_to, cadence) tuples"]
     Tup --> Chart["dept_block() → org-chart.yaml<br/>{{DEPARTMENTS}} block"]
     Tup --> Agents["fill(template) → agents/&lt;name&gt;.md<br/>one mandate per tuple"]
-    Args --> Docs["copy VERBATIM_DOCS:<br/>patterns · safe · emoji-gate · envelopes · blocker-ledger · RUNBOOK"]
+    Args --> Docs["copy VERBATIM_DOCS (7):<br/>patterns · safe · emoji-gate · envelopes · blocker-ledger · FIELD-NOTES · RUNBOOK"]
     Args --> Fill["fill DESIGN.md, .env.example; copy blockers.yaml"]
     Chart --> Inv(["Invariant: one tuple list →<br/>chart and agents/ never disagree"])
     Agents --> Inv
@@ -260,7 +267,7 @@ bin/orggen init ../my-org --product "myproduct.com" --goal "$10k/month" \
 ```
 
 `ceo` is special-cased to `(ceo, chief-executive, board, board, weekly)` with `max_subagents: 0`;
-every other name maps to `(name, name, name, ceo, daily)` with an envelope of `4 / 500k`. The six
+every other name maps to `(name, name, name, ceo, daily)` with an envelope of `4 / 500k`. The seven
 governance docs are copied **verbatim** (they are meant to travel unchanged); `DESIGN.md`,
 `.env.example`, and the org chart are filled from your flags.
 
