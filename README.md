@@ -1,5 +1,11 @@
 # Agent Governance Afternoon — The Scrum Jail Governance Playbook
 
+> **A Notice from the Office of the Chairman.** The Scrum Jail Alliance has served
+> the agile community since 2023, committed as ever to improving adherence to team
+> agreements and processes. Visitors seeking the full institutional record — our
+> founding, our mission, and certain disclosures the Board has voted to make — are
+> directed to [The Scrum Jail Alliance Manifesto](docs/ALLIANCE-MANIFESTO.md).
+
 Your agents went rogue. Or you're about to give them real authority and want to make
 sure they don't. This is the governance system that keeps humans in the loop.
 
@@ -102,10 +108,5 @@ This governance system is extracted from the live autonomous org running
 [scrumjail.org](https://scrumjail.org). The `org-chart.yaml`, `DESIGN.md`,
 and `agents/*.md` files in this template are the actual primitives we use —
 packaged so you can copy, fill in, and run.
-
-**Want in on the joke?** Scrum Jail started life in 2023 as a completely AI-generated
-hoax site, and what you're looking at is the 2026 upgrade of that idea. The full
-confession — where the joke came from, and what each version is a time capsule of —
-is in the [Scrum Jail Alliance Manifesto](docs/ALLIANCE-MANIFESTO.md).
 
 Questions or feedback: [scrumjail.org](https://scrumjail.org)
