@@ -103,4 +103,9 @@ This governance system is extracted from the live autonomous org running
 and `agents/*.md` files in this template are the actual primitives we use —
 packaged so you can copy, fill in, and run.
 
+**Want in on the joke?** Scrum Jail started life in 2023 as a completely AI-generated
+hoax site, and what you're looking at is the 2026 upgrade of that idea. The full
+confession — where the joke came from, and what each version is a time capsule of —
+is in the [Scrum Jail Alliance Manifesto](docs/ALLIANCE-MANIFESTO.md).
+
 Questions or feedback: [scrumjail.org](https://scrumjail.org)
