@@ -10,10 +10,12 @@ Your agents went rogue. Or you're about to give them real authority and want to 
 sure they don't. This is the governance system that keeps humans in the loop.
 
 **Setup time**: 2-4 hours for the governance layer, plus building a thin runtime  
-**Cost**: $0 of infrastructure (your own hardware; Claude usage is the running cost)  
+**Cost**: $0 of infrastructure beyond GitHub itself (a private repo works fine; Claude
+usage is the running cost)  
 **What you get**: the complete governance layer for a multi-agent org — org templates, a
-generator, and the emoji-gate protocol — plus precise contracts for the thin runtime
-(bus + Registrar + wake runner) you build or bring yourself. See
+generator, and the GitHub-native authority model (a `production` environment gate for
+deploys, a reviewed `decisions.yaml` ledger for money/org-shape) — plus precise contracts
+for the thin runtime (a GitHub poller + wake runner) you build or bring yourself. See
 [RUNBOOK.md](RUNBOOK.md) "What This Repo Ships vs. What You Build" before planning
 your afternoon.
 
@@ -25,7 +27,7 @@ your afternoon.
 |---|---|
 | `org-chart.yaml` | Define your agents, their roles, and their authority envelopes |
 | `envelopes.yaml` | Reference for every envelope field — what it means, how to tune it |
-| `emoji-gate.md` | The 5-step approval loop — how every privileged action flows through you |
+| `emoji-gate.md` | The authorization gate walkthrough — decisions.yaml/CODEOWNERS for money/org-shape, the `production` environment for deploys, why each step exists, and the pre-deploy code-review/demo chain |
 | `patterns.md` | **11** agent misbehavior patterns + the specific governance fix for each |
 | `blocker-ledger.md` | The blocker ledger + capability boundary + wake backpressure — stops the "blocked loop" |
 | `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output; the `[CODEREVIEW]` + `[DEMO]` gates before a 🚀 |
@@ -43,35 +45,49 @@ or "do nothing." Both halves are battle-tested on the live org — see the write
 
 ## The Core Idea
 
-Agents propose. You approve. The Registrar (deterministic code, not an LLM) verifies
-your reaction and acts on it.
+Agents propose. You approve. **The platform, not an LLM, verifies your approval and
+enforces it** — GitHub's own review/merge and environment-approval primitives, not a
+custom bot watching a chat stream.
 
 ```
-Agent posts SPEND/DEPLOY/CHARTER proposal
-  → You react with the governance emoji (💰/🚀/🏛️)
-    → Registrar verifies it's you, then executes the org change (🏛️/⚰️/💎/🛑)
-      or records the approval to the #decisions audit ledger (💰/🚀)
-      → Agent posts STATUS confirmation
+Agent opens a decisions.yaml PR (spend/charter/promote/sunset)
+  → CODEOWNERS routes it to you; branch protection requires your review
+    → Your merge IS the authorization — git log decisions.yaml is the audit trail
+      → Agent acts within the merged scope
+Agent opens a product PR toward a deploy
+  → CI green + an accepted [DEMO] → the deploy workflow pauses at the
+    `production` environment
+    → Your required-reviewer approval releases it — GitHub's own deployment
+      log is the audit trail
 ```
 
 Be precise about which layer stops what — the honest version is *stronger* than the
 slogan "enforced in code":
 
-- **Enforced in Registrar code:** charter / sunset / promote / halt handling (the
-  Registrar is the only thing that mutates the org chart), the per-agent subagent
-  ceilings and global agent cap, and worker-subagent tool-scoping (no worker gets a
-  shell — asserted in CI).
-- **Not executed by the Registrar:** spend and deploy. For 💰/🚀 the Registrar verifies
-  the reactor and message type, then **records the approval to `#decisions`** — it
-  moves no money and ships no code. The hard backstop lives *outside the agents' trust
-  domain*: agents hold no payment credentials, and prod deploys are gated by branch
-  protection + human review on the product repo. There is no credential for a confused
-  agent to misuse.
+- **Enforced by GitHub, not application code:** a `decisions.yaml` PR cannot merge
+  without your CODEOWNERS review once branch protection requires it; a deploy cannot
+  proceed past the `production` environment without your approval as its required
+  reviewer. Neither gate depends on a bot correctly parsing a reaction — they're the
+  same primitives GitHub uses to gate any human review or release.
+- **Not automated at all:** nothing executes a `decisions.yaml` entry's payload for
+  you. Money and org-shape changes take effect because the diff describing them landed
+  on `main` — there's no code path from "PR merged" to "money moves" the way there is
+  no code path from "Chairman reacted 💰" in the old model. The hard backstop is still
+  **capability-absence** outside the platform gates: agents hold no payment credentials
+  or prod access, so even a confused or compromised agent has nothing to spend or ship
+  with directly.
 
-The emoji gate is a legible human-in-the-loop approval interface plus audit trail,
-layered on top of that capability-absence. No agent can act unilaterally on anything
-privileged — not because a daemon intercepts it, but because the capability was never
-handed out in the first place.
+This replaces an earlier, chat-based version of this same idea (agents post typed
+messages, a human reacts with a governance emoji, a Registrar bot watching the chat
+WebSocket verifies the reactor and executes or records it). Both shapes enforced the
+identical principle — *agents propose, a human authorizes, the authorization is legible
+and audited* — but the chat-based mechanism is retired here, not carried forward as a
+maintained alternative: it was unenforceable in code and depended on prose-policing a
+bot's behavior. [emoji-gate.md](emoji-gate.md) walks through the GitHub-native version in
+full — the same file name for history's sake, now describing the gate above in detail,
+not the retired chat mechanism. If you'd rather build a chat-based variant for your own
+org, that's a fork/adaptation decision this template no longer needs to carry as a second
+supported path.
 
 ---
 
@@ -82,13 +98,24 @@ Two ways in:
 **A. Generate a fresh org skeleton (recommended):**
 ```bash
 bin/orggen init ../my-org --product "myproduct.com" --goal "$10k/month" \
-  --chairman-id <YOUR_MATTERMOST_USER_ID> --departments ceo,business,it
+  --chairman-id <YOUR_CHAIRMAN_USER_ID> --departments ceo,business,it
 ```
 Stamps a new org repo from `_init/`: `org-chart.yaml` (its `departments:` block generated from
 `--departments`, so the chart and `agents/` always match), `DESIGN.md` (product + goal filled),
 `agents/` (one file per department + the shared `_policy.md`), `blockers.yaml`, `.env.example`,
 and the playbook docs — then prints the next steps. `--org`, `--goal`, and `--departments` are
 optional (defaults: target dir name, a placeholder goal, and `ceo,business,it`).
+
+**Note:** `bin/orggen` and its `_init/` templates (`org-chart.yaml`, `.env.example`,
+`agents/_policy.md`, the department mandate template) still stamp the chat-based
+runtime's fields and instructions — a Mattermost user id for `--chairman-id`,
+`MATTERMOST_TOKEN_*` env vars, `bus read`/`bus post` commands in the agent policy —
+none of it has been rewritten for the GitHub-native path yet (tracked separately). If
+you're building GitHub-native today, generate the skeleton for the org-chart shape and
+department list, then rewrite the stamped `org-chart.yaml` chairman field, `.env.example`,
+and `agents/_policy.md` by hand against `RUNBOOK.md` once it's updated — or work from
+`org-chart.yaml`/`agents/_policy.md` in a live GitHub-native org as your reference instead
+of the stamped output.
 
 **B. Fork this repo** as your org repo and edit `org-chart.yaml` by hand.
 
@@ -107,6 +134,12 @@ Full setup instructions: [RUNBOOK.md](RUNBOOK.md)
 This governance system is extracted from the live autonomous org running
 [scrumjail.org](https://scrumjail.org). The `org-chart.yaml`, `DESIGN.md`,
 and `agents/*.md` files in this template are the actual primitives we use —
-packaged so you can copy, fill in, and run.
+packaged so you can copy, fill in, and run. The live org itself started on the
+chat-based emoji gate and cut over to the GitHub-native model described above on
+2026-07-05 — this template is mid-cutover too: `README.md` and the Core Idea above
+describe the new model, while `RUNBOOK.md`, `FIELD-NOTES.md`, `docs/ARCHITECTURE.md`,
+and the `_init/` stamped templates still walk through the retired chat runtime pending
+their own rewrite. Until that lands, treat this README as the source of truth for
+*which* model to build, and `RUNBOOK.md` as accurate only for the chat-based path.
 
 Questions or feedback: [scrumjail.org](https://scrumjail.org)
