@@ -27,7 +27,7 @@ your afternoon.
 |---|---|
 | `org-chart.yaml` | Define your agents, their roles, and their authority envelopes |
 | `envelopes.yaml` | Reference for every envelope field — what it means, how to tune it |
-| `emoji-gate.md` | The chat-based approval loop (typed message → emoji reaction → Registrar bot) — an alternative to the GitHub-native decisions.yaml/production-environment gate described above, for operators who'd rather run on chat than GitHub review |
+| `emoji-gate.md` | The authorization gate walkthrough — decisions.yaml/CODEOWNERS for money/org-shape, the `production` environment for deploys, why each step exists, and the pre-deploy code-review/demo chain |
 | `patterns.md` | **11** agent misbehavior patterns + the specific governance fix for each |
 | `blocker-ledger.md` | The blocker ledger + capability boundary + wake backpressure — stops the "blocked loop" |
 | `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output; the `[CODEREVIEW]` + `[DEMO]` gates before a 🚀 |
@@ -79,12 +79,15 @@ slogan "enforced in code":
 
 This replaces an earlier, chat-based version of this same idea (agents post typed
 messages, a human reacts with a governance emoji, a Registrar bot watching the chat
-WebSocket verifies the reactor and executes or records it — walked through in detail in
-[emoji-gate.md](emoji-gate.md)). Both shapes enforce the identical principle — *agents
-propose, a human authorizes, the authorization is legible and audited* — the GitHub-native
-version just moves the verifier from a bot you run to the platform you're already on, so
-there's no Registrar to keep online, patch, or trust. Pick whichever fits your stack;
-**pick one** — don't run both in parallel or the audit trail forks.
+WebSocket verifies the reactor and executes or records it). Both shapes enforced the
+identical principle — *agents propose, a human authorizes, the authorization is legible
+and audited* — but the chat-based mechanism is retired here, not carried forward as a
+maintained alternative: it was unenforceable in code and depended on prose-policing a
+bot's behavior. [emoji-gate.md](emoji-gate.md) walks through the GitHub-native version in
+full — the same file name for history's sake, now describing the gate above in detail,
+not the retired chat mechanism. If you'd rather build a chat-based variant for your own
+org, that's a fork/adaptation decision this template no longer needs to carry as a second
+supported path.
 
 ---
 
