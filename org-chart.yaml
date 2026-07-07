@@ -33,10 +33,10 @@ governance:
                                 #     the runner and every agent cycle; only a human clears it
 
 limits:
-  global_max_agents: 16         # Declared org-wide agent ceiling. HONESTY NOTE: no code
-                                # currently reads this — the old Registrar enforcement retired
-                                # with the chat stack (2026-07-05). Keep it declared so audits
-                                # have a number to check the chart against.
+  global_max_agents: 16         # Org-wide agent ceiling, CI-checked: the reference tests fail
+                                # any chart whose roster arithmetic (every brain + its full
+                                # permitted fan-out) exceeds this. Per-wake refusal of each
+                                # agent's share is subagent_gate.py (envelope.max_subagents).
 
 # ── GLOBAL CONFIG ────────────────────────────────────────────
 # Org-wide knobs the scripts read. Field reference: envelopes.yaml § global config.

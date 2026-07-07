@@ -51,11 +51,11 @@ stack, replaced by the CI check.) Three rules keep it honest:
 - **Anchor the verdict to evidence, not vibes.** Bind it to the PR's current **head SHA** —
   a new push invalidates a stale PASS. The review itself
   happens *on the PR* (inline `file:line` comments), where the code is.
-- **A demo may cite only a PASS.** The `[DEMO]` carries the passing review's id. HONESTY NOTE:
-  today that citation is prompt-enforced — the typed-handoff schema lives in
-  `agents/_policy.md` §handoffs, and the Actions validator that would mechanically catch a
-  handoff skipping it is planned, not built (the chat-era Warden that used to police this
-  retired with the demolition).
+- **A demo may cite only a PASS.** The `[DEMO]` carries the passing review's id. The payload
+  *shape* is mechanically enforced: the handoff-validator workflow (`scripts/handoff_check.py`,
+  the Actions successor to the chat-era Warden) fails any `[DEMO]` missing its required keys.
+  HONESTY NOTE: that the cited review is actually a PASS is checked by the facts layer
+  (`demo-verify.sh` re-derives evidence from the head SHA), not by the shape validator.
 - **Ship it dormant.** The gate is dormant until the review check is installed on the product
   repo — no check, no citation required — then binding. Until then, don't pretend to have it.
 

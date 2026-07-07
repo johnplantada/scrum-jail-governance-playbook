@@ -237,14 +237,17 @@ chain as key lookups, not paraphrase. Human-facing messages stay prose; only wha
 gate acts on gets a schema.
 
 **The honest enforcement status:** the chat-era enforcers (the bus's malformed-payload
-warning, the Warden citation — Part II §R6) died in the demolition, and the planned
-GitHub Actions validator is **not built yet** — today the payload *shape* is
-prompt-enforced only. What keeps this from being pure vibes: the *facts* the payloads
-assert are checked in code regardless (`demo-verify.sh` re-derives the evidence run
-from the head SHA; `last-ship.sh` re-derives shipped-ness), so a wrong payload can lie
-about form but not outcome. One drift specimen: `_policy.md` §handoffs still cites the
-deleted `services/common/protocol/handoff.go` as its schema source — exactly the decay
-class the constitution linter exists for, one rule short.
+warning, the Warden citation — Part II §R6) died in the demolition; their Actions
+successor is now built. `scripts/handoff_check.py` holds the authoritative key list,
+the handoff-validator workflow runs it on every comment that leads a line with a
+handoff marker (a malformed payload fails the run and gets a reply naming the missing
+keys), and a CI test keeps `_policy.md` §handoffs — the human-readable copy — from
+drifting off the code. The *facts* the payloads assert are checked separately, as
+before (`demo-verify.sh` re-derives the evidence run from the head SHA; `last-ship.sh`
+re-derives shipped-ness), so a payload can no longer lie about form, and never could
+lie about outcome. The drift specimen that used to live here — `_policy.md` citing the
+deleted `handoff.go` as its schema source — was fixed by exactly this mechanism
+becoming real.
 
 ---
 

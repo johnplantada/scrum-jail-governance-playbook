@@ -28,14 +28,13 @@ envelope_fields:
       delegating at all. Set 4 for a head-of-department who needs to
       sub-divide work. Crossing this limit requires a [CHARTER] entry
       appended to decisions.yaml by PR — the Chairman's merge is the
-      approval. HONESTY NOTE: this is a prompt-level norm today, not a
-      code-enforced ceiling. v1's Registrar refused over-cap sub-teams
-      in code; that enforcement retired with the Registrar, and nothing
-      has replaced the hard check yet. The cap rides the agents'
-      standing instructions — the same enforcement channel as the
-      blocker WIP warning (scripts/blockers.py) — and the org-shape
-      ledger makes violations auditable, but the runtime will not
-      physically stop an over-cap spawn.
+      approval. ENFORCED IN CODE: scripts/subagent_gate.py — a
+      PreToolUse hook on the Agent/Task tools — counts spawns per wake
+      and denies any call past this cap (0 = the first spawn is
+      refused), the successor to v1's Registrar refusal, which retired
+      with the chat stack. Fail-open outside a wake and on gate errors:
+      the Chairman's own sessions are never capped, and a broken gate
+      never bricks a cycle.
     guidance: >
       Start at 0. Grant 2-4 only for departments that demonstrably need
       parallel work (e.g. Business running SEO + content simultaneously).
@@ -140,13 +139,13 @@ reference_envelopes:
 
 # ── WHAT HAPPENS AT EACH LIMIT — AND WHAT ACTUALLY ENFORCES IT ──
 #
-# max_subagents exceeded  → prompt-level norm: the cap rides the agents' standing
-#                           instructions, and crossing it means proposing a [CHARTER]
-#                           entry to decisions.yaml and waiting for the merge. NOT
-#                           code-enforced today — v1's Registrar refused over-cap
-#                           sub-teams in code; that check retired with the Registrar.
-#                           Likewise limits.global_max_agents is a declared ceiling
-#                           no code currently reads.
+# max_subagents exceeded  → ENFORCED IN CODE: subagent_gate.py (a PreToolUse hook on
+#                           Agent/Task) denies the over-cap spawn with a reason the
+#                           model reads in-cycle — finish the work yourself, or propose
+#                           a [CHARTER] entry to decisions.yaml and wait for the merge.
+#                           Successor to v1's Registrar refusal. limits.global_max_agents
+#                           is a CI-checked invariant: the tests fail any chart whose
+#                           roster arithmetic (brains + max fan-out) exceeds it.
 # daily_token_budget      → ENFORCED IN CODE: budget_gate.py + agent-run.sh brown out an
 #                           over-budget agent — non-direct wakes skipped, direct wakes
 #                           still run. Resets daily; bounds burn rate per agent, not
@@ -206,7 +205,7 @@ reference_envelopes:
 #                     blockers, blockers.py prepends a WIP warning to every wake
 #                     prompt — don't start work whose critical path ends in another
 #                     human-only unlock. Prompt-enforced.
-# global_max_agents — (under `limits:`) declared org-wide agent ceiling. HONESTY NOTE:
-#                     no code currently reads it — the old Registrar enforcement
-#                     retired with the chat stack. Keep it declared so audits have a
-#                     number to check the chart against.
+# global_max_agents — (under `limits:`) org-wide agent ceiling, CI-checked: the tests
+#                     fail any chart whose roster arithmetic (every brain plus its
+#                     full permitted fan-out) exceeds it. Runtime refusal of each
+#                     agent's share is subagent_gate.py's job (max_subagents above).

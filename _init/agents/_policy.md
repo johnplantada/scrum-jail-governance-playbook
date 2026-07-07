@@ -62,9 +62,10 @@ one ready, un-gated move that needs a single Chairman yes/no — once, crisply, 
 ## §handoffs — [AGREEMENT], [DEMO] and [CODEREVIEW] carry a typed yaml payload
 
 Structured handoffs are typed, not prose-by-convention: a fenced ```yaml block in the
-relevant issue/PR comment with the required keys. **This section is the authoritative
-schema.** (Nothing machine-validates it yet — an Actions validator is the planned
-enforcement, and per the counter-ratchet it must name this gap as what it replaces.)
+relevant issue/PR comment with the required keys. **The authoritative schema is
+`scripts/handoff_check.py`** (ships with the reference runtime), enforced by the
+handoff-validator workflow on every marker-bearing comment; the lists below document
+it — keep them in sync with the code.
 
 `[AGREEMENT]` requires: `plan:` (the converged one-liner), `owners:` (who-does-what map),
 `acceptance:` (the bar the CEO reviews against), `tickets:` (the org#N ids).

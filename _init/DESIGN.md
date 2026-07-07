@@ -58,9 +58,10 @@ wakes) before going live.
 ## 4 · Typed handoffs
 
 Cross-role handoffs carry a fenced yaml payload in the relevant issue/PR comment — typed,
-not prose-by-convention. Required keys per type live in `agents/_policy.md` §handoffs, the
-authoritative schema. *(Nothing machine-validates it yet; an Actions validator is the
-planned enforcement — per §5, it must name this gap as what it replaces.)*
+not prose-by-convention. Required keys per type live in `scripts/handoff_check.py`
+(documented in `agents/_policy.md` §handoffs; keep the two in sync — the reference org
+CI-tests it). The handoff-validator workflow fails a malformed payload and replies with
+the missing keys; both ship with the reference runtime scripts.
 
 ## 5 · Counter-ratchet
 

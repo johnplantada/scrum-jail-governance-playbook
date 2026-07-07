@@ -69,11 +69,13 @@ token spend explodes and you can't tell who's doing what or why.
 "delegate complex work" as permission to fan out indefinitely.
 
 **Counter-pattern:** Set `max_subagents: 0` for leaf agents and `2-4` only for
-department heads who demonstrably need parallel work — but be honest about what
-enforces it. Today, nothing does: the Registrar that policed `global_max_agents` was
-deleted with the chat stack, so both `max_subagents` and `global_max_agents: 16` in
-`org-chart.yaml` are declared ceilings no code reads. What actually bounds fan-out is
-shape, not a counter: the worker roster is declarative (`scripts/worker_policy.py`
+department heads who demonstrably need parallel work — and enforce it in code. The live
+org does: `scripts/subagent_gate.py`, a PreToolUse hook on the Agent/Task tools, counts
+spawns per wake and DENIES any call past the agent's `envelope.max_subagents` (the
+successor to the Registrar's sub-team refusal, which retired with the chat stack), and
+`limits.global_max_agents` is a CI-checked invariant — the tests fail any chart whose
+roster arithmetic (every brain + its full permitted fan-out) exceeds the ceiling. The
+second bound is shape, not a counter: the worker roster is declarative (`scripts/worker_policy.py`
 defines the only three subagent types, tool-scoped and tier-pinned — no worker gets a
 shell, so none can spawn, spend, or deploy at depth), and `agent-run.sh` single-flights
 each department behind a lock, so a department is one cycle at a time. When an agent
