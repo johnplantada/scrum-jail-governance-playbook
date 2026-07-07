@@ -31,7 +31,7 @@ your afternoon.
 | `patterns.md` | **11** agent misbehavior patterns + the specific governance fix for each |
 | `blocker-ledger.md` | The blocker ledger + capability boundary + wake backpressure — stops the "blocked loop" |
 | `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output; the `[CODEREVIEW]` + `[DEMO]` gates before a 🚀 |
-| `FIELD-NOTES.md` | **11 field-tested mechanisms** from the live org — backpressure numbers, the haiku pre-gate, single-flight locks, worker tool-scoping, model-tier pinning, the Warden, typed handoffs, and more |
+| `FIELD-NOTES.md` | **Field-tested mechanisms** from the live org — the event loop, spend guards, the `.halt` switch, single-flight locks, worker tool-scoping, model-tier pinning, typed handoffs — plus the graveyard of what the 2026-07-05 demolition retired, and what replaced each piece |
 | `RUNBOOK.md` | Step-by-step: set up your org in an afternoon |
 | `bin/orggen` | Generator that stamps a new governance-gated org skeleton from `_init/` |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How it all fits together, with Mermaid diagrams — the gate, the patterns, `orggen`, and where this repo sits in the wider Scrum Jail ecosystem |
