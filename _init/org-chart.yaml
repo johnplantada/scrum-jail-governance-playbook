@@ -1,34 +1,59 @@
 # ============================================================
 # {{PRODUCT}} GOVERNANCE — org-chart.yaml
 # ============================================================
-# The Registrar reads this file and enforces the org SHAPE — it is the single source of
-# truth for WHO exists, and the spawn ceilings (max_subagents, global_max_agents) are hard
-# limits it refuses to cross. can_spend / can_deploy are declared hints (the spend/deploy
-# backstop is capability-absence outside the runtime — see envelopes.yaml). Fill in the
-# <ANGLE_BRACKET> blanks (bot ids) once your Mattermost bots exist, then run the registrar.
+# The single source of truth for WHO exists and what each department may do. GitHub-native:
+# no bot accounts, no channels — the Chairman is a GitHub username, wakes route on dept:*
+# labels (wake-rules.yaml), and authorization is a merge/approval, not a chat reaction.
+# The runtime scripts read this file (runner routing, pm setup stages, the blockers WIP
+# warning, tier→model resolution). Spawn ceilings (max_subagents, global_max_agents) are
+# the declared org-shape limits agents must not cross; can_spend / can_deploy are declared
+# hints — the spend/deploy backstop is capability-absence plus the platform gates
+# (production environment, CODEOWNERS + branch protection).
 #
 # RULE: every agent has a parent; authority flows DOWN the tree.
-# The Chairman (you, the human) holds the keys. Agents propose; you approve.
+# The Chairman (you, the human) holds the keys. Agents propose; your merge/approval decides.
 
 chairman:
-  user_id: "{{CHAIRMAN_ID}}"   # Find this in Mattermost: Profile → ID field
+  github: "{{CHAIRMAN_GITHUB}}"   # decision authority: CODEOWNERS + the production environment
 
 governance:
-  # Emoji names (rare/custom) that mean something ONLY when the chairman reacts.
-  # Use emoji the agents won't accidentally post. Custom Mattermost emoji work best.
-  charter: "classical_building"   # 🏛️  charter a new department
-  sunset:  "coffin"               # ⚰️  dissolve a department or team
-  promote: "gem"                  # 💎  raise an agent's model tier
-  fund:    "moneybag"             # 💰  approve spend up to a stated ceiling
-  ship:    "rocket"               # 🚀  approve a production deploy
-  halt:    "octagonal_sign"       # 🛑  emergency stop — halts the WHOLE org (flag file);
-                                  #     fires on any message type; operator clears it to resume
+  # The gate vocabulary (ledger language — decisions.yaml `type`, issue/PR prose). In the
+  # chat era these were reaction emojis a registrar parsed; authorization is now the
+  # Chairman's merge (decisions.yaml PR) or deploy approval (production environment).
+  charter: classical_building   # 🏛️ new top-level department (decisions.yaml type: charter)
+  sunset: coffin                # ⚰️ dissolve a department/team (type: sunset)
+  fund: moneybag                # 💰 spend up to a stated ceiling (type: spend)
+  ship: rocket                  # 🚀 prod deploy (production-environment approval)
+  halt: octagonal_sign          # 🛑 whole-org stop — a .halt file; only a human clears it
+  promote: gem                  # 💎 raise a department's model tier (type: promote)
 
 limits:
-  global_max_agents: 16           # Hard ceiling across the entire org
+  global_max_agents: 16         # hard ceiling across the entire org
+
+global:
+  review_interval: {{REVIEW_INTERVAL}}    # wakes per iteration — the [REVIEW] cadence
+  pi_interval: {{PI_INTERVAL}}          # iterations per PI (review_interval × pi_interval = wakes per PI)
+  # Chairman-queue discipline (DESIGN.md invariant 2): once blockers.yaml holds more open
+  # human-only entries than this, agents must not START new work whose critical path ends
+  # in another human-only unlock — scripts/blockers.py prepends the WIP warning to the
+  # queue injected into every wake prompt. Prompt-enforced. 0/absent disables the warning.
+  unlock_wip_limit: {{UNLOCK_WIP_LIMIT}}
+  # Canonical pm workflow stages, in order (DESIGN.md §2). The ONLY place the stage list
+  # is defined — github-pm-setup.sh builds the Project's Stage field from it, and docs and
+  # mandates must reference it rather than restate it.
+  pm_stages: [To-Do, Doing, Staged, Demo, Done]
+  # Pinned API model id per brain tier — the ONE place tier→model resolution lives.
+  # Everything else — ledger, wake banners, budget brownouts, 💎 PROMOTE — keeps speaking
+  # in tiers; a 💎 changes an AGENT's tier, editing THIS map upgrades what a tier means
+  # org-wide. Update to current model ids when you stamp a new org.
+  model_ids:
+    haiku: claude-haiku-4-5
+    sonnet: claude-sonnet-5
+    opus: claude-opus-4-8
 
 departments:
 {{DEPARTMENTS}}
   # ── ADD MORE DEPARTMENTS BELOW ────────────────────────────────
-  # Each department needs a board CHARTER proposal + Chairman's 🏛️ before it's live.
-  # Copy a block above, fill in the fields, post a CHARTER to #board, wait for 🏛️.
+  # A new top-level department is a Board act: a decisions.yaml PR (type: charter) whose
+  # payload is the new block, opened via the board-proposals skill. The Chairman's merge
+  # IS the 🏛️ — then the block above gets added in the same change.

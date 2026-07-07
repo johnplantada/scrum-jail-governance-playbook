@@ -7,9 +7,11 @@ control. It is the architectural companion to the conceptual docs
 [`blocker-ledger.md`](../blocker-ledger.md), [`safe.md`](../safe.md)) and the setup walkthrough
 ([`RUNBOOK.md`](../RUNBOOK.md)).
 
-> **One-line summary:** *Agents propose. The human Chairman approves with a rare emoji. A
-> deterministic Registrar — code, never an LLM — executes.* This repo packages that model as
-> copyable primitives plus a generator (`bin/orggen`) that stamps a fresh governance-gated org.
+> **One-line summary:** *Agents propose. The human Chairman authorizes by merging a
+> `decisions.yaml` PR (money, org-shape) or approving a `production` deployment (prod). GitHub
+> — platform configuration, never an LLM and no longer a bot — enforces.* This repo packages
+> that model as copyable primitives plus a generator (`bin/orggen`) that stamps a fresh
+> governance-gated org.
 
 ---
 
@@ -20,12 +22,12 @@ software organizations. Each repo stands alone, but they only make full sense as
 
 ```mermaid
 flowchart LR
-    GP["📓 scrum-jail-governance-playbook<br/><b>Methodology</b><br/>emoji-gate model · 11 patterns · orggen generator"]
-    BIZ["🏛️ scrum-jail-business<br/><b>The autonomous org — runtime</b><br/>Go bus / registrar / pm · Mattermost · Claude agents"]
+    GP["📓 scrum-jail-governance-playbook<br/><b>Methodology</b><br/>authorization gate · 11 patterns · orggen generator"]
+    BIZ["🏛️ scrum-jail-business<br/><b>The autonomous org — runtime</b><br/>Python scripts over gh · runner.py + wake-rules.yaml · Claude agents"]
     PROD["🌐 scrum-jail<br/><b>The product — scrumjail.org</b><br/>React SPA · Go Lambda · AWS · Terraform"]
 
     GP -->|"orggen stamps an org<br/>make sync-playbook vendors the docs"| BIZ
-    BIZ -->|"IT agent ships PRs<br/>🚀 authorizes each deploy"| PROD
+    BIZ -->|"IT agent opens PRs<br/>Chairman approves each deploy at the production environment"| PROD
     PROD -->|"site CTAs / PLAYBOOK_URL link back"| GP
     BIZ -.->|"governance model extracted from the live org"| GP
 
@@ -39,34 +41,49 @@ flowchart LR
 | [scrum-jail](https://github.com/johnplantada/scrum-jail) | **Product** | The actual website the org builds and ships. |
 
 **This repo is the "golden source."** The live org (`scrum-jail-business`) pulls these docs in
-as a pinned, read-only snapshot (`make sync-playbook`, drift-checked in CI). So the patterns and
-gates here are not theory — they are the literal primitives a running org dogfoods every day.
+as a pinned, read-only snapshot: `make sync-playbook` copies the docs and records the golden
+commit it copied from, and the business repo's CI verifies the vendored copy against that
+pinned commit — a mismatch **fails the build**, while a pin that merely trails the golden's
+`main` produces a **warning**, not a failure (staleness is a choice; silent tampering is not).
+So the patterns and gates here are not theory — they are the literal primitives a running org
+dogfoods every day.
 
 ---
 
 ## What this repo is — and is not
 
 This is a **GitHub template repo**: documentation + YAML config + one Python generator. It
-contains **no runtime**. The Go services that actually watch Mattermost and enforce the gate
-(the *Registrar*, the *bus*, the *pm* CLI) live in the separate `scrum-jail-business` repo. When
-you `orggen init` a new org, the generator prints the next step: copy that Go runtime in.
+contains **no runtime**. The runtime is deliberately thin — a handful of scripts wrapping the
+`gh` CLI, plus GitHub platform primitives that are *configuration, not code*:
+
+- **Scripts** (the moving parts): `runner.py` + `wake-rules.yaml` (poll GitHub, route events to
+  department wakes), `agent-run.sh` + `agent_cycle.py` (one headless Claude cycle per wake),
+  `pm-gh.sh` (the ticket CLI over Issues + a Project).
+- **Platform** (the enforcing parts): branch protection + CODEOWNERS, a `production`
+  environment with a required reviewer, Actions CI.
+
+The reference implementation of the scripts powers the live `scrum-jail-business` org;
+[`RUNBOOK.md`](../RUNBOOK.md) ("What This Repo Ships vs. What You Build") specifies each
+component's contract precisely enough to write your own thin version — none is more than a
+small script.
 
 ```
 scrum-jail-governance-playbook/
 ├── README.md            entry point + file inventory
-├── RUNBOOK.md           afternoon setup, incl. the 3 gate-verification tests
-├── emoji-gate.md        the core safety primitive (5-step loop)
+├── RUNBOOK.md           afternoon setup, incl. ships-vs-builds + the gate-verification tests
+├── emoji-gate.md        the authorization gate (historical filename; the mechanism is
+│                        merges + environment approvals, not chat emoji)
 ├── patterns.md          11 misbehavior patterns + counter-patterns
 ├── blocker-ledger.md    the anti-"blocked loop" primitives
 ├── safe.md              scaled-agile without the theater
 ├── envelopes.yaml       authority-envelope field reference + presets
-├── org-chart.yaml       a concrete example org (the Registrar's source of truth)
+├── org-chart.yaml       a concrete example org (the runtime's parameter file)
 ├── bin/orggen           the generator — stamps a new org from _init/
 └── _init/               the template orggen fills in
     ├── DESIGN.md         the constitution (PRODUCT/GOAL placeholders)
-    ├── org-chart.yaml    chart template ({{CHAIRMAN_ID}}, {{DEPARTMENTS}})
+    ├── org-chart.yaml    chart template (chairman + departments)
     ├── blockers.yaml     empty human-task ledger
-    ├── .env.example      secrets/config template
+    ├── .env.example      the env contract your runtime reads
     └── agents/           _policy.md (shared) + department.tmpl.md
 ```
 
@@ -75,46 +92,73 @@ scrum-jail-governance-playbook/
 ## The core idea — propose → approve → execute
 
 Every privileged action (spend money, deploy to prod, charter or dissolve a department, raise a
-model tier) flows through the same five steps. The human is the only one who can authorize, and
-authorization is a **rare emoji reaction** — something a casual 👍 can never trigger.
+model tier) flows through the same loop. The human is the only one who can authorize, and
+authorization is an act GitHub already knows how to gate: **a merge or a deployment approval**
+— something no agent can perform, because the agents' shared identity cannot merge to a
+protected `main` and is not on the environment's reviewer list.
+
+**Money and org-shape** go through the decisions ledger:
 
 ```mermaid
 sequenceDiagram
     participant A as Agent
-    participant M as Mattermost
+    participant GH as GitHub
+    participant CI as CI (decisions.py check)
     participant C as Chairman
-    participant R as Registrar (code)
-    A->>M: 1. Post typed proposal [SPEND]/[CHARTER], then stop
-    M-->>C: notification
-    Note over C: 2. Read the proposal
-    C->>M: 3. React with governance emoji 💰/🏛️/🚀
-    M-->>R: reaction_added (WebSocket)
-    Note over R: 4. Verify reactor == chairman.user_id<br/>AND emoji matches the message [TYPE]
+    A->>GH: 1. Open a PR appending ONE entry to decisions.yaml<br/>(type: spend / charter / promote / sunset)
+    GH->>CI: 2. CI validates the entry (unique id, required fields)
+    GH-->>C: 3. CODEOWNERS requests the Chairman's review
+    Note over C: read the diff — the diff IS the proposal
     alt authorized
-        R->>R: execute (spend / deploy / mutate org-chart)
-        R->>M: announce [DECISION] to #decisions
-        A->>M: 5. Post [STATUS] confirmation
-    else wrong reactor or wrong emoji
-        R-->>M: ignored / threaded misfire notice
+        C->>GH: 4. Merge — the merge IS the authorization
+        Note over GH: git log decisions.yaml =<br/>the tamper-evident decision history
+        A->>GH: 5. Execute within what was approved, record status
+    else declined
+        Note over C,GH: no action = no. The PR sits open or is closed.<br/>Nothing executes — declining is doing nothing.
     end
 ```
 
-Why this works: the only authority is `chairman.user_id`, checked in code. An agent that reacts
-with the same emoji does **nothing**. The Registrar holds no spend or deploy credentials itself —
-for money and prod it merely *records* the Board's approval; the actual spend/deploy happens
-downstream within the approved ceiling. See [`emoji-gate.md`](../emoji-gate.md) for the message
-templates and the common-mistakes table.
+**Prod deploys** go through the product repo's environment gate:
+
+```mermaid
+sequenceDiagram
+    participant A as IT agent
+    participant GH as GitHub (product repo)
+    participant W as deploy.yml
+    participant C as Chairman
+    A->>GH: open a product PR from agent/it/* (agents never merge to main)
+    GH->>GH: CI green + review/demo evidence → the PR merges
+    GH->>W: merge to main triggers the deploy workflow
+    W->>W: pause at the production environment
+    GH-->>C: requests approval (required reviewer)
+    alt approved
+        C->>W: approve — the approval IS the authorization
+        W->>GH: deploy runs · GitHub's deployment log is the SHA-bound audit trail
+    else not approved
+        Note over W: the run stays paused, then expires — nothing ships
+    end
+```
+
+Why this works: the only authority is **platform configuration keyed to the Chairman's GitHub
+account**, checked by GitHub itself — there is no bot to verify a reactor, and nothing to
+evade short of the platform. One honest caveat: CODEOWNERS alone only *routes* the review;
+the branch-protection rule "require review from Code Owners" is what makes it *binding*, and
+that is a repo-Settings step a human must actually perform. The RUNBOOK's gate-verification
+tests exist precisely to prove you flipped it. The 🛑 emergency stop is not a gate at all — it
+is a `.halt` flag file that stops the runner and every agent cycle, and only a human removes
+it. See [`emoji-gate.md`](../emoji-gate.md) for the full loop, the `decisions.yaml` entry
+schema, and the common-mistakes table.
 
 ---
 
-## The governance model — org chart, envelopes, emoji
+## The governance model — org chart, envelopes, gate vocabulary
 
-Authority is declared, not improvised. `org-chart.yaml` is the Registrar's source of truth for
+Authority is declared, not improvised. `org-chart.yaml` is the runtime's source of truth for
 *who exists*; each node carries an **envelope** bounding what it may do without asking.
 
 ```mermaid
 flowchart TD
-    Board["🏛️ Board / Chairman<br/>holds the keys — emoji reaction is the signing key"]
+    Board["🏛️ Board / Chairman<br/>holds the keys — the merge and the environment approval are the signing keys"]
     CEO["CEO<br/>chief-executive · sonnet · max_subagents 0"]
     BIZ["Business<br/>demand · sonnet · envelope 4 / 500k tokens"]
     IT["IT<br/>supply · sonnet · envelope 4 / 500k tokens"]
@@ -128,21 +172,23 @@ An envelope has four fields (full reference + presets in [`envelopes.yaml`](../e
 
 | Field | Meaning | Hitting the limit is the *protocol*, not an error |
 |---|---|---|
-| `max_subagents` | how many sub-teams this node may spawn | exceed it → post a `[CHARTER]` to the Board, wait for 🏛️ |
-| `daily_token_budget` | declared per-day token target — *not* code-enforced (see [`envelopes.yaml`](../envelopes.yaml)) | audited against the spend ledger; cost is actually bounded by wake backpressure + tier-pinning |
-| `can_spend` | almost always `false` | attempt → must post `[SPEND]`, wait for 💰 |
-| `can_deploy` | almost always `false` | attempt → must post `[DEPLOY]`, wait for 🚀 |
+| `max_subagents` | how many sub-teams this node may spawn | exceed it → open a `[CHARTER]` decisions.yaml PR, wait for the merge |
+| `daily_token_budget` | per-day token ceiling, metered per call into the spend ledger | enforced as a **brownout** (`budget_gate.py`): over-budget wakes skip — except direct, event-routed wakes, which always run; the org-wide daily $ cap is a separate breaker at the runner |
+| `can_spend` | almost always `false` | attempt → must open a `[SPEND]` decisions.yaml PR, wait for the merge |
+| `can_deploy` | almost always `false` | the deploy workflow pauses at `production` regardless — wait for the Chairman's approval |
 
-The six governance emoji and the `[TYPE]` each may act on:
+The six governance gates. The emoji survive from the chat era as **mnemonic ledger
+vocabulary** (`org-chart.yaml` → `governance:`) — nothing parses a reaction anymore; four of
+the six are `decisions.yaml` `type` strings, and the other two are platform/file mechanisms:
 
-| Emoji | Name | Action | Acts on |
+| Gate | Mnemonic | Action | Mechanism |
 |---|---|---|---|
-| 🏛️ | `classical_building` | charter a new department | `[CHARTER]` |
-| ⚰️ | `coffin` | sunset (dissolve) a department | `[SUNSET]` |
-| 💎 | `gem` | promote a node's model tier | `[PROMOTE]` |
-| 💰 | `moneybag` | fund (record spend approval) | `[SPEND]` |
-| 🚀 | `rocket` | ship (record deploy approval) | `[DEPLOY]` |
-| 🛑 | `octagonal_sign` | emergency stop — halts the **whole org** (not a per-proposal veto) | *any* message |
+| `charter` | 🏛️ | charter a new department | decisions.yaml PR (`type: charter`) → Chairman's merge |
+| `sunset` | ⚰️ | sunset (dissolve) a department | decisions.yaml PR (`type: sunset`) → Chairman's merge |
+| `promote` | 💎 | raise a node's model tier | decisions.yaml PR (`type: promote`) → Chairman's merge |
+| `fund` | 💰 | approve spend up to a stated ceiling | decisions.yaml PR (`type: spend`) → Chairman's merge |
+| `ship` | 🚀 | approve a production deploy | `production` environment → Chairman's required-reviewer approval |
+| `halt` | 🛑 | emergency stop — halts the **whole org** (not a per-proposal veto) | `.halt` flag file; only a human removes it |
 
 ---
 
@@ -170,8 +216,9 @@ mindmap
       Self-wake storm
 ```
 
-The first root is cured by the emoji gate and tight envelopes (above). The second root is cured by
-three smaller primitives, described next. Full write-ups in [`patterns.md`](../patterns.md).
+The first root is cured by the authorization gate and tight envelopes (above). The second root
+is cured by three smaller primitives, described next. Full write-ups in
+[`patterns.md`](../patterns.md).
 
 ---
 
@@ -181,11 +228,12 @@ A naive agent loop, when it hits something only a human can do, re-states the bl
 burns tokens. Three primitives (see [`blocker-ledger.md`](../blocker-ledger.md)) fix this.
 
 **1 — The capability boundary.** A hard list of things *no* agent can ever do: hold credentials,
-move money, register a domain, or perform the governance reactions. These are the human's alone.
+move money, register a domain, or perform the governance merges and environment approvals.
+These are the human's alone.
 
 **2 — The blocker ledger.** `blockers.yaml` is a durable operator queue. When an agent hits a
 human-only action it appends **one** entry and goes quiet — it never re-posts. Only the Chairman
-clears an entry, and that clearing is itself new inbound that wakes the org.
+clears an entry; his follow-up on the blocked issue is the GitHub event that wakes the owner.
 
 ```mermaid
 stateDiagram-v2
@@ -193,51 +241,58 @@ stateDiagram-v2
     none --> open: agent hits a human-only action<br/>appends ONE entry, goes quiet
     open --> open: re-wake sees the open entry, stays quiet (no re-post)
     open --> cleared: Chairman flips the entry (the only writer)
-    cleared --> [*]: clearing is new inbound, wakes the org, blocked work resumes
+    cleared --> [*]: his comment on the blocked issue is new inbound — the blocked work re-wakes
 ```
 
-**3 — Wake backpressure.** Wakes are classified by *reason*, and a wake with nothing to do costs
-zero tokens because the model never starts.
+**3 — Event-driven wakes.** The old architecture needed backpressure — classifiers and no-op
+gates to make idle wakes cheap. The new one makes them **nonexistent**: there are no scheduled
+wake floors and no broadcast fan-out. The runner polls GitHub each tick and wakes a department
+only when a routed event names it. No event, no wake, no spend — zero-cost idleness is
+structural, not clever.
 
 ```mermaid
 flowchart TD
-    W["Agent wake"] --> Q{"Wake reason?"}
-    Q -->|"direct: owner TASK / Chairman / VOICE"| Full["Run a full cycle"]
-    Q -->|"broadcast: shared-channel post"| Pre{"Cheap classifier:<br/>anything to add?"}
-    Pre -->|yes| Full
-    Pre -->|no| Noop["No-op (never the priciest model)"]
-    Q -->|"scheduled: cron floor"| Peek{"Peek channels:<br/>anything new?"}
-    Peek -->|no| Noop2["No-op — model never starts"]
-    Peek -->|yes| Full
+    GH["GitHub events since the cursor<br/>issues · comments · workflow runs"] --> R["runner.py tick<br/>dedup → route via wake-rules.yaml<br/>first match wins; unrouted events wake nobody"]
+    R --> B["one batched wake per department per tick<br/>five comments ≠ five wakes"]
+    B --> G{"agent-run.sh gates"}
+    G -->|".halt present"| S1["skip — org halted"]
+    G -->|"lock contended"| S2["skip — a cycle for this agent is already running"]
+    G -->|"over token budget, non-direct wake"| S3["brownout — skip until the ledger rolls over"]
+    G -->|clear| Full["one headless SDK cycle — metered into the spend ledger"]
 ```
 
-Two reliability corollaries: suppressed wakes **coalesce** into one delayed retry rather than
-dropping, and a read cursor only advances after a **successful** cycle (at-least-once delivery).
+One reliability note, stated honestly: delivery is currently **at-most-once**. The runner's
+cursor advances per tick even if a dispatched cycle crashes; the abort is logged loudly, but
+the triggering events are not re-delivered — re-delivery on failure is an open follow-up in
+the live runtime, not a property you can rely on. (The chat-era loop claimed at-least-once;
+that guarantee did not survive the rewrite yet.)
 
 ---
 
 ## Scaled-agile without the theater
 
 Ceremony (demos, reviews, planning) is gated on **shipped output, not elapsed time**. A single
-predicate — `last-ship.sh`, "is there a green prod deploy on `main`?" — decides whether the whole
-process layer is awake. Full rules in [`safe.md`](../safe.md).
+predicate — `last-ship.sh`, "is there a green `deploy.yml` run on the product's `main`?" —
+decides whether the whole process layer is awake. Full rules in [`safe.md`](../safe.md).
 
 ```mermaid
 flowchart TD
     Cer["Any ceremony begins"] --> Pred{"last-ship.sh:<br/>green prod deploy on main?"}
-    Pred -->|"shipped = no"| Dormant["Process layer dormant:<br/>no demo · no acceptance · no PI planning<br/>accepted PRs merge on green CI, queue in Demo column"]
-    Pred -->|"shipped = yes"| Active["[CODEREVIEW] (Reviewer, author≠reviewer) → [DEMO] → Business accepts → CEO relays DEPLOY → Chairman 🚀<br/>PI planning only if due AND shipped-in-window"]
+    Pred -->|"shipped = no"| Dormant["Process layer dormant:<br/>no demo · no acceptance · no PI planning<br/>reviews close with one line; accepted PRs queue"]
+    Pred -->|"shipped = yes"| Active["code review + demo evidence on the product PR<br/>→ merge → deploy.yml pauses at production<br/>→ Chairman approves (the 🚀)"]
 ```
 
-This is why the capabilities can ship **dormant** behind a 🏛️ charter: until the org actually
-ships something, no one runs a planning meeting about it.
+This is why capabilities can ship **dormant** behind a charter: until the org actually ships
+something, no one runs a planning meeting about it. The PI counters are GitHub-native too —
+iteration and PI boundaries are derived from closed `[REVIEW]` issues, not from a bus that no
+longer exists.
 
 Two gates sit in front of any product-surface deploy (see [`safe.md`](../safe.md) /
-[`emoji-gate.md`](../emoji-gate.md)): a **`[CODEREVIEW]`** from an independent **Reviewer**
-department — structurally separate from whoever wrote the code (**author ≠ reviewer**),
-head-SHA-bound, and dormant until a `reviewer` is chartered — proves the code is *correct*, and
-the **`[DEMO]`** proves it *reaches a user*. Only an accepted demo (citing its passing review)
-earns the 🚀.
+[`emoji-gate.md`](../emoji-gate.md)): an independent **code review** proves the code is
+*correct* — in the live org the chat-era Reviewer department retired with the demolition, and
+review returns as a `claude-code-action` check on product PRs when needed — and **demo
+evidence** on the PR (checked mechanically, head-SHA-bound) proves the change *reaches a user*.
+Only then does the deploy workflow earn its pause at `production` for the Chairman's approval.
 
 ---
 
@@ -250,26 +305,31 @@ can never disagree about who exists.
 
 ```mermaid
 flowchart LR
-    Args["orggen init &lt;target&gt;<br/>--departments ceo,business,it"] --> Tup["departments(): list of<br/>(name, role, channel, reports_to, cadence) tuples"]
-    Tup --> Chart["dept_block() → org-chart.yaml<br/>{{DEPARTMENTS}} block"]
-    Tup --> Agents["fill(template) → agents/&lt;name&gt;.md<br/>one mandate per tuple"]
+    Args["orggen init &lt;target&gt;<br/>product · goal · chairman GitHub username · product repo · departments"] --> Tup["departments(): one tuple per department<br/>name, role, reports_to"]
+    Tup --> Chart["org-chart.yaml<br/>departments: block"]
+    Tup --> Agents["agents/&lt;name&gt;.md<br/>one mandate per tuple"]
     Args --> Docs["copy VERBATIM_DOCS (7):<br/>patterns · safe · emoji-gate · envelopes · blocker-ledger · FIELD-NOTES · RUNBOOK"]
-    Args --> Fill["fill DESIGN.md, .env.example; copy blockers.yaml"]
+    Args --> Fill["fill DESIGN.md + .env.example<br/>copy blockers.yaml · stamp a README"]
     Chart --> Inv(["Invariant: one tuple list →<br/>chart and agents/ never disagree"])
     Agents --> Inv
 ```
 
-Usage:
+Usage (the chairman identifier is your **GitHub username** — CODEOWNERS and the `production`
+environment's required-reviewer list both key off it; there are no bot ids and no channels to
+configure):
 
 ```bash
 bin/orggen init ../my-org --product "myproduct.com" --goal "$10k/month" \
-  --chairman-id <YOUR_MATTERMOST_USER_ID> --departments ceo,business,it
+  --chairman-github <your-github-username> --product-repo <you>/<product-repo> \
+  --departments ceo,business,it
 ```
 
-`ceo` is special-cased to `(ceo, chief-executive, board, board, weekly)` with `max_subagents: 0`;
-every other name maps to `(name, name, name, ceo, daily)` with an envelope of `4 / 500k`. The seven
-governance docs are copied **verbatim** (they are meant to travel unchanged); `DESIGN.md`,
-`.env.example`, and the org chart are filled from your flags.
+`ceo` is special-cased (reports to the board, `max_subagents: 0`); every other name reports to
+the CEO with an envelope of `4 / 500k`. The seven governance docs are copied **verbatim** (they
+are meant to travel unchanged); `DESIGN.md`, `.env.example` (the org/product repo slugs the
+runner and `pm-gh.sh` read), and the org chart are filled from your flags. The generator stamps
+the governance + behavioral layer only — it prints, as its first next step, how to bring the
+thin runtime in, per the contracts in [`RUNBOOK.md`](../RUNBOOK.md).
 
 ---
 
@@ -291,6 +351,24 @@ flowchart LR
 
 Same philosophy — *the pattern lives in a golden repo, and a generator copies + parameterizes it*
 — applied to organizational governance instead of code.
+
+---
+
+## v1 — the chat era (retired 2026-07-05)
+
+The first version of this architecture ran on chat: Mattermost as the medium, five Go services
+(bus, pm, registrar, memory, vox) as the runtime, a fleet of watcher scripts for wakes, and a
+governance gate that was literally an emoji — the Registrar parsed `reaction_added` events off
+a WebSocket and verified the reactor's user id in code. It worked, and every pattern in
+[`patterns.md`](../patterns.md) was earned there. But the properties it was chasing —
+coordination, visibility, auditability, decision authority — are *system-of-record* properties,
+and the chat org implemented them by parsing a system of *conversation*: prose-policed
+conventions, plus a bot to verify what the platform could have enforced. On 2026-07-05 the live
+org demolished the whole stack in one move (no parallel run) and put the record where the
+output lives: GitHub Issues, PRs, environments, and committed ledgers, enforced by GitHub
+itself. The emoji survive only as ledger vocabulary. The before-measurements live in the
+business repo's `docs/MIGRATION-BASELINE.md`; the code lives in git history, which is where
+retired architecture belongs.
 
 ---
 

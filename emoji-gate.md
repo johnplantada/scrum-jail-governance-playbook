@@ -104,11 +104,16 @@ it can self-authorize, and the gate is void *in practice* while looking intact i
 `git log`. Keep such tokens scoped to what agents actually need (`gh` calls that open
 PRs and comment — never merge, never admin), and if one with elevated rights ever lands
 in an agent-visible environment, treat it as burned: rotate it, don't just move it.
-(These aren't hypothetical — see the two ledgered dependencies this gate currently
-rests on: branch protection with required CODEOWNERS review isn't enabled on `main` yet,
-and the `production` environment's required reviewer hasn't been created yet either.
-Until both exist, treat the gate as *specified*, not yet *enforced* — the honest status
-belongs in your blocker ledger, not glossed over here.)
+(These aren't hypothetical — both halves of this gate started life as ledgered
+blockers, and only one has cleared. The money/org-shape half is **enforced now**:
+branch protection on `main` went live 2026-07-06 — required CODEOWNERS review, required
+status checks on test+lint, no force pushes, linear history (blocker
+`github-codeowners-branch-protection`, cleared) — so a `decisions.yaml` PR genuinely
+cannot merge without the Chairman's review. The deploy half is still **specified, not
+enforced**: the `production` environment and its required reviewer are a ~10-minute
+repo-Settings step only the Chairman can perform (blocker
+`github-production-environment`, still open). Until that clears, the honest status of
+the deploy gate lives in the blocker ledger, not glossed over here.)
 
 Be precise about what happens after the check passes, though. For org-shape actions
 (charter, sunset, promote) the merged `decisions.yaml` entry **is** the change taking
@@ -134,10 +139,14 @@ gate doesn't check for you** — they're enforced by convention + process, not b
 protection or the environment reviewer prompt itself. For a product-surface change, the
 `production` environment approval is the *last* step of a short chain, not the first:
 
-1. **`[CODEREVIEW]`** — an independent **Reviewer** department (structurally separate
-   from whoever wrote the code: **author ≠ reviewer**) reviews the PR and posts a
-   `PASS` / `CHANGES-REQUESTED` verdict, bound to the PR's **head SHA** and anchored to a
-   green code-review CI run on that SHA. A demo may cite only a `PASS`.
+1. **`[CODEREVIEW]`** — a `claude-code-action` check on the product PR posts a
+   `PASS` / `CHANGES-REQUESTED` verdict, bound to the PR's **head SHA** (a new push
+   invalidates a stale PASS); `wake-rules.yaml` routes the review workflow's runs to IT
+   so a department owns acting on the verdict. Because the check isn't the author, the
+   **author ≠ reviewer** separation holds structurally. A demo may cite only a `PASS`.
+   (Lineage: v1 chartered an independent **Reviewer** *department* for this; it retired
+   2026-07-05 with the chat stack — the gate came back as a CI check on the PR, not a
+   seat on the org chart.)
 2. **`[DEMO]`** — the demand side accepts a worked demonstration that the change meets
    its acceptance criteria; the demo cites the passing `[CODEREVIEW]`. See
    [safe.md](safe.md).
@@ -146,9 +155,9 @@ protection or the environment reviewer prompt itself. For a product-surface chan
    PASS) so you're reviewing evidence, not a bare "trust me."
 
 Both gates ship **dormant** and become binding only when there's something to gate: the
-`[CODEREVIEW]` gate is dormant until a `reviewer` department is chartered (via a merged
-`decisions.yaml` entry), and the whole demo/review layer is dormant while the output
-predicate says nothing has shipped (safe.md). This is the gate's answer to "green tests
+`[CODEREVIEW]` gate is dormant until the review check is installed on the product repo
+(no check, no citation required), and the whole demo/review layer is dormant while the
+output predicate says nothing has shipped (safe.md). This is the gate's answer to "green tests
 aren't authorization": the environment approval stays a pure human authorization, with
 correctness (review) and user-value (demo) proven *before* it, by parties who don't
 approve their own work.

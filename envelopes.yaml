@@ -9,6 +9,12 @@
 # The cost of a too-narrow envelope is one escalation.
 # The cost of a too-wide envelope is your agent doing something
 # you can't take back.
+#
+# LINEAGE: v1 ran these gates as Chairman emoji reactions (💰/🚀)
+# verified by a deterministic Registrar service; retired 2026-07-05
+# with the chat stack. The gates survived — only the mechanism
+# translated to GitHub-native primitives (merges and environment
+# approvals instead of reactions).
 
 # ── ENVELOPE FIELDS ──────────────────────────────────────────
 
@@ -20,7 +26,16 @@ envelope_fields:
       How many sub-teams this agent may spin up inside its own scope,
       WITHOUT a new Board approval. Set 0 if you don't want the agent
       delegating at all. Set 4 for a head-of-department who needs to
-      sub-divide work. Crossing this limit requires a CHARTER to the Board.
+      sub-divide work. Crossing this limit requires a [CHARTER] entry
+      appended to decisions.yaml by PR — the Chairman's merge is the
+      approval. HONESTY NOTE: this is a prompt-level norm today, not a
+      code-enforced ceiling. v1's Registrar refused over-cap sub-teams
+      in code; that enforcement retired with the Registrar, and nothing
+      has replaced the hard check yet. The cap rides the agents'
+      standing instructions — the same enforcement channel as the
+      blocker WIP warning (scripts/blockers.py) — and the org-shape
+      ledger makes violations auditable, but the runtime will not
+      physically stop an over-cap spawn.
     guidance: >
       Start at 0. Grant 2-4 only for departments that demonstrably need
       parallel work (e.g. Business running SEO + content simultaneously).
@@ -30,18 +45,28 @@ envelope_fields:
     unit: tokens
     default: 200000
     description: >
-      Declared per-day token target for this agent. HONESTY NOTE: in the
-      reference runtime this is a declared policy value, not a code-enforced
-      cap — no code reads it to stop an agent mid-day. What actually bounds
-      cost in practice: wake backpressure (a no-op wake costs zero tokens),
-      state-change-only STATUS, tier-pinning, and auditing the spend ledger
-      against this number. Wire a hard check into your wake runner if you
-      need one.
+      Per-day token budget for this agent — and, since the GitHub-native
+      cutover, a CODE-ENFORCED one: scripts/budget_gate.py reads this
+      field from org-chart.yaml, and agent-run.sh consults it before
+      every model cycle. An over-budget agent gets a BROWNOUT, not a
+      blackout: non-direct wakes (broadcasts, catch-up cycles) are
+      SKIPPED, but DIRECT wakes — a runner-routed GitHub event such as
+      the Chairman filing an issue, or a deploy failure — always run.
+      A spent budget must never block the Chairman, and the overage
+      stays visible in the log + ledger. Accounting: in + out tokens
+      across today's state/spend.jsonl rows for this agent (cycles and
+      offloads); cache reads are excluded — the budget bounds fresh
+      work, and cached input is exactly the cost the org already
+      optimized away. The gate fails OPEN: a broken meter browns out
+      the metering, never the org.
     guidance: >
       200k = light/daily agent (haiku-tier work, terse output).
       500k = active department head (sonnet, daily cadence, multi-step reasoning).
       300k = CEO/opus (fewer wakes, denser thinking, strategic output).
       Never set higher than 1M without a Board-approved business case.
+      Honest caveat: this is per-agent per-day and resets with the date —
+      it caps burn RATE, not total dollars. The org-wide dollar backstop
+      is the runner's spend breaker (see the section below).
 
   can_spend:
     type: boolean
@@ -54,11 +79,14 @@ envelope_fields:
       payment token, no stored payment method. Keep it false so the
       declared policy matches the capability reality.
     guidance: >
-      ALWAYS false for agents. Agents PROPOSE spend in a SPEND message;
-      the Chairman reacts 💰 to approve a ceiling (the Registrar records
-      the approval to #decisions); the agent then acts within that
-      ceiling. Agents never hold the card — that absence, not this flag,
-      is what makes rogue spend impossible.
+      ALWAYS false for agents. Agents PROPOSE spend by opening a PR that
+      appends ONE entry to decisions.yaml (the entry schema lives in that
+      file's header comments); .github/CODEOWNERS routes the PR to the
+      Chairman, and the Chairman's MERGE is the authorization — the diff
+      is exactly what was approved, and `git log decisions.yaml` is the
+      audit trail. The agent then acts within the approved ceiling.
+      Agents never hold the card — that absence, not this flag, is what
+      makes rogue spend impossible.
 
   can_deploy:
     type: boolean
@@ -66,15 +94,17 @@ envelope_fields:
     description: >
       Declares whether this agent may push to production without a human
       gate. HONESTY NOTE: like can_spend, this is a declared hint — no
-      runtime code branches on it. The real enforcement lives outside the
-      runtime: agents have no prod credentials, and the deploy pipeline
-      sits behind branch protection + human review on the product repo.
+      runtime code branches on it. The real enforcement lives on the
+      platform: agents have no prod credentials, and every deploy pauses
+      at the product repo's `production` environment, whose required
+      reviewer is the Chairman.
     guidance: >
-      ALWAYS false. Agents open PRs and post a DEPLOY message; the
-      Chairman reacts 🚀 (recorded to #decisions). Only then does the
-      deploy proceed — through the product repo's protected pipeline.
-      Even "trivial" deploys go through this gate — it costs 10 seconds
-      and has caught real accidents.
+      ALWAYS false. Agents open PRs against the product repo; the deploy
+      run then pauses at the `production` environment until the Chairman
+      approves it in the GitHub UI. That approval is the authorization,
+      and GitHub's environment deployment log is the audit trail. Even
+      "trivial" deploys go through this gate — it costs 10 seconds and
+      has caught real accidents.
 
 # ── REFERENCE ENVELOPES (copy-paste into org-chart.yaml) ────
 
@@ -110,56 +140,73 @@ reference_envelopes:
 
 # ── WHAT HAPPENS AT EACH LIMIT — AND WHAT ACTUALLY ENFORCES IT ──
 #
-# max_subagents exceeded  → ENFORCED IN CODE: the Registrar refuses the sub-team
-#                           (hard ceiling, plus global_max_agents). The agent must
-#                           post a CHARTER to the Board and wait.
-# daily_token_budget      → NOT code-enforced (see the field note above). It is the
-#                           number you audit the spend ledger against; the mechanisms
-#                           that actually bound cost are wake backpressure and
-#                           tier-pinning.
+# max_subagents exceeded  → prompt-level norm: the cap rides the agents' standing
+#                           instructions, and crossing it means proposing a [CHARTER]
+#                           entry to decisions.yaml and waiting for the merge. NOT
+#                           code-enforced today — v1's Registrar refused over-cap
+#                           sub-teams in code; that check retired with the Registrar.
+#                           Likewise limits.global_max_agents is a declared ceiling
+#                           no code currently reads.
+# daily_token_budget      → ENFORCED IN CODE: budget_gate.py + agent-run.sh brown out an
+#                           over-budget agent — non-direct wakes skipped, direct wakes
+#                           still run. Resets daily; bounds burn rate per agent, not
+#                           total dollars (that's the spend breaker below).
 # can_spend / can_deploy  → hints, not switches — no runtime code branches on them.
 #                           The real backstop is capability-absence: no payment
 #                           credentials exist for an agent to use, and prod deploys
-#                           are gated by branch protection + human review outside the
-#                           runtime. The 💰/🚀 emoji gates are the human-in-the-loop
-#                           approval interface + audit trail layered on top.
+#                           pause at the product repo's `production` environment.
+#                           The human-in-the-loop approval interface is the Chairman's
+#                           MERGE of a decisions.yaml PR (money, org-shape) and the
+#                           Chairman's environment approval (deploys); git log and
+#                           GitHub's environment log are the audit trail on top.
 #
 # A refused sub-team or an unapproved proposal is NOT an error. It is the governance
 # protocol working correctly. Design your agents to propose-and-wait, not to retry
 # until they get through.
 
-# ── AGENT-LEVEL FIELDS (outside the envelope) ────────────────
-# These sit on the department node itself, next to `model` and `bot_user_id` — not in the
-# authority envelope. Both optional.
+# ── THE ORG-WIDE SPEND BREAKER (outside every envelope) ──────
+# Two fuses, two blast radii — don't confuse them:
 #
-# voice   — a TTS voice name. If you run a voice console (Chairman talks to an agent, the
-#           reply is read back), this is the voice that agent answers in. Omit if you don't.
-# active  — set false to PAUSE an agent: the Registrar stops waking it, but its node stays in
-#           the chart (channels, history, envelope intact) so re-enabling is a one-line flip.
-#           Use it for a chartered department with no live outlet yet, rather than deleting it.
-#           Default (absent) = active.
+#   per-agent  envelope.daily_token_budget  →  TOKENS, brownout, one department
+#   org-wide   SPEND_BREAKER_DAILY_USD      →  DOLLARS, hard hold, everyone
+#
+# Every Claude call is metered into state/spend.jsonl via spend_log.py (DESIGN.md
+# invariant 3 — no unmetered calls). The runner (scripts/runner.py) sums today's
+# metered cost; once it crosses SPEND_BREAKER_DAILY_USD (set in .env), it holds ALL
+# wakes until the ledger rolls over to a new day. Unlike the per-agent brownout,
+# there is no direct-wake exception: the dollar breaker is the last fuse before your
+# card, so it trips the whole org. Set it to a number you could shrug at losing to a
+# bug — once — and audit efficiency.py's cost-per-shipped-output before raising it.
 
-# ── GLOBAL CONFIG (org-chart.yaml `global:`) ─────────────────
-# Org-wide knobs, all optional. These are policy/behavior tuning, NOT authority — an agent
-# can't widen its own authority by editing them; that's what the envelope + emoji gates are for.
+# ── AGENT-LEVEL FIELDS (outside the envelope) ────────────────
+# These sit on the department node itself: name, role, reports_to, model, teams.
+# The chat-era extras (channel, cadence, bot_user_id, voice, active) left with the
+# chat stack — wake routing now lives in wake-rules.yaml (dept:* labels route GitHub
+# events), and pausing a department is an org-chart edit recorded in git (comment the
+# node out with a dated note; re-charter later via a decisions.yaml [CHARTER] entry)
+# rather than an `active: false` flag the old Registrar honored.
+
+# ── GLOBAL CONFIG (org-chart.yaml `global:` + `limits:`) ─────
+# Org-wide knobs. These are policy/behavior tuning, NOT authority — an agent can't
+# widen its own authority by editing them; that's what the envelope and the Chairman's
+# merge/environment gates are for.
 #
-# model_ids            — tier (haiku/sonnet/opus) → exact API model id. The SINGLE source of
-#                        truth for tier→model resolution. A 💎 PROMOTE changes an AGENT's tier;
-#                        editing this map changes what a tier MEANS for the whole org. Pin ids so
-#                        a provider's silent default can't drift you onto a different model.
-# pm_stages            — the ordered kanban columns (e.g. To-Do, Doing, Staged, Demo, Done),
-#                        defined in ONE place. The Demo column is the [DEMO]-gate queue (safe.md).
-# review_interval      — wakes per SAFe iteration (safe.md). pi_interval — iterations per PI.
-# broadcast_channels   — channels whose posts wake more than their owner.
-# review_reviewers /   — trim the broadcast fan-out: which departments get an IMMEDIATE wake from
-# broadcast_reviewers    a #reviews / #feedback post (everyone else catches it on their next
-#                        natural cycle). This is the knob that tames the self-wake storm
-#                        (patterns.md Pattern 11); unset = wake all.
-# broadcast_stagger_seconds — spacing between broadcast wakes, departments first, CEO last, so
-#                        each recipient's pre-gate can see the earlier replies and defer.
-# collab_channel /     — the collaboration workspace (FIELD-NOTES §5): where the CEO posts a
-# collab_participants /   [DELEGATE], the pair converge directly, and a thread runs up to
-# collab_max_turns        collab_max_turns replies before escalating to the CEO as arbiter.
-# voice_default        — default agent the voice console talks to.
-# memory_channels_extra — extra channels the semantic-memory layer ingests that no department
-#                        owns (the rest are derived from the chart automatically).
+# model_ids         — tier (haiku/sonnet/opus) → exact API model id. The SINGLE source
+#                     of truth for tier→model resolution. A 💎 PROMOTE (a decisions.yaml
+#                     entry now, not an emoji) changes an AGENT's tier; editing this map
+#                     changes what a tier MEANS for the whole org. Pin ids so a
+#                     provider's silent default can't drift you onto a different model.
+# pm_stages         — the ordered kanban columns (To-Do, Doing, Staged, Demo, Done),
+#                     defined in ONE place. github-pm-setup.sh builds the Project's
+#                     Stage field from it; the Demo column is the [DEMO]-gate queue
+#                     (safe.md).
+# review_interval / — SAFe cadence (safe.md): an iteration = review_interval wakes;
+# pi_interval         a PI = pi_interval iterations.
+# unlock_wip_limit  — Chairman-queue discipline: past this many open human-only
+#                     blockers, blockers.py prepends a WIP warning to every wake
+#                     prompt — don't start work whose critical path ends in another
+#                     human-only unlock. Prompt-enforced.
+# global_max_agents — (under `limits:`) declared org-wide agent ceiling. HONESTY NOTE:
+#                     no code currently reads it — the old Registrar enforcement
+#                     retired with the chat stack. Keep it declared so audits have a
+#                     number to check the chart against.
