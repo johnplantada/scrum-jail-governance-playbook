@@ -5,7 +5,7 @@ Mirrors the lambdagen/spagen golden-example generators: the pattern lives here, 
 copies + parameterizes it into a fresh org repo. It stamps the GOVERNANCE + BEHAVIORAL layer
 (org-chart, constitution, agent mandates, blocker + env seeds, the playbook docs). The
 RUNTIME — the Python/gh scripts the constitution names (runner.py + wake-rules.yaml,
-agent-run.sh, pm-gh.sh, blockers.py, spend_log.py, decisions.py, last-ship.sh,
+agent-run.sh, pm-gh.sh, workitems.py, blockers.py, spend_log.py, decisions.py, last-ship.sh,
 github-pm-setup.sh, the .claude/skills) — is a separate dependency living in the reference
 org repo; orggen prints how to bring it in.
 
@@ -141,8 +141,8 @@ def cmd_init(args):
     print(f"  org repo: {org_gh_repo}   product repo: {product_gh_repo}")
     print("\nNext steps (RUNBOOK.md walks through each one):")
     print("  1. Bring the RUNTIME — orggen stamps the governance layer only. The Python/gh")
-    print("     scripts (runner.py + wake-rules.yaml, agent-run.sh, pm-gh.sh, blockers.py,")
-    print("     spend_log.py, decisions.py, last-ship.sh, github-pm-setup.sh, the")
+    print("     scripts (runner.py + wake-rules.yaml, agent-run.sh, pm-gh.sh, workitems.py,")
+    print("     blockers.py, spend_log.py, decisions.py, last-ship.sh, github-pm-setup.sh, the")
     print("     .claude/skills) live in the reference org repo that runs the live Scrum Jail")
     print("     org (private) — copy them into scripts/ here, or build to their contracts.")
     print("     Also seed decisions.yaml, .github/CODEOWNERS (route /decisions.yaml to the")

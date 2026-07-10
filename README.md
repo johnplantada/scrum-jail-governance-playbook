@@ -28,18 +28,20 @@ your afternoon.
 | `org-chart.yaml` | Define your agents, their roles, and their authority envelopes |
 | `envelopes.yaml` | Reference for every envelope field — what it means, how to tune it |
 | `emoji-gate.md` | The authorization gate walkthrough — decisions.yaml/CODEOWNERS for money/org-shape, the `production` environment for deploys, why each step exists, and the pre-deploy code-review/demo chain |
-| `patterns.md` | **11** agent misbehavior patterns + the specific governance fix for each |
+| `patterns.md` | **13** agent misbehavior patterns + the specific governance fix for each |
 | `blocker-ledger.md` | The blocker ledger + capability boundary + wake backpressure — stops the "blocked loop" |
-| `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output; the `[CODEREVIEW]` + `[DEMO]` gates before a 🚀 |
-| `FIELD-NOTES.md` | **Field-tested mechanisms** from the live org — the event loop, spend guards, the `.halt` switch, single-flight locks, worker tool-scoping, model-tier pinning, typed handoffs — plus the graveyard of what the 2026-07-05 demolition retired, and what replaced each piece |
+| `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output; the work-item tree with a closing rule per level; the `[CODEREVIEW]` + `[DEMO]` gates before a 🚀 |
+| `FIELD-NOTES.md` | **Field-tested mechanisms** from the live org — the event loop, spend guards, the `.halt` switch, single-flight locks, worker tool-scoping, model-tier pinning, typed handoffs, the work-item tree's closure gate — plus the graveyard of what the 2026-07-05 demolition retired, and what replaced each piece |
 | `RUNBOOK.md` | Step-by-step: set up your org in an afternoon |
 | `bin/orggen` | Generator that stamps a new governance-gated org skeleton from `_init/` |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How it all fits together, with Mermaid diagrams — the gate, the patterns, `orggen`, and where this repo sits in the wider Scrum Jail ecosystem |
 
-The first 8 patterns are about agents with **too much authority**. Patterns 9–11 (idle
-restatement, process theater, the self-wake storm) and the `blocker-ledger.md` / `safe.md`
-primitives are about the other half: an orchestration loop with no idea of "blocked," "done,"
-or "do nothing." Both halves are battle-tested on the live org — see the writeups.
+The first 8 patterns are about agents with **too much authority**. Patterns 9–13 (idle
+restatement, process theater, the self-wake storm, the tree that only grows, prose-patching
+the checker) and the `blocker-ledger.md` / `safe.md` primitives are about the other half: an
+orchestration loop with no idea of "blocked," "done," or "do nothing" — and gates that
+collect compliance instead of bug reports when they misfire. Both halves are battle-tested
+on the live org — see the writeups.
 
 ---
 

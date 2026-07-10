@@ -35,7 +35,8 @@ afternoon of hunting for files that don't exist.
 | Component | Its contract (what the docs assume it does) |
 |---|---|
 | GitHub itself | The org repo (this stamped skeleton) + your product repo(s); Issues + one Project (a `Stage` single-select) for work tracking; Actions for CI and the deploy workflow; a `production` **environment** with the Chairman as required reviewer; `.github/CODEOWNERS` + branch protection routing `decisions.yaml` PRs to the Chairman |
-| `pm-gh.sh` | The ticket CLI — `create`/`tasks`/`move`/`comment`/`comments`/`done` — mapped onto Issues + the Project's `Stage` field; ticket ids are `org#N` (the issue number) |
+| `pm-gh.sh` | The ticket CLI — `create`/`tasks`/`move`/`comment`/`comments`/`done`, plus the work-item tree verbs: `create --type epic\|feature\|story --parent N` (kind label + prefix, routing inherited, native sub-issue link) and `tree --id N` — mapped onto Issues + the Project's `Stage` field; ticket ids are `org#N` (the issue number) |
+| `workitems.py` | The tree's closure gate (safe.md): `can-close` re-derives the facts live — no open children; story evidence = merged repo-qualified PR or done-when; feature evidence = accepted `[DEMO]` or done-when — and `pm-gh.sh done` refuses to close a work-item the gate rejects, posting the typed `[CLOSE]` payload when it passes |
 | `runner.py` + `wake-rules.yaml` | The poller: each tick, diffs GitHub (issues, comments on both repos, workflow runs on the product repo) against a saved cursor, normalizes to events, and routes each through the rules table to wake the owning department |
 | `agent-run.sh` | Runs one headless Claude cycle per wake — loads the department's mandate + `agents/_policy.md` + the open `blockers.yaml` queue, single-flight-locks so two wakes of the same agent never race, respects the `.halt` kill switch |
 | `decisions.py check` (CI) | Validates every `decisions.yaml`-touching PR (unique ids, required fields) so a malformed entry can't merge |
@@ -43,8 +44,8 @@ afternoon of hunting for files that don't exist.
 The reference implementation of that runtime powers the live Scrum Jail org and is
 private — it's ordinary scripts wrapping `gh`, small enough to write your own from the
 contracts above. This playbook ships the governance layer and specifies each runtime
-component's contract precisely enough to build your own thin version — none of the
-four is more than a small script.
+component's contract precisely enough to build your own thin version — none is more
+than a small script.
 
 ---
 
@@ -242,12 +243,18 @@ gh issue create --repo <your-org-repo> \
 ```
 
 The CEO wakes on the runner's next tick — the `dept:ceo` label is what routes it — reads
-the objective, and begins decomposing it into tickets for Business and IT.
+the objective, and routes it to an owning department, which decomposes it as a
+**work-item tree** on native sub-issues (`[PROPOSAL]`s under the objective, epics under
+the accepted one, features/stories just-in-time — see safe.md): each child is born with
+the `dept:*` label that routes it and the acceptance line its closure will bind to.
 
 **What to watch for in the first week:**
 - Agents opening `[PROPOSAL]` issues or `decisions.yaml` PRs (good — they're asking, not
   acting)
 - Tickets moving `To-Do → Doing → Staged → Demo → Done` on the Project board
+- The tree closing **upward** — stories citing merged PRs, features citing accepted
+  `[DEMO]`s (`pm-gh.sh tree --id N` shows the rollup; a tree that only grows is
+  patterns.md Pattern 12)
 - Any unexpected spend or deploy attempt (should be zero — not because a watcher blocks
   it, but because agents hold no payment credentials or prod access; if an attempt
   could ever have *succeeded*, you have a capability leak to fix, not a prompt problem)
@@ -339,11 +346,13 @@ should have equivalents. They are a contract, not shipped binaries:
 | Task | Reference shape |
 |---|---|
 | Create a ticket | `pm-gh.sh create --project <dept> --title "…"` |
+| Create a work-item tree child (kind label + prefix, routing inherited, sub-issue link) | `pm-gh.sh create --type epic\|feature\|story --parent N` |
+| Render an objective's tree (the rollup) | `pm-gh.sh tree --id N` |
 | Move a ticket | `pm-gh.sh move --id N --to <Stage>` |
 | List tickets | `pm-gh.sh tasks --project <dept>` |
 | Comment on a ticket | `pm-gh.sh comment --id N --body "…"` |
 | Read a ticket's thread | `pm-gh.sh comments --id N` |
-| Close a ticket | `pm-gh.sh done --id N` |
+| Close a ticket (work-items pass the closure gate and post their `[CLOSE]` evidence) | `pm-gh.sh done --id N [--pr <owner/repo#N> \| --done-when "…" \| --demo <url>]` |
 | Run one poll tick | `make tick` (wraps `scripts/runner-watch.sh`, which drives `scripts/runner.py`) |
 | Dry-run a tick — show would-be wakes without firing or advancing the cursor | `make preview` (`scripts/runner.py preview`) |
 | Start one agent wake by hand | `scripts/agent-run.sh <dept>` |

@@ -37,6 +37,40 @@ the answer is N for three iterations running, the review degenerates to one line
 single external blocker — no retro over a hold. This kills the "executed cleanly within our
 constraints" report that lets a stuck org feel productive.
 
+## The work-item tree — decomposition with a closing rule
+
+Give the objectives themselves a structure, or "decomposed the objective" becomes another
+artifact that reads as progress. The live org runs a four-level tree on native GitHub
+sub-issues, kind carried by a plain label + matching title prefix:
+
+    [OBJECTIVE] → [PROPOSAL]*   competing means; epics descend from the ACCEPTED one
+    [OBJECTIVE] → [EPIC] → [FEATURE] → [STORY]
+
+A story's plan is a `## Plan` section in the story body — deliberately not a fifth level.
+Children inherit the parent's `dept:*` routing label at creation, so the poller routes them
+with zero added cost (`pm-gh.sh create --type epic|feature|story --parent N` in the
+reference runtime; `pm-gh.sh tree --id N` renders the rollup).
+
+The tree only works because it is designed against an asymmetry: **for an agent,
+decomposing is nearly free and looks like progress; verification is scarce and is the
+progress.** Left alone, every edge points downward and the tree only grows (patterns.md
+Pattern 12). So every level gets a closing rule as explicit as its decomposing rule,
+enforced in code (`workitems.py can-close` + a typed `[CLOSE]` payload — the same
+shape-vs-facts split as the other gates):
+
+- a **story** closes only citing a merged, repo-qualified PR — or a one-line done-when for
+  internal work;
+- a **feature** closes only citing its accepted `[DEMO]` (or a done-when when it has no
+  product surface) — which means acceptance criteria are written at *decomposition* time:
+  the reference runtime refuses to create a feature/story without them;
+- **epics and objectives** close by rollup — every child closed, nothing else;
+- a **proposal** closes freely: rejected must be cheap to bury.
+
+Two norms complete it: **decompose just-in-time** (split a feature into stories only when
+it's next up — a pre-built tree is inventory that rots and burns wakes re-syncing dead
+issues), and **close only through the gate** (a refusal means the work isn't done — fix the
+fact it names, never close around it).
+
 ## The `[CODEREVIEW]` gate — correctness, before the demo
 
 The `[DEMO]` proves a change *reaches a user*; it does not prove the *code* is correct or safe.

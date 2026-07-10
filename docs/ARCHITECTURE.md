@@ -22,7 +22,7 @@ software organizations. Each repo stands alone, but they only make full sense as
 
 ```mermaid
 flowchart LR
-    GP["📓 scrum-jail-governance-playbook<br/><b>Methodology</b><br/>authorization gate · 11 patterns · orggen generator"]
+    GP["📓 scrum-jail-governance-playbook<br/><b>Methodology</b><br/>authorization gate · 13 patterns · orggen generator"]
     BIZ["🏛️ scrum-jail-business<br/><b>The autonomous org — runtime</b><br/>Python scripts over gh · runner.py + wake-rules.yaml · Claude agents"]
     PROD["🌐 scrum-jail<br/><b>The product — scrumjail.org</b><br/>React SPA · Go Lambda · AWS · Terraform"]
 
@@ -36,7 +36,7 @@ flowchart LR
 
 | Repo | Role | What lives here |
 |---|---|---|
-| **scrum-jail-governance-playbook** *(you are here)* | **Methodology** | The governance model, the 11 misbehavior patterns + fixes, and `orggen` — packaged so anyone can copy it. |
+| **scrum-jail-governance-playbook** *(you are here)* | **Methodology** | The governance model, the 13 misbehavior patterns + fixes, and `orggen` — packaged so anyone can copy it. |
 | [scrum-jail-business](https://github.com/johnplantada/scrum-jail-business) | **Runtime** | The live multi-agent org that runs scrumjail.org. It *vendors* this repo's docs and is the org these primitives were extracted from. |
 | [scrum-jail](https://github.com/johnplantada/scrum-jail) | **Product** | The actual website the org builds and ships. |
 
@@ -73,7 +73,7 @@ scrum-jail-governance-playbook/
 ├── RUNBOOK.md           afternoon setup, incl. ships-vs-builds + the gate-verification tests
 ├── emoji-gate.md        the authorization gate (historical filename; the mechanism is
 │                        merges + environment approvals, not chat emoji)
-├── patterns.md          11 misbehavior patterns + counter-patterns
+├── patterns.md          13 misbehavior patterns + counter-patterns
 ├── blocker-ledger.md    the anti-"blocked loop" primitives
 ├── safe.md              scaled-agile without the theater
 ├── envelopes.yaml       authority-envelope field reference + presets
@@ -192,15 +192,15 @@ the six are `decisions.yaml` `type` strings, and the other two are platform/file
 
 ---
 
-## The two failure roots — and the 11 patterns
+## The two failure roots — and the 13 patterns
 
 The patterns documented here are battle scars. They cluster into two roots: agents given **too
 much authority**, and an orchestration loop with **no concept of "blocked," "done," or "do
-nothing."**
+nothing."** (Pattern 13 mirrors both: a buggy gate collects compliance instead of bug reports.)
 
 ```mermaid
 mindmap
-  root((11 patterns, two roots))
+  root((13 patterns, two roots))
     Too much authority, patterns 1 to 8
       Rogue spender
       Broken deploy
@@ -210,14 +210,17 @@ mindmap
       Domain expansion
       Double execution
       Emoji-gate evasion
-    No concept of blocked, done, or nothing, patterns 9 to 11
+    No concept of blocked, done, or nothing, patterns 9 to 12
       Idle restatement
       Process theater
       Self-wake storm
+      The tree that only grows
+    The gates are code too, pattern 13
+      Prose-patching the checker
 ```
 
 The first root is cured by the authorization gate and tight envelopes (above). The second root
-is cured by three smaller primitives, described next. Full write-ups in
+is cured by a few smaller primitives, described next. Full write-ups in
 [`patterns.md`](../patterns.md).
 
 ---
