@@ -31,7 +31,7 @@ your afternoon.
 | `patterns.md` | **11** agent misbehavior patterns + the specific governance fix for each |
 | `blocker-ledger.md` | The blocker ledger + capability boundary + wake backpressure — stops the "blocked loop" |
 | `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output; the `[CODEREVIEW]` + `[DEMO]` gates before a 🚀 |
-| `FIELD-NOTES.md` | **11 field-tested mechanisms** from the live org — backpressure numbers, the haiku pre-gate, single-flight locks, worker tool-scoping, model-tier pinning, the Warden, typed handoffs, and more |
+| `FIELD-NOTES.md` | **Field-tested mechanisms** from the live org — the event loop, spend guards, the `.halt` switch, single-flight locks, worker tool-scoping, model-tier pinning, typed handoffs — plus the graveyard of what the 2026-07-05 demolition retired, and what replaced each piece |
 | `RUNBOOK.md` | Step-by-step: set up your org in an afternoon |
 | `bin/orggen` | Generator that stamps a new governance-gated org skeleton from `_init/` |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How it all fits together, with Mermaid diagrams — the gate, the patterns, `orggen`, and where this repo sits in the wider Scrum Jail ecosystem |
@@ -98,24 +98,13 @@ Two ways in:
 **A. Generate a fresh org skeleton (recommended):**
 ```bash
 bin/orggen init ../my-org --product "myproduct.com" --goal "$10k/month" \
-  --chairman-id <YOUR_CHAIRMAN_USER_ID> --departments ceo,business,it
+  --chairman-github <YOUR_GITHUB_USERNAME> --departments ceo,business,it
 ```
 Stamps a new org repo from `_init/`: `org-chart.yaml` (its `departments:` block generated from
 `--departments`, so the chart and `agents/` always match), `DESIGN.md` (product + goal filled),
 `agents/` (one file per department + the shared `_policy.md`), `blockers.yaml`, `.env.example`,
 and the playbook docs — then prints the next steps. `--org`, `--goal`, and `--departments` are
 optional (defaults: target dir name, a placeholder goal, and `ceo,business,it`).
-
-**Note:** `bin/orggen` and its `_init/` templates (`org-chart.yaml`, `.env.example`,
-`agents/_policy.md`, the department mandate template) still stamp the chat-based
-runtime's fields and instructions — a Mattermost user id for `--chairman-id`,
-`MATTERMOST_TOKEN_*` env vars, `bus read`/`bus post` commands in the agent policy —
-none of it has been rewritten for the GitHub-native path yet (tracked separately). If
-you're building GitHub-native today, generate the skeleton for the org-chart shape and
-department list, then rewrite the stamped `org-chart.yaml` chairman field, `.env.example`,
-and `agents/_policy.md` by hand against `RUNBOOK.md` once it's updated — or work from
-`org-chart.yaml`/`agents/_policy.md` in a live GitHub-native org as your reference instead
-of the stamped output.
 
 **B. Fork this repo** as your org repo and edit `org-chart.yaml` by hand.
 
@@ -136,10 +125,12 @@ This governance system is extracted from the live autonomous org running
 and `agents/*.md` files in this template are the actual primitives we use —
 packaged so you can copy, fill in, and run. The live org itself started on the
 chat-based emoji gate and cut over to the GitHub-native model described above on
-2026-07-05 — this template is mid-cutover too: `README.md` and the Core Idea above
-describe the new model, while `RUNBOOK.md`, `FIELD-NOTES.md`, `docs/ARCHITECTURE.md`,
-and the `_init/` stamped templates still walk through the retired chat runtime pending
-their own rewrite. Until that lands, treat this README as the source of truth for
-*which* model to build, and `RUNBOOK.md` as accurate only for the chat-based path.
+2026-07-05 — and this template has followed it across: `RUNBOOK.md` is the current
+GitHub-native operating guide (setup, runtime contracts, and the gate verification
+tests), and the rest of the docs — `emoji-gate.md`, `safe.md`, `patterns.md`,
+`blocker-ledger.md`, `FIELD-NOTES.md`, `envelopes.yaml`, `docs/ARCHITECTURE.md`,
+`org-chart.yaml`, and the `_init/` stamped templates — describe the same model. Where
+a doc keeps a chat-era filename or a lineage note, that's deliberate history, not a
+second supported path.
 
 Questions or feedback: [scrumjail.org](https://scrumjail.org)

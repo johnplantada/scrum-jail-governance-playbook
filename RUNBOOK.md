@@ -71,13 +71,8 @@ Generate a fresh org skeleton from this repo's templates:
 
 ```bash
 bin/orggen init ../my-org --product "myproduct.com" --goal "$10k/month" \
-  --chairman-id <YOUR_GITHUB_USERNAME> --departments ceo,business,it
+  --chairman-github <YOUR_GITHUB_USERNAME> --departments ceo,business,it
 ```
-
-> `bin/orggen`'s own flag help and stamped output still say
-> `<YOUR_MATTERMOST_USER_ID>` — that rewrite is next in this doc's sequence (tracked on
-> `org#116`), not done yet. The flag itself just wants your Chairman identifier, which
-> in this model is a GitHub username, not a chat user id.
 
 Verify what you got — every one of these files now exists and is yours to edit:
 
@@ -107,8 +102,8 @@ disagree about who exists.)
    the agents behave
 
 See `envelopes.yaml` for a field-by-field explanation — including which fields are
-code-enforced (the spawn ceilings) and which are declared policy (`can_spend`,
-`can_deploy`, `daily_token_budget`).
+code-enforced (the spawn ceilings, and `daily_token_budget` via the budget gate — see
+"Tuning After Week 1") and which are declared policy (`can_spend`, `can_deploy`).
 
 **Edit each `agents/<name>.md`** — these are the standing instructions:
 - Replace the example product with your product
@@ -296,12 +291,18 @@ Read their `agents/<name>.md` file. The instructions may be too broad. Narrow th
 charter, not the model tier.
 
 **If an agent is burning too many tokens:**
-`daily_token_budget` is a declared target, not a code-enforced cap — nothing in the
-reference runtime stops an agent at N tokens. The mechanisms that actually bound cost
-are wake backpressure (a tick that finds nothing new is a no-op — zero model calls),
-comment-triggered wakes staying rare (fewer noise comments → fewer peer wakes), and
-pinning the agent to a cheaper model tier. Audit the spend ledger against the declared
-budget and tighten those levers.
+`daily_token_budget` is code-enforced now, at two layers. Per envelope,
+`scripts/budget_gate.py` sums the agent's day from the spend ledger; `agent-run.sh`
+consults it before every cycle and **skips non-direct wakes** for an agent over budget.
+Direct wakes — a runner-routed GitHub event like the Chairman's issue or a deploy
+failure — still run, so this is a brownout, not a blackout: a spent budget never blocks
+the Chairman, and the overage stays visible in the ledger. Org-wide, the runner holds
+**all** wakes once the day's metered spend in `state/spend.jsonl` crosses
+`SPEND_BREAKER_DAILY_USD` (the constitution's metering invariant). The cheaper levers
+still come first: wake backpressure (a tick that finds nothing new is a no-op — zero
+model calls), comment-triggered wakes staying rare (fewer noise comments → fewer peer
+wakes), and pinning the agent to a cheaper model tier. Audit the spend ledger against
+the declared budget and tighten those before you're leaning on the breakers.
 
 **If you want to add a department:**
 Open a `decisions.yaml` PR (`type: charter`) describing the new department. Your merge
@@ -343,7 +344,8 @@ should have equivalents. They are a contract, not shipped binaries:
 | Comment on a ticket | `pm-gh.sh comment --id N --body "…"` |
 | Read a ticket's thread | `pm-gh.sh comments --id N` |
 | Close a ticket | `pm-gh.sh done --id N` |
-| Run one poll tick | `scripts/runner.py tick` |
+| Run one poll tick | `make tick` (wraps `scripts/runner-watch.sh`, which drives `scripts/runner.py`) |
+| Dry-run a tick — show would-be wakes without firing or advancing the cursor | `make preview` (`scripts/runner.py preview`) |
 | Start one agent wake by hand | `scripts/agent-run.sh <dept>` |
 
 ---

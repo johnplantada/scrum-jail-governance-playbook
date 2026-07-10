@@ -1,26 +1,40 @@
 # Human-task ledger — the single source of truth for work that ONLY the Chairman can clear.
 #
-# Agents can talk, write code, and open PRs, but they cannot perform real-world unlocks (set
-# cloud credentials, spend money, register accounts, provide URLs or a mailing address, or
-# approve a prod deploy). When blocked on one, an agent records it here ONCE and goes quiet —
-# it never re-posts a blocked STATUS. This ledger, not the chat stream, is what the Chairman
-# scans to see "what does a human need to do."  (See blocker-ledger.md.)
+# Why this file exists: agents can talk, write code, and open PRs, but they cannot perform
+# real-world unlocks (set cloud credentials, spend money, register accounts, provide URLs or
+# a mailing address, or approve a prod deploy). When blocked on one, an agent records it here
+# ONCE and goes quiet — no wake-spinning, no re-posted blocked status. This ledger, not any
+# status stream, is what the Chairman scans to see "what does a human need to do."
 #
 # Contract:
-#   - Agents READ this every cycle and may APPEND a new entry (state: open). They never clear one.
-#   - The Chairman clears an entry (state: open -> cleared) once the action is done; clearing it
-#     is what un-gates the work it `blocks` and wakes the org again.
-#   - `scripts/blockers.py open` prints the open queue.
+#   - Agents READ this every cycle (the runner injects the open queue into each wake prompt)
+#     and may APPEND a new entry (state: open). They never flip an entry to cleared.
+#   - The Chairman clears an entry (state: open -> cleared, plus a note:) once the action is
+#     done. Clearing is what un-gates the work the entry `blocks`.
+#   - `scripts/blockers.py open` prints the open queue in EV order.
 #
 # kind:  external-input = a credential/URL/address/account only the human can supply
-#        governance      = a Chairman emoji approval (💰 fund · 🚀 ship · 🏛️ charter · 💎 promote)
+#        governance     = a Chairman authorization — a decisions.yaml merge (💰 fund ·
+#                         🏛️ charter · 💎 promote · ⚰️ sunset) or a 🚀 production-environment
+#                         deploy approval
+# needs: chairman (always, for now)
+# state: open | cleared
+# value: what clearing it unlocks — revenue (a conversion path goes live) | signal
+#        (market evidence lands) | infra (pipeline/deploy capability). Orders the queue.
+# effort_minutes: honest estimate of the Chairman-minutes needed to clear it. Within a
+#        value class the cheapest unlock prints first, so a batching sit-down starts with
+#        the best value-per-minute. Past global.unlock_wip_limit open entries
+#        (org-chart.yaml), blockers.py prepends the WIP warning that stops agents starting
+#        work whose critical path ends in yet another unlock.
 
 blockers: []
   # - id: example-deploy-credentials
   #   kind: external-input
   #   needs: chairman
+  #   value: infra
+  #   effort_minutes: 10
   #   summary: "What is blocked and why only a human can clear it."
-  #   action: "The exact command/step the Chairman runs to clear it."
+  #   action: "The exact command/click-path the Chairman follows to clear it."
   #   blocks: [deploy]
   #   opened: 2026-01-01
   #   state: open

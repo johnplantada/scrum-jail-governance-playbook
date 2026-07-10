@@ -40,21 +40,27 @@ constraints" report that lets a stuck org feel productive.
 ## The `[CODEREVIEW]` gate — correctness, before the demo
 
 The `[DEMO]` proves a change *reaches a user*; it does not prove the *code* is correct or safe.
-Add one gate in front of it for product-surface work: an independent **Reviewer** —
-structurally separate from whoever authored the code (**author ≠ reviewer**) — gives every
-product-surface PR a `PASS` / `CHANGES-REQUESTED` verdict before it can be demoed or deployed.
-Three rules keep it honest:
+Add one gate in front of it for product-surface work: an independent review — structurally
+separate from whoever authored the code (**author ≠ reviewer**) — gives every product-surface
+PR a `PASS` / `CHANGES-REQUESTED` verdict before it can be demoed or deployed. In the live org
+that reviewer is a `claude-code-action` check running *on the PR itself*, with its workflow
+runs routed to IT by `wake-rules.yaml` so a department owns acting on the verdict. (Lineage:
+v1 chartered an independent Reviewer *department* for this; retired 2026-07-05 with the chat
+stack, replaced by the CI check.) Three rules keep it honest:
 
-- **Anchor the verdict to evidence, not vibes.** Bind it to the PR's current **head SHA** and a
-  green code-review CI run on that SHA — a new push invalidates a stale PASS. The review itself
+- **Anchor the verdict to evidence, not vibes.** Bind it to the PR's current **head SHA** —
+  a new push invalidates a stale PASS. The review itself
   happens *on the PR* (inline `file:line` comments), where the code is.
-- **A demo may cite only a PASS.** The `[DEMO]` carries the passing review's id; a relay that
-  skips it (or cites an unaccepted one) is a process violation your warden can catch.
-- **Ship it dormant.** The gate is dormant until a `reviewer` department is chartered (🏛️) — no
-  reviewer in the chart, no citation required — then binding. Until then, don't pretend to have it.
+- **A demo may cite only a PASS.** The `[DEMO]` carries the passing review's id. The payload
+  *shape* is mechanically enforced: the handoff-validator workflow (`scripts/handoff_check.py`,
+  the Actions successor to the chat-era Warden) fails any `[DEMO]` missing its required keys.
+  HONESTY NOTE: that the cited review is actually a PASS is checked by the facts layer
+  (`demo-verify.sh` re-derives evidence from the head SHA), not by the shape validator.
+- **Ship it dormant.** The gate is dormant until the review check is installed on the product
+  repo — no check, no citation required — then binding. Until then, don't pretend to have it.
 
 This is the "author ≠ reviewer" separation the emoji gate already applies to spend and deploy,
-extended to code correctness. It's a message type + a convention, not a parser.
+extended to code correctness — a CI check on the PR, not a department and not a parser.
 
 ## The `[DEMO]` gate — the one gate worth adding
 
@@ -73,6 +79,11 @@ relay cites the accepted demo's id. Two rules keep it honest:
   resent — and a tell that the process is running ahead of the substance.)
 
 A `[DEMO]` needs no special tooling — it's a message type, a convention. Don't build a parser.
+Do steal the live org's one predicate behind it, though: `scripts/demo-verify.sh` answers "is
+there a green `demo-evidence.yml` run on this PR's **current head SHA**?" — same pattern as the
+output predicate, evidence in code, not prose. A stale run (evidence generated, then more
+commits pushed) does not verify, and the run URL goes in the `[DEMO]` so the acceptor opens
+artifacts, not adjectives.
 
 **Let the tracker hold the queue.** Give the board a fixed, ordered set of columns so a
 change can't silently skip the gate. The live org runs **To-Do → Doing → Staged → Demo → Done**:
@@ -84,7 +95,10 @@ being quietly treated as shipped.
 
 ## Program Increments — gate the planning, not just the cadence
 
-A PI bundles a few iterations. A counter (`pi-tick`) tells you the cadence boundary, but emit a
+A PI bundles a few iterations. A counter (`pi-tick`) tells you the cadence boundary — the live
+org's `scripts/pi-tick.sh` counts closed `[REVIEW]` issues as completed iterations, with
+`iters_per_pi` read from the org chart's `pi_interval`, so the cadence is derived from the
+record, not a clock — but emit a
 **second** flag: `pi_planning_eligible = (due AND shipped-in-window)`. **PI Planning convenes
 only when eligible.** Otherwise the lead posts a one-line conclusion: *"PI N closed with zero
 prod ships; planning suppressed; sole blocker = X; no theme set."* You cannot plan an increment

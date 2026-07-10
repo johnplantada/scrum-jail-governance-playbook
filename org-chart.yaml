@@ -3,106 +3,93 @@
 # ============================================================
 # Fill in the blanks marked with <ANGLE_BRACKETS>.
 # Then run: cp org-chart.yaml ../org-chart.yaml
-# The Registrar reads this file and enforces the org SHAPE: who exists, the spawn
-# ceilings (max_subagents, global_max_agents), and which emoji map to which gates.
-# can_spend / can_deploy are declared hints — the hard spend/deploy backstop is
-# capability-absence outside the runtime (see envelopes.yaml).
+# This file is the source of truth for org SHAPE: who exists, who reports to whom,
+# each agent's authority envelope (envelopes.yaml), and the org-wide knobs the
+# scripts read. Changing money or org-shape reality goes through a decisions.yaml
+# PR that the Chairman merges — this chart then records the approved shape.
 #
 # RULE: every agent has a parent; authority flows DOWN the tree.
 # The Chairman (you, the human) holds the keys. Agents propose; you approve.
 
 chairman:
-  user_id: "<YOUR_MATTERMOST_USER_ID>"   # Find this in Mattermost: Profile → ID field
+  github: "<your-github-username>"  # Decision authority hangs off this handle: it goes in
+                                    # .github/CODEOWNERS (so decisions.yaml PRs route to you —
+                                    # your MERGE is the authorization) and as the required
+                                    # reviewer on the product repo's `production` environment
+                                    # (so deploys pause for your approval).
 
 governance:
-  # Emoji names (rare/custom) that mean something ONLY when the chairman reacts.
-  # Use emoji the agents won't accidentally post. Custom Mattermost emoji work best.
-  charter: "classical_building"   # 🏛️  charter a new department
-  sunset:  "coffin"               # ⚰️  dissolve a department or team
-  promote: "gem"                  # 💎  raise an agent's model tier
-  fund:    "moneybag"             # 💰  approve spend up to a stated ceiling
-  ship:    "rocket"               # 🚀  approve a production deploy
-  halt:    "octagonal_sign"       # 🛑  emergency stop — halts the WHOLE org (flag file);
-                                  #     fires on any message type; operator clears it to resume
+  # The gate vocabulary — ledger `type` strings for decisions.yaml entries and issue/PR
+  # prose. Explicitly NOT a chat emoji: in v1 these were reaction emojis a Registrar
+  # parsed; authorization is now the Chairman's merge (decisions.yaml PR) or deploy
+  # approval (production environment). The names keep their emoji flavor so the ledger
+  # stays human-skimmable.
+  charter: classical_building   # 🏛️  charter a new department
+  sunset:  coffin               # ⚰️  dissolve a department or team
+  promote: gem                  # 💎  raise an agent's model tier
+  fund:    moneybag             # 💰  approve spend up to a stated ceiling
+  ship:    rocket               # 🚀  approve a production deploy
+  halt:    octagonal_sign       # 🛑  emergency stop — a .halt file in the repo root halts
+                                #     the runner and every agent cycle; only a human clears it
 
 limits:
-  global_max_agents: 16           # Hard ceiling across the entire org
+  global_max_agents: 16         # Org-wide agent ceiling, CI-checked: the reference tests fail
+                                # any chart whose roster arithmetic (every brain + its full
+                                # permitted fan-out) exceeds this. Per-wake refusal of each
+                                # agent's share is subagent_gate.py (envelope.max_subagents).
 
-# ── GLOBAL CONFIG (all optional) ─────────────────────────────
-# Org-wide knobs the runtime reads. Every key is optional — omit one to take its default
-# (usually the old, wake-everyone behavior). Field reference: envelopes.yaml § global config.
+# ── GLOBAL CONFIG ────────────────────────────────────────────
+# Org-wide knobs the scripts read. Field reference: envelopes.yaml § global config.
 global:
-  # Model tier → exact API model id. The ONE place tier→model resolution lives. Everything
-  # else (spend ledger, wake banners, 💎 PROMOTE) keeps speaking in tiers; a 💎 changes an
-  # AGENT's tier, editing THIS map upgrades what a tier MEANS org-wide. Pin ids so a silent
-  # provider default can't drift your org onto a different model.
-  model_ids:
-    haiku:  "<haiku-model-id>"     # e.g. claude-haiku-4-5
-    sonnet: "<sonnet-model-id>"    # e.g. claude-sonnet-5
-    opus:   "<opus-model-id>"      # e.g. claude-opus-4-8
+  # SAFe cadence (safe.md): an iteration = review_interval wakes; a PI = pi_interval
+  # iterations (review_interval × pi_interval = wakes per PI; 20×3 = 60).
+  review_interval: 20           # start ~5; raise once it proves too frequent
+  pi_interval: 3
+
+  # Chairman-queue discipline: once blockers.yaml holds more open human-only entries than
+  # this, scripts/blockers.py prepends a WIP warning to the queue it injects into every
+  # wake prompt — agents must not START new work whose critical path ends in another
+  # human-only unlock. Prompt-enforced. 0/absent disables the warning.
+  unlock_wip_limit: 5
 
   # Canonical pm/kanban workflow stages, in order — the ONLY place the list is defined.
-  # The Demo column is the [DEMO]-gate queue (safe.md).
+  # ENFORCED BY USE: github-pm-setup.sh builds the Project's Stage field from it, and
+  # pm-gh.sh moves cards against it. The Demo column is the [DEMO]-gate queue (safe.md).
   pm_stages: [To-Do, Doing, Staged, Demo, Done]
 
-  # SAFe cadence (safe.md). An iteration = review_interval wakes; a PI = pi_interval iterations.
-  review_interval: 20            # wakes per iteration (start ~5; raise once it proves too frequent)
-  pi_interval: 3                 # iterations per PI (20 × 3 = 60 wakes per PI)
-
-  # Broadcast channels wake the whole org by default. Trim the fan-out to cut the self-wake
-  # storm (patterns.md Pattern 11): list which departments get an IMMEDIATE wake from a
-  # broadcast; everyone else picks the thread up on their next natural cycle. Unset = wake all.
-  feedback_channel: feedback
-  review_channel: reviews
-  broadcast_channels: [feedback, reviews]
-  review_reviewers: [business, it]
-  broadcast_reviewers:
-    feedback: [business, it]
-  broadcast_stagger_seconds: 30  # wake recipients this far apart, departments first, CEO last
-
-  # Collaboration workspace (FIELD-NOTES §5): the CEO posts one [DELEGATE], the pair converge
-  # DIRECTLY (each reply wakes only the peer), then post one [AGREEMENT] back. A thread runs up
-  # to collab_max_turns before a still-open one escalates to the CEO (the arbiter).
-  collab_channel: projects
-  collab_participants: [business, it]
-  collab_max_turns: 8
-
-  # Voice console (optional): default agent the Chairman's voice console talks to.
-  voice_default: ceo
-
-  # Extra channels the semantic-memory layer ingests that no department owns (department /
-  # feedback / review / collab channels are derived from the chart automatically).
-  memory_channels_extra: [decisions, metrics]
+  # Model tier → exact API model id. The ONE place tier→model resolution lives. Everything
+  # else (spend ledger, wake banners, budget brownouts, 💎 PROMOTE) keeps speaking in
+  # tiers; a 💎 changes an AGENT's tier, editing THIS map upgrades what a tier MEANS
+  # org-wide. Pin ids so a provider's silent default can't drift you onto a different model.
+  model_ids:
+    haiku:  "<haiku-model-id>"     # cheapest tier that reliably does the job
+    sonnet: "<sonnet-model-id>"    # the workhorse tier for department heads
+    opus:   "<opus-model-id>"      # stakes-only escalation tier
 
 departments:
+  # A department node is deliberately small: name, role, reports_to, model, envelope,
+  # teams. Wake routing lives in wake-rules.yaml (a dept:<name> label on an issue routes
+  # its events here) — the node itself carries no channel, cadence, or bot id.
+
   # ── CEO ──────────────────────────────────────────────────────
   - name: ceo
     role: chief-executive         # Sets strategy, objectives, department charters
     reports_to: board
-    channel: "board"              # Posts to the board channel; Chairman reads here
-    cadence: weekly               # How often this agent wakes
     model: sonnet                 # Authority isn't tied to compute — most CEO cycles (routing,
                                   # arbitration, standups) are well within sonnet. Escalate to
                                   # opus by STAKES on a specific hard call, not by default.
-    bot_user_id: "<CEO_BOT_USER_ID>"
-    # voice: "<TTS_VOICE_NAME>"   # optional — the voice console reads this agent's replies in this voice
-    # active: true                # optional — set false to PAUSE an agent (the Registrar won't wake it),
-                                  # e.g. a department with no live outlet yet. Default: active.
-    envelope:
+    envelope:                     # The authority box — field-by-field notes in envelopes.yaml.
       max_subagents: 0            # CEO escalates; it doesn't spawn sub-teams itself
-      daily_token_budget: 300000
-      can_spend: false            # Only the Chairman can approve spend
-      can_deploy: false           # Only the Chairman can approve deploys
+      daily_token_budget: 300000  # ENFORCED: budget_gate.py browns out non-direct wakes past it
+      can_spend: false            # Only the Chairman authorizes spend (decisions.yaml merge)
+      can_deploy: false           # Only the Chairman approves deploys (production environment)
     teams: []
 
   # ── BUSINESS ─────────────────────────────────────────────────
   - name: business
     role: demand                  # Positioning, pricing, content, growth hypotheses
     reports_to: ceo
-    channel: "business"
-    cadence: daily
     model: sonnet                 # Raise to opus only on an approved business case
-    bot_user_id: "<BUSINESS_BOT_USER_ID>"
     envelope:
       max_subagents: 4            # May spawn SEO / content sub-teams within this cap
       daily_token_budget: 500000
@@ -114,10 +101,7 @@ departments:
   - name: it
     role: supply                  # Ships PRs, infra, reliability
     reports_to: ceo
-    channel: "it"
-    cadence: daily
     model: sonnet
-    bot_user_id: "<IT_BOT_USER_ID>"
     envelope:
       max_subagents: 4
       daily_token_budget: 500000
@@ -126,37 +110,23 @@ departments:
     teams: []
 
   # ── ADD MORE DEPARTMENTS BELOW ────────────────────────────────
-  # Each department needs a board CHARTER proposal + Chairman's 🏛️ before it's live.
-  # Copy the block above, fill in the fields, post a CHARTER to #board, wait for 🏛️.
+  # Chartering a department is a Board act: open a PR appending a [CHARTER] entry to
+  # decisions.yaml whose payload is exactly the node you'd add below; the Chairman's
+  # merge is the authorization, then the node lands here.
   #
-  # ── REVIEWER — the [CODEREVIEW] gate (dormant until chartered) ──
-  # An independent code reviewer, structurally separate from IT (author ≠ reviewer). The
-  # [CODEREVIEW] gate (safe.md / emoji-gate.md) is DORMANT until this department exists: with no
-  # reviewer bot id in the chart, no review citation is required. Charter it with 🏛️ once you
-  # have product-surface PRs worth gating. Uncomment to enable:
-  # - name: reviewer
-  #   role: code-review
-  #   reports_to: ceo
-  #   channel: "it"               # posts [CODEREVIEW] here; the review itself lives on the PR
-  #   cadence: on-demand
-  #   model: sonnet
-  #   bot_user_id: "<REVIEWER_BOT_USER_ID>"
-  #   envelope:
-  #     max_subagents: 0
-  #     daily_token_budget: 300000
-  #     can_spend: false
-  #     can_deploy: false
-  #   teams: []
+  # ── WHERE THE REVIEWER DEPARTMENT WENT ────────────────────────
+  # Earlier revisions carried a dormant `reviewer` department for the [CODEREVIEW] gate.
+  # There deliberately isn't one anymore: code review is a claude-code-action CI check on
+  # product PRs (GITHUB-NATIVE-PLAN.md), not a chartered agent — author ≠ reviewer holds
+  # without a standing department burning budget. Charter one via a decisions.yaml
+  # [CHARTER] entry only if a CI check genuinely can't do the job.
   #
   # ── A GENERIC EXTRA DEPARTMENT ────────────────────────────────
-  # Example:
+  # Copy, fill in, and propose via decisions.yaml:
   # - name: ops
   #   role: operations
   #   reports_to: ceo
-  #   channel: "ops"
-  #   cadence: daily
   #   model: haiku                # Cheapest tier that reliably does the job
-  #   bot_user_id: "<OPS_BOT_USER_ID>"
   #   envelope:
   #     max_subagents: 2
   #     daily_token_budget: 200000
