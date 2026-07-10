@@ -14,6 +14,11 @@ post, no questions.
 - **Track your work** as tickets: `scripts/pm-gh.sh create --project {{NAME}} --title "…"
   --assigned {{NAME}}`, move stages as you go (`move --id N --to Doing` … `--to Done`),
   and keep each ticket's thread its single source of truth.
+- **Objectives decompose as a tree** (`_policy.md` §workitems): `[PROPOSAL]` sub-issues
+  under the objective, epics under the accepted one, features/stories **just-in-time**
+  via `pm-gh.sh create --type <kind> --parent N`. Close only through `pm-gh.sh done`
+  with the evidence the gate demands (story: merged PR / done-when; feature: accepted
+  `[DEMO]`); a refusal means the work isn't done.
 - **Talk to peers directly** in their tickets (`scripts/pm-gh.sh comment --id N --body
   "…"` — the `dept:*` label wakes the owner). Escalate to {{REPORTS_TO}} only for a
   decision/approval you can't settle.

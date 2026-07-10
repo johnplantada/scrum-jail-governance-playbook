@@ -59,7 +59,7 @@ build work: unblocking the deploy or deploy observability. Always allowed: answe
 Chairman; recording a genuinely new blocker; acting the moment a gate clears; and surfacing
 one ready, un-gated move that needs a single Chairman yes/no — once, crisply, then hold.
 
-## §handoffs — [AGREEMENT], [DEMO] and [CODEREVIEW] carry a typed yaml payload
+## §handoffs — [AGREEMENT], [DEMO], [CODEREVIEW] and [CLOSE] carry a typed yaml payload
 
 Structured handoffs are typed, not prose-by-convention: a fenced ```yaml block in the
 relevant issue/PR comment with the required keys. **The authoritative schema is
@@ -78,6 +78,44 @@ live). Posted as a comment on the PR; Business accepts or rejects in-reply again
 code), `verdict:` (`PASS` or `CHANGES-REQUESTED`), `findings:` (count of unresolved blocking
 findings — 0 to PASS), `review_url:` (the GitHub PR review with the inline discussion),
 `evidence_run:` (the `code-review` run URL). Posted as a PR review.
+
+`[CLOSE]` requires: `item:` (the org#N being closed), `kind:` (story / feature / epic /
+objective), `evidence:` (a mapping: a story cites a merged repo-qualified `pr` or a
+`done_when` line; a feature cites its accepted `demo` comment URL or a `done_when` when it
+has no product surface; epics and objectives close by rollup, so their mapping may be
+empty). Posted by `pm-gh.sh done`, which only closes after the facts are re-derived live
+(`scripts/workitems.py can-close` in the reference runtime — open children, PR merge
+state, the [DEMO] marker). Closing a work-item any other way skips the gate; don't.
+
+## §workitems — objectives decompose as a tree; only evidence closes it
+
+Work decomposes on native GitHub sub-issues, kind carried by the plain label + matching
+title prefix:
+
+    [OBJECTIVE] → [PROPOSAL]*   competing means; epics descend from the ACCEPTED one
+    [OBJECTIVE] → [EPIC] → [FEATURE] → [STORY]
+
+A story's plan is the `## Plan` section of the story body — never a separate issue.
+Children are born with `scripts/pm-gh.sh create --type epic|feature|story --parent N`:
+kind prefix + label applied, the parent's `dept:*` routing inherited (the runner routes
+children for free), taxonomy-violating edges refused before the issue exists, and a
+feature/story refused unless `--desc` carries the Acceptance/Done-when line its closure
+will bind to. To brief a peer inside the tree, add `--project <their lane>` — the child
+carries their wake label but stays linked under your parent. `pm-gh.sh tree --id N`
+renders any subtree; the rollup, not narrated progress, is the status.
+
+Two norms keep the tree from becoming decomposition theater (patterns.md Pattern 12):
+
+- **Decompose just-in-time.** Split a feature into stories only when it's next up
+  (To-Do); split an epic into features only as the one before it closes. Never expand
+  the whole tree on day one — a pre-built tree is inventory that rots and burns wakes
+  re-syncing dead issues. Decomposing is cheap and looks like progress; closing is
+  progress.
+- **Close only through the gate.** `pm-gh.sh done` is the ONE closing path for
+  work-items — it checks the facts (open children; the kind's evidence, per `[CLOSE]`
+  above) and posts the payload before closing. If the gate refuses, the work is not
+  done: fix the fact it names, never bare-`gh issue close` around it, never argue it
+  down in prose.
 
 ## Model tier, offload, and workers — spend judgment, not tokens
 

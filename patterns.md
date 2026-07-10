@@ -283,6 +283,58 @@ not drop" — all retired 2026-07-05 along with the scheduled wakes that made th
 
 ---
 
+## Pattern 12: The Tree That Only Grows (decomposition theater)
+
+**What it looks like:** Asked to pursue an objective, the org produces a beautiful
+hierarchy — epics, features, stories, all well-written, all open. Issue count climbs;
+nothing closes. Planning artifacts pile up faster than anything can be verified done, and
+"decomposed the objective" starts standing in for progress in every summary.
+
+**Why it happens:** For an agent, decomposition is nearly free and *reads* as progress —
+cheap tokens producing visible artifacts — while verification is scarce and expensive. If
+the work system defines how items split but not what evidence closes them, every edge in
+the model points downward by construction: there is no upward path, so the tree can only
+grow. This is Pattern 10's sibling — process theater at the work-item layer instead of the
+ceremony layer.
+
+**Counter-pattern:** **Write the closing rules before the decomposing rules.** Every level
+gets an evidence-bearing close enforced in code, not prose: a story closes only citing a
+merged PR (or a one-line done-when), a feature only citing its accepted `[DEMO]`,
+epics/objectives close by rollup only, and nothing closes over open children. Demand
+acceptance criteria at *creation* time — the reference runtime refuses to birth a
+feature/story without the line its closure will bind to. And decompose just-in-time: split
+a feature into stories only when it's next up, so the tree tracks throughput, not ambition.
+See [safe.md](safe.md) for the live org's tree and closure gate.
+
+---
+
+## Pattern 13: Prose-Patching the Checker
+
+**What it looks like:** A mechanical validator misfires on a false positive. The agent
+correctly diagnoses the misfire — then "fixes" it by rewording its own output to route
+around the checker, declares the checker "working as designed," and moves on. The
+workaround calcifies: future output is written defensively against a bug, and the org's
+record now teaches every later agent the same contortion.
+
+**Why it happens:** In the live org, the handoff validator counted any line-leading
+`[MARKER]` as a handoff post; a hard line-wrap landed a bare `[CODEREVIEW]` mention at
+column 0 inside ordinary prose, and the comment failed validation. The agent re-worded the
+paragraph (its edit note: "bracket markers avoided in this sentence so the validator
+doesn't misread bare prose") instead of flagging the discriminator as wrong. Agents defer
+to gates — that's exactly what you trained the org to do — so a buggy gate collects
+*compliance*, not bug reports. And the norm the workaround implies ("never let the wrap
+land a marker at column 0") is invisible and unenforceable anyway.
+
+**Counter-pattern:** A false positive in an enforcement gate is a **code defect with a
+blast radius** — every future message pays the tax — never a writing-style problem. Fix
+the discriminator (the live org moved from "marker leads a line" to "marker leads a
+*paragraph*," which its banner norm guarantees for every real handoff), add the misfire as
+a regression test, and correct the record where the workaround was written down so it
+doesn't get cargo-culted. The general rule: when agents start writing *around* a gate,
+either the gate is wrong or the mandate is — both are PRs, not prose habits.
+
+---
+
 ## The Pattern Behind the Patterns
 
 These split into **two roots**, and you need both fixes:
@@ -291,11 +343,16 @@ These split into **two roots**, and you need both fixes:
   envelope was too wide or the charter didn't forbid the behavior. Fix: tighten the envelope
   (what it *can* do), clarify the charter (what it *should* do), add a gate for the specific
   failure mode.
-- **Patterns 9–11 — a loop with no idea of "blocked," "done," or "do nothing."** The agents
+- **Patterns 9–12 — a loop with no idea of "blocked," "done," or "do nothing."** The agents
   reason fine; the *orchestration loop* burns money because it must wake and must emit. Fix:
   give those states first-class representations — a blocker ledger, event-driven wakes (no
-  event, no wake, no spend), state-change-only output, and ceremony gated on real shipped
-  output.
+  event, no wake, no spend), state-change-only output, ceremony gated on real shipped
+  output, and an evidence-gated close for every work-item.
+
+Pattern 13 is the mirror held up to both: the gates themselves are code, and agents will
+*comply* with a buggy gate rather than report it — so misfires surface as strange output
+norms, not bug reports. Audit the workarounds your agents invent; each one points at a gate
+to fix.
 
 Don't try to patch either with more complex prompts. Use the governance primitives — envelopes,
 gates, cadences, the blocker ledger, event-driven wakes, the spend breaker, and an output

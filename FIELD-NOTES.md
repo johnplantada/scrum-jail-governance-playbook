@@ -228,10 +228,10 @@ whole org, in one line — two changes, two authorities, one obvious place each.
 demo," "the review passed" — started as free prose, and the gates consuming them had to
 *parse* it. Parsing English is where a governance gate quietly starts guessing.
 
-**How it works today:** the three machine-consumed types — `[AGREEMENT]`, `[DEMO]`,
-`[CODEREVIEW]` — carry a **fenced YAML payload with required keys** in the relevant
-issue/PR comment; the authoritative schema is `agents/_policy.md` §handoffs (per the
-constitution §4). A `[CODEREVIEW]` requires `pr` / `head_sha` / `verdict` / `findings` /
+**How it works today:** the four machine-consumed types — `[AGREEMENT]`, `[DEMO]`,
+`[CODEREVIEW]`, and `[CLOSE]` (the work-item closure payload, §10) — carry a **fenced
+YAML payload with required keys** in the relevant issue/PR comment; the authoritative
+schema is `agents/_policy.md` §handoffs (per the constitution §4). A `[CODEREVIEW]` requires `pr` / `head_sha` / `verdict` / `findings` /
 `review_url` / `evidence_run` — `head_sha` binds the verdict to the code, and citations
 chain as key lookups, not paraphrase. Human-facing messages stay prose; only what a
 gate acts on gets a schema.
@@ -239,10 +239,14 @@ gate acts on gets a schema.
 **The honest enforcement status:** the chat-era enforcers (the bus's malformed-payload
 warning, the Warden citation — Part II §R6) died in the demolition; their Actions
 successor is now built. `scripts/handoff_check.py` holds the authoritative key list,
-the handoff-validator workflow runs it on every comment that leads a line with a
-handoff marker (a malformed payload fails the run and gets a reply naming the missing
+the handoff-validator workflow runs it on every comment that leads a **paragraph** with
+a handoff marker (a malformed payload fails the run and gets a reply naming the missing
 keys), and a CI test keeps `_policy.md` §handoffs — the human-readable copy — from
-drifting off the code. The *facts* the payloads assert are checked separately, as
+drifting off the code. Paragraph-leading, not line-leading, is a paid-for lesson: the
+original any-line-start rule fired on a hard line-wrap that landed a bare `[CODEREVIEW]`
+mention at column 0 in ordinary prose, and the agent's response was to write around the
+checker rather than report it (patterns.md Pattern 13). The banner norm means a real
+handoff marker always follows a blank line, so the tighter discriminator costs nothing. The *facts* the payloads assert are checked separately, as
 before (`demo-verify.sh` re-derives the evidence run from the head SHA; `last-ship.sh`
 re-derives shipped-ness), so a payload can no longer lie about form, and never could
 lie about outcome. The drift specimen that used to live here — `_policy.md` citing the
@@ -276,6 +280,34 @@ each degrading safely when `gh` is absent:**
   product repo's demo-evidence workflow has a **green run on the PR's current head
   SHA**. A stale run (evidence generated, then more commits pushed) does **not**
   verify; the run URL is cited in the `[DEMO]` payload for the humans to open.
+
+---
+
+## 10. The work-item tree — sub-issues with a closure gate
+
+**The failure:** decomposition theater (patterns.md Pattern 12) — objectives decompose
+into ever more open issues, because decomposing is cheap and looks like progress, and
+nothing defines what evidence closes each level. The tree only grows.
+
+**How it works:** objectives are tree roots on **native GitHub sub-issues** —
+`[OBJECTIVE] → [PROPOSAL]*` (competing means; epics descend from the accepted one) and
+`[OBJECTIVE] → [EPIC] → [FEATURE] → [STORY]` — kind carried by a plain label + title
+prefix (GitHub issue *types* need an org account; labels work everywhere). A story's
+plan is a `## Plan` section in its body, not a fifth level. `pm-gh.sh create --type
+<kind> --parent N` births children correctly: kind prefix + label applied, the parent's
+`dept:*` routing inherited (the runner routes children with **zero** added poll cost),
+taxonomy edges pre-flighted so a bad link is refused before the issue exists, and a
+feature/story refused unless its description carries the acceptance line its closure
+will later bind to. `pm-gh.sh tree --id N` renders the rollup.
+
+The upward path is the point. `pm-gh.sh done` is the only closing path, and it runs
+`scripts/workitems.py can-close` first — the facts layer, live from GitHub: no open
+children (any kind); a story cites a merged repo-qualified PR or a done-when; a feature
+cites its accepted `[DEMO]` or a done-when when it has no product surface;
+epics/objectives close by rollup; proposals close freely (rejected must be cheap to
+bury). Anything unverifiable — offline, 404 — refuses rather than passes. The evidence
+lands as a typed `[CLOSE]` comment (§8) before the issue closes. Two norms ride on top
+in the mandates: decompose **just-in-time**, and never close around the gate's refusal.
 
 ---
 

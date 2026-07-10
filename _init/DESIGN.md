@@ -41,7 +41,10 @@ restate what the config owns; adopt that with the runtime.)*
 Work is **GitHub Issues** on the org Project (`scripts/pm-gh.sh`; Stage field =
 `org-chart.yaml global.pm_stages`, the only place the stage list is defined). The Chairman
 injects work by filing an issue (forms in `.github/ISSUE_TEMPLATE`); the `dept:*` label
-routes it. Product code ships as PRs against `$PRODUCT_GH_REPO` from branch
+routes it. Objectives decompose as a **work-item tree** on native sub-issues with an
+evidence-gated close at every level (`agents/_policy.md` §workitems): children inherit
+their parent's routing label, and nothing closes over open children or without the
+evidence its kind demands. Product code ships as PRs against `$PRODUCT_GH_REPO` from branch
 `agent/it/<desc>`; **agents open PRs, never merge to main** — CI plus invariant 1 gate the
 merge. Org-repo changes go through an isolated worktree + PR (the `org-worktree` skill),
 never the runtime checkout.
