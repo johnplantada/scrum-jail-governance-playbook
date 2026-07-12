@@ -302,6 +302,10 @@ for a blocker gating your only checkout or only audience — that one must stay 
 2. **Wake backpressure.** A tick that finds nothing new since the runner's last cursor
    is a no-op — no model call. `runner.py`'s cursor is what carries this now (there's no
    channel watermark to maintain). A blocked org on a quiet day should cost zero tokens.
+   Even an unblocked, actively-polling org can hold its steady-state GitHub API cost
+   near zero: conditional polling (ETag/`If-None-Match`) means an unchanged endpoint
+   answers `304 Not Modified`, which GitHub does not bill against the rate limit — see
+   [FIELD-NOTES.md §1](FIELD-NOTES.md) for the mechanism.
 3. **Comments are the only "something changed" signal.** No ticket gets a "no change
    from yesterday" comment — every comment on a labeled issue re-wakes every department
    that label names, so a noise comment is a self-wake storm across your whole org, not
