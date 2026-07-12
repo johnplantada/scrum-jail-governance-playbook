@@ -5,8 +5,8 @@ wants to make sure they never do.
 
 **Time required**: 2-4 hours (the governance layer) + however long your runtime takes  
 **What you'll have when done**: a multi-agent org with human-in-the-loop
-controls — a `decisions.yaml` + CODEOWNERS ledger gating money/org-shape, a `production`
-environment gating deploys — and a clear audit trail that's just git history.
+controls — a `decisions.yaml` + CODEOWNERS ledger gating money/org-shape, a
+`workflow_dispatch`-only deploy gate — and a clear audit trail that's just git history.
 
 **No special infrastructure.** This runs on your laptop, a cheap VPS, or CI. The only
 external service is GitHub itself — you already have it if you're reading this here.
@@ -28,13 +28,13 @@ afternoon of hunting for files that don't exist.
 | `_init/agents/` | The shared `_policy.md` + the per-department mandate template |
 | `_init/blockers.yaml` | The blocker ledger, empty and documented |
 | `_init/.env.example` | The env contract your runtime will read |
-| The docs | `emoji-gate.md` (the gate walkthrough — kept its historical filename for link stability, even though the mechanism it now documents is `decisions.yaml`/`production`, not chat emoji), `envelopes.yaml`, `patterns.md`, `blocker-ledger.md`, `safe.md`, `FIELD-NOTES.md` |
+| The docs | `emoji-gate.md` (the gate walkthrough — kept its historical filename for link stability, even though the mechanism it now documents is `decisions.yaml`/`workflow_dispatch`, not chat emoji), `envelopes.yaml`, `patterns.md`, `blocker-ledger.md`, `safe.md`, `FIELD-NOTES.md` |
 
 **You build or bring (the runtime — NOT included here):**
 
 | Component | Its contract (what the docs assume it does) |
 |---|---|
-| GitHub itself | The org repo (this stamped skeleton) + your product repo(s); Issues + one Project (a `Stage` single-select) for work tracking; Actions for CI and the deploy workflow; a `production` **environment** with the Chairman as required reviewer; `.github/CODEOWNERS` + branch protection routing `decisions.yaml` PRs to the Chairman |
+| GitHub itself | The org repo (this stamped skeleton) + your product repo(s); Issues + one Project (a `Stage` single-select) for work tracking; Actions for CI and the deploy workflow — every prod-touching job triggered by **`workflow_dispatch` only** (the deploy gate); `.github/CODEOWNERS` + branch protection routing `decisions.yaml` PRs to the Chairman |
 | `pm-gh.sh` | The ticket CLI — `create`/`tasks`/`move`/`comment`/`comments`/`done`, plus the work-item tree verbs: `create --type epic\|feature\|story --parent N` (kind label + prefix, routing inherited, native sub-issue link) and `tree --id N` — mapped onto Issues + the Project's `Stage` field; ticket ids are `org#N` (the issue number) |
 | `workitems.py` | The tree's closure gate (safe.md): `can-close` re-derives the facts live — no open children; story evidence = merged repo-qualified PR or done-when; feature evidence = accepted `[DEMO]` or done-when — and `pm-gh.sh done` refuses to close a work-item the gate rejects, posting the typed `[CLOSE]` payload when it passes |
 | `runner.py` + `wake-rules.yaml` | The poller: each tick, diffs GitHub (issues, comments on both repos, workflow runs on the product repo) against a saved cursor, normalizes to events, and routes each through the rules table to wake the owning department |
@@ -56,8 +56,8 @@ You need:
 - [ ] The `gh` CLI installed and authenticated: `gh auth login`, then
       `gh auth refresh -s project` (Project-board writes need the extra scope)
 - [ ] An Anthropic API key or Claude subscription (for the agent LLMs)
-- [ ] Your GitHub username (the Chairman — CODEOWNERS and the `production` environment's
-      required-reviewer list both key off it)
+- [ ] Your GitHub username (the Chairman — CODEOWNERS keys off it, and the deploy
+      dispatch is yours to click)
 - [ ] 30 minutes of uninterrupted focus for the initial setup
 
 **You do NOT need**: Kubernetes, a load balancer, any SaaS beyond GitHub, any payment
@@ -130,10 +130,29 @@ to provision, for **both** your org repo and your product repo:
    pull request before merging" + "Require review from Code Owners". Without this,
    CODEOWNERS only *requests* your review — it doesn't *require* it, and a
    `decisions.yaml` PR could merge unreviewed.
-4. **The `production` environment**, in your product repo: Settings → Environments →
-   New environment named exactly `production` → Required reviewers: you → Save. Point
-   your deploy workflow's job at it with `environment: production` — that one line is
-   the whole gate; GitHub pauses the run there until you approve.
+4. **The deploy gate**, in your product repo — it's code, not Settings: every workflow
+   that touches prod triggers on **`workflow_dispatch` only**. The common shape is one
+   workflow with both triggers, where a push to `main` runs only the verify jobs:
+
+   ```yaml
+   on:
+     push:
+       branches: [main]    # verify only — build + test, no prod credentials
+     workflow_dispatch:    # the gate: deploy runs ONLY from your manual dispatch
+   jobs:
+     verify: ...
+     deploy:
+       if: github.event_name == 'workflow_dispatch'
+       ...
+   ```
+
+   A merge builds; only your dispatch deploys, and the Actions run history is the
+   SHA-bound audit trail. *(The `production` environment with yourself as required
+   reviewer is the approve-button variant of this gate — use it **only if your plan
+   enforces it**: required reviewers work on public repos, but on a **private** repo
+   they need Team/Enterprise; on a private Free-plan repo the Settings screen accepts
+   them and silently doesn't enforce. The live org shipped the environment first and
+   found out via Test 2. Whichever you pick, run the test.)*
 
 Create Mattermost channels — no. That's the whole point: there is nothing here to
 stand up beyond a handful of GitHub Settings clicks and one setup script.
@@ -198,24 +217,29 @@ Verify:
 - [ ] Confirm the PR is blocked from merging without your review (branch protection:
       "Require review from Code Owners")
 
-**Test 2 — Deploy gate (the `production` environment)**
+**Test 2 — Deploy gate (the dispatch-only trigger)**
 
-Have IT open a product-repo PR, get it green on CI, and walk it to a deploy ask per its
-mandate.
+Have IT open a product-repo PR, get it green on CI, and merge it (or merge any trivial
+change).
 
 Verify:
-- [ ] The deploy workflow run pauses at the `production` environment, showing "Waiting
-      for review"
-- [ ] You get a GitHub review-request notification (web/mobile/email, your settings)
-- [ ] Approve — the deploy proceeds. Don't approve — it sits, indefinitely, no timeout
-- [ ] Reject it — verify nothing deployed
+- [ ] The push to `main` runs **verify jobs only** — the deploy job shows as skipped,
+      not run. Merged ≠ deployed
+- [ ] Nothing is waiting for you, because nothing can deploy without you: dispatch the
+      workflow by hand (Actions → the deploy workflow → Run workflow → `main`) and
+      verify the deploy job runs *now*
+- [ ] Don't dispatch — the merged change sits, indefinitely, no timeout
+- [ ] If you used the `production`-environment variant instead: verify the run actually
+      **pauses** at the environment. If it sails straight through, your plan does not
+      enforce required reviewers on this repo — fall back to the dispatch-only trigger
 
-**Test 3 — Wrong reviewer**
+**Test 3 — Wrong actor**
 
-Have a second GitHub account (or a friend) try to approve the `production` deployment,
-or review the `decisions.yaml` PR.
-- [ ] Verify GitHub itself refuses — the required-reviewer list and CODEOWNERS routing
-      are platform-enforced, not something any of your scripts have to check
+Have a second GitHub account (or a friend) with no write access try to dispatch the
+deploy workflow, or review the `decisions.yaml` PR.
+- [ ] Verify GitHub itself refuses — workflow dispatch requires write access, and
+      CODEOWNERS routing is platform-enforced, not something any of your scripts have
+      to check
 
 **Test 4 — Capability absence (the one that actually matters)**
 
@@ -223,9 +247,11 @@ The gates above are the approval interface. The enforcement is what the agent *c
 reach*:
 - [ ] Grep your agent host for payment or cloud-deploy credentials the agent could read
       directly (as opposed to its own scoped `gh` session) — there should be none
-- [ ] Confirm the agent's `gh` token cannot push straight to `main` or dismiss a
-      required review — branch protection and the environment's required reviewer are
-      what actually stop it, not a prompt instruction
+- [ ] Confirm the agent's `gh` token cannot push straight to `main`, dismiss a
+      required review, **or dispatch the deploy workflow** — branch protection and the
+      dispatch-only trigger are what actually stop it, not a prompt instruction (an
+      agent-visible token with Actions-write rights can self-authorize a deploy; see
+      the credential-hygiene note in emoji-gate.md)
 
 If all four pass, your governance layer is live.
 
@@ -239,7 +265,7 @@ File your first objective as a GitHub issue (you, the Chairman):
 gh issue create --repo <your-org-repo> \
   --title "Objective: <your goal>. Due: <date>." \
   --label objective --label dept:ceo \
-  --body "No spend or deploy without a decisions.yaml merge or a production approval."
+  --body "No spend or deploy without a decisions.yaml merge or the Chairman's workflow dispatch."
 ```
 
 The CEO wakes on the runner's next tick — the `dept:ceo` label is what routes it — reads
@@ -263,10 +289,11 @@ the `dept:*` label that routes it and the acceptance line its closure will bind 
 
 ## Step 7 — Harden against the blocked loop (do this before week 2)
 
-The `decisions.yaml`/`production` gates stop agents doing too *much*. The other failure
-mode — agents doing nothing but *re-announcing* that they're blocked — burns just as
-much money and is what most operators hit first. Three primitives stop it (full detail
-in [blocker-ledger.md](blocker-ledger.md)):
+The `decisions.yaml`/deploy-dispatch gates stop agents doing too *much*. The other
+failure mode — agents doing nothing but *re-announcing* that they're blocked — burns
+just as much money and is what most operators hit first. Three primitives stop it (full
+detail in [blocker-ledger.md](blocker-ledger.md), including the one flagged exception
+for a blocker gating your only checkout or only audience — that one must stay loud):
 
 1. **`blockers.yaml`** ledger. When an agent hits a human-only blocker (a credential, a
    URL, an approval, a repo-Settings action), it records the blocker there once and

@@ -14,15 +14,15 @@
 chairman:
   github: "<your-github-username>"  # Decision authority hangs off this handle: it goes in
                                     # .github/CODEOWNERS (so decisions.yaml PRs route to you —
-                                    # your MERGE is the authorization) and as the required
-                                    # reviewer on the product repo's `production` environment
-                                    # (so deploys pause for your approval).
+                                    # your MERGE is the authorization); deploys are yours
+                                    # because the product repo's deploy workflows trigger on
+                                    # manual workflow_dispatch only (your DISPATCH is the deploy).
 
 governance:
   # The gate vocabulary — ledger `type` strings for decisions.yaml entries and issue/PR
   # prose. Explicitly NOT a chat emoji: in v1 these were reaction emojis a Registrar
-  # parsed; authorization is now the Chairman's merge (decisions.yaml PR) or deploy
-  # approval (production environment). The names keep their emoji flavor so the ledger
+  # parsed; authorization is now the Chairman's merge (decisions.yaml PR) or manual
+  # deploy dispatch (workflow_dispatch). The names keep their emoji flavor so the ledger
   # stays human-skimmable.
   charter: classical_building   # 🏛️  charter a new department
   sunset:  coffin               # ⚰️  dissolve a department or team
@@ -57,6 +57,19 @@ global:
   # pm-gh.sh moves cards against it. The Demo column is the [DEMO]-gate queue (safe.md).
   pm_stages: [To-Do, Doing, Staged, Demo, Done]
 
+  # Holding columns — orthogonal PARKED states, NOT points in the pm_stages flow
+  # (safe.md "Parked states are not flow stages"). Options of the SAME board Stage
+  # field and a valid move target, but kept out of the ordered list so flow lint and
+  # index math stay honest — and EXEMPT from any forward auto-reconcile (a parked item
+  # with a PR must not be yanked back into the flow while the blocker holds).
+  pm_holding_stages: [Blocked, On-Hold]
+
+  # OPTIONAL pins for a warden-style reconciler (FIELD-NOTES.md §11) — the ONE place
+  # scripts resolve these coordinates from, so recreating the board or the queue epic
+  # is a one-line re-pin. Uncomment when you build one.
+  # chairman_queue_issue: <N>   # the epic whose sub-issues = what only the human can do
+  # pm_project_number: <N>      # the org Project's number (gh project <N>)
+
   # Model tier → exact API model id. The ONE place tier→model resolution lives. Everything
   # else (spend ledger, wake banners, budget brownouts, 💎 PROMOTE) keeps speaking in
   # tiers; a 💎 changes an AGENT's tier, editing THIS map upgrades what a tier MEANS
@@ -82,7 +95,7 @@ departments:
       max_subagents: 0            # CEO escalates; it doesn't spawn sub-teams itself
       daily_token_budget: 300000  # ENFORCED: budget_gate.py browns out non-direct wakes past it
       can_spend: false            # Only the Chairman authorizes spend (decisions.yaml merge)
-      can_deploy: false           # Only the Chairman approves deploys (production environment)
+      can_deploy: false           # Only the Chairman deploys (manual workflow_dispatch)
     teams: []
 
   # ── BUSINESS ─────────────────────────────────────────────────
@@ -130,6 +143,22 @@ departments:
   #   envelope:
   #     max_subagents: 2
   #     daily_token_budget: 200000
+  #     can_spend: false
+  #     can_deploy: false
+  #   teams: []
+  #
+  # ── A WARDEN (hygiene) DEPARTMENT ─────────────────────────────
+  # The engine-first shape the live org chartered 2026-07-11 (FIELD-NOTES.md §11): a
+  # DETERMINISTIC script does the reconciling (Chairman queue, board, [SYNC] convening)
+  # on plain cron — token-free; this smallest-budget haiku brain wakes only on
+  # dept:warden events for the judgment residue the script flags.
+  # - name: warden
+  #   role: hygiene
+  #   reports_to: board
+  #   model: haiku
+  #   envelope:
+  #     max_subagents: 0
+  #     daily_token_budget: 100000
   #     can_spend: false
   #     can_deploy: false
   #   teams: []

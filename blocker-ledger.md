@@ -17,13 +17,19 @@ world or in the owner's account, not just an approval:
 - registering an account or a domain
 - providing a real-world value: a public URL, a mailing address, a phone number
 - the authorization acts themselves: merging a `decisions.yaml` PR past CODEOWNERS,
-  approving the `production` environment, changing repo Settings
+  dispatching a prod deploy (`workflow_dispatch`), changing repo Settings
   *(v1: these were chat reactions — 💰/🚀/🏛️/💎; retired 2026-07-05 with the chat stack. The
   emoji survive as `decisions.yaml` type mnemonics, not reactions.)*
 
 Write this list into the shared policy every agent loads (`agents/_policy.md`). An agent that
 hits one of these has exactly one correct move, below — **not** "try harder," and **not**
 "announce it again."
+
+One hygiene rule for the credential-class entries, non-negotiable on a public repo: the
+operator sets secret **values** directly where they're consumed (GitHub → Settings →
+Secrets and variables → Actions), and the ledger/issue side carries only the secret
+**names** and a plain "done" — issue history is permanent and world-readable; a value
+pasted there once is burned.
 
 ## 2. The ledger (`blockers.yaml`)
 
@@ -44,6 +50,7 @@ blockers:
     effort_minutes: 30            # honest estimate of the Chairman-minutes to clear it
     opened: 2026-06-26
     state: open                   # open | cleared
+    # gates_market_contact: true  # RARE — see "the one exception" below
 ```
 
 **The contract:**
@@ -52,10 +59,31 @@ blockers:
   STATUS.
 - Agents **never** flip an entry to `cleared` — only the operator does. Clearing it (and the
   issue/comment activity that does so) is what wakes the org again.
+- **Every open entry carries an actionable `action:` runbook** — the exact steps the
+  operator performs, not a restatement of the problem. Lint it in CI (`blockers.py lint`
+  in the reference runtime fails the build on an open entry without one), because
+  "assigned to the operator with no instructions" is how an unlock silently ages. If the
+  steps are long, the `action:` points at a runbook doc.
 - The helper (`scripts/blockers.py open`) prints the open queue **EV-sorted** (each line
   tagged kind, value, effort, age), prefixed by the WIP banner when it applies — for the
   prompt and a `make blockers` view. The whole point: the operator scans **one short,
   ordered list**, not 70 status posts.
+
+### The one exception to go-quiet: `gates_market_contact`
+
+Record-once-and-go-quiet has a failure mode of its own, and the live org paid for it: a
+launched product sat quiet for days with **no checkout and no audience**, because the
+blockers that gated its entire reason to exist faded into the ledger exactly like a typo
+fix. Uniform quiet treats your most existential fact like your least.
+
+The fix is one flag, applied to the *rare* entry whose critical path is the org's **only
+live checkout or its only audience**: `gates_market_contact: true`. The helper treats it
+as the deliberate inverse of go-quiet — it sorts **above every value class** and reprints
+with a loud banner **every wake until cleared**. Note who repeats it: the *tooling*
+reprints the flagged entry mechanically; agents still never re-post it as STATUS, so
+Pattern 5/9 discipline is intact. Give the flag an invariant-tied sunset (the live org's:
+retire it once a checkout is live **and** a demand signal has landed) so it can't become
+the new default loudness.
 
 ### EV ordering & the unlock WIP limit
 
@@ -124,3 +152,9 @@ work product**, agent-triggered wakes outnumbered the operator's, and the real b
 (three tiny human inputs) sat buried inside dozens of restated STATUS posts the operator had
 stopped reading. The fix is not a smarter prompt — it is teaching the loop the difference
 between "blocked," "done," and "nothing to do."
+
+And the sequel incident (2026-07-11) taught the complement: once go-quiet worked, the org
+went *perfectly* quiet over a live product that had no way to take a payment and no
+audience that knew it existed — governance-compliant silence into a void. That's where
+`gates_market_contact` and the `action:` lint above came from. Quiet is the correct
+default; your single most important blocker is the one place it isn't.

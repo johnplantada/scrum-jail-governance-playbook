@@ -8,22 +8,22 @@
 # warning, tier→model resolution). Spawn ceilings (max_subagents, global_max_agents) are
 # the declared org-shape limits agents must not cross; can_spend / can_deploy are declared
 # hints — the spend/deploy backstop is capability-absence plus the platform gates
-# (production environment, CODEOWNERS + branch protection).
+# (workflow_dispatch-only deploy workflows, CODEOWNERS + branch protection).
 #
 # RULE: every agent has a parent; authority flows DOWN the tree.
 # The Chairman (you, the human) holds the keys. Agents propose; your merge/approval decides.
 
 chairman:
-  github: "{{CHAIRMAN_GITHUB}}"   # decision authority: CODEOWNERS + the production environment
+  github: "{{CHAIRMAN_GITHUB}}"   # decision authority: CODEOWNERS + manual workflow_dispatch of deploys
 
 governance:
   # The gate vocabulary (ledger language — decisions.yaml `type`, issue/PR prose). In the
   # chat era these were reaction emojis a registrar parsed; authorization is now the
-  # Chairman's merge (decisions.yaml PR) or deploy approval (production environment).
+  # Chairman's merge (decisions.yaml PR) or manual deploy dispatch (workflow_dispatch).
   charter: classical_building   # 🏛️ new top-level department (decisions.yaml type: charter)
   sunset: coffin                # ⚰️ dissolve a department/team (type: sunset)
   fund: moneybag                # 💰 spend up to a stated ceiling (type: spend)
-  ship: rocket                  # 🚀 prod deploy (production-environment approval)
+  ship: rocket                  # 🚀 prod deploy (the Chairman's manual workflow_dispatch)
   halt: octagonal_sign          # 🛑 whole-org stop — a .halt file; only a human clears it
   promote: gem                  # 💎 raise a department's model tier (type: promote)
 
@@ -42,6 +42,10 @@ global:
   # is defined — github-pm-setup.sh builds the Project's Stage field from it, and docs and
   # mandates must reference it rather than restate it.
   pm_stages: [To-Do, Doing, Staged, Demo, Done]
+  # Holding columns — orthogonal PARKED states, NOT points in the pm_stages flow (safe.md).
+  # Same board Stage field, valid move target, kept out of the ordered list, and exempt
+  # from any forward auto-reconcile (a parked item with a PR stays parked).
+  pm_holding_stages: [Blocked, On-Hold]
   # Pinned API model id per brain tier — the ONE place tier→model resolution lives.
   # Everything else — ledger, wake banners, budget brownouts, 💎 PROMOTE — keeps speaking
   # in tiers; a 💎 changes an AGENT's tier, editing THIS map upgrades what a tier means

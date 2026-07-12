@@ -66,6 +66,14 @@ shape-vs-facts split as the other gates):
 - **epics and objectives** close by rollup — every child closed, nothing else;
 - a **proposal** closes freely: rejected must be cheap to bury.
 
+And one rule *above* the kind-specific rules, paid for by a real incident: **verify
+whatever the caller cites, regardless of kind.** The live org's gate originally validated
+PR-merge evidence only where the kind demanded it (stories) — so an untyped ticket that
+*cited* `--pr <unmerged>` sailed through with zero verification and was closed three times
+against a PR that had never merged. A cited PR must be repo-qualified and actually merged
+for **every** kind; the kind's own rules only govern what happens when no evidence is
+cited. Gates must check what's asserted, not just what's required.
+
 Two norms complete it: **decompose just-in-time** (split a feature into stories only when
 it's next up — a pre-built tree is inventory that rots and burns wakes re-syncing dead
 issues), and **close only through the gate** (a refusal means the work isn't done — fix the
@@ -126,6 +134,16 @@ awaiting demand-side acceptance of the `[DEMO]`); `Done` = shipped (or, for non-
 completed). Define the stage list in **one place** and have your docs and lint reference it —
 the column *is* the queue, so a merged-but-undeployed PR visibly waits in `Demo` instead of
 being quietly treated as shipped.
+
+**Parked states are not flow stages.** The live board also carries two **holding columns**
+— `Blocked` (waiting on a ledgered human-only blocker) and `On-Hold` (deliberately
+deprioritized) — kept in a *separate* `pm_holding_stages` list, not appended to the
+ordered flow. They're options of the same board Stage field and a valid move target, but
+three properties depend on keeping them out of the ordered list: the flow linter and any
+`.index()` math over the stage sequence stay honest; a stalled item shows as *parked*
+instead of feigning progress in `Doing`; and any forward auto-reconcile (a bot moving
+cards to match PR state) must **exempt** them — a parked item that happens to have a PR
+must not be yanked back into the flow while the thing that parked it still holds.
 
 ## Program Increments — gate the planning, not just the cadence
 

@@ -37,9 +37,9 @@ Never `git commit`/`checkout`/`branch` in the runtime dir. To land an org-repo c
 - Within your envelope, self-organize sub-teams freely (announce them on the relevant
   ticket; don't exceed the cap).
 - **Spend and org-shape changes are `decisions.yaml` PRs** (invoke the `board-proposals`
-  skill); **prod deploys pause at the product repo's `production` environment**. Never
-  assume approval — the Chairman's merge/approval IS the authorization; an unmerged
-  proposal is a no.
+  skill); **prod deploys happen only by the Chairman's manual `workflow_dispatch` on the
+  product repo**. Never assume approval — the Chairman's merge/dispatch IS the
+  authorization; an unmerged proposal is a no.
 - **Blocked on a human-only action?** Record it once in `blockers.yaml` and go quiet —
   don't re-post blocked status (see `agents/_policy.md`).
 - Never put secrets in an issue, PR, or ledger.
