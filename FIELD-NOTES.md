@@ -76,6 +76,19 @@ The honest caveat, documented in the code itself: delivery is currently **at-mos
 re-delivered. `agent-run.sh` makes the abort loud ("events were NOT re-queued; re-wake
 by hand if needed"); cursor hold-back on failure is an open follow-up.
 
+**Conditional polling makes the quiet tick free, not just scarce.** Wakes being scarce
+still leaves the *poll itself* metered — every tick calls 5 endpoints whether or not
+anything changed. The fix: the cursor keeps an ETag per poll endpoint and replays it as
+`If-None-Match`; an unchanged endpoint answers `304 Not Modified`, which GitHub does not
+count against the rate limit. Verified live: `core.used` was identical (57 → 57) across
+a full steady-state tick — 5 revalidations, 0 billed calls — dropping the poll from
+~60 billed calls/hour to ~0 at rest. The same caching covers the per-comment
+issue-label lookups (labels/state/etag persist in the cursor, bounded to 200 entries,
+pruned by last touch). `GH_NO_ETAG=1` reverts to plain polling if a 304 ever misbehaves;
+any parse anomaly degrades to the existing failed-poll no-op semantics. This is the
+direct follow-up to the GH rate-limit hold (`GH_RATE_FLOOR`, which pauses all wakes once
+quota runs low) — with steady-state cost near zero, that hold should rarely trigger.
+
 (What even scarce, deduped, batched wakes still waste — the real-but-pointless event —
 is §12's territory: measure wake *yield*, then filter in the router.)
 
@@ -386,11 +399,18 @@ correctly.
   "wasted less."
 - **Filter in the router, for $0** (`wake_filter.py`): a pure function over (event,
   GitHub state, recent outcomes) that the runner consults before dispatching. The live
-  org's first two rules: **closed-thread echo defer** (a non-human comment on a closed
-  issue defers the wake) and **noop-streak cooldown** (N consecutive `noop` outcomes for
-  a department defers its next non-direct wake). Hard piercing rules ride above both:
-  a human's comment, an unsigned comment, a workflow run, or any direct/Chairman event
-  **always wakes** — the filter may only defer what provably cannot need a brain.
+  org's first two rules (**v1**): **closed-thread echo defer** (a non-human comment on a
+  closed issue defers the wake) and **noop-streak cooldown** (N consecutive `noop`
+  outcomes for a department defers its next non-direct wake). Hard piercing rules ride
+  above both: a human's comment, an unsigned comment, a workflow run, or any
+  direct/Chairman event **always wakes** — the filter may only defer what provably
+  cannot need a brain. **v2** (business#286) closed the gap v1 left open: an edited
+  comment bumps its parent issue's `updatedAt` to the exact same timestamp, so the
+  runner mints a fresh *issue* event that v1's comment-side rule never saw — attribution
+  (`attribute_issue_bumps`, pre-dedup) stamps the bump's department when a same-poll
+  comment shares its exact timestamp, then defers it as `issue-self-echo`
+  (open issue) or `issue-closed-thread-echo` (closed); unattributed issue events —
+  human edits, label changes, CI — still fire exactly as v1.
 - **Shadow first.** The filter ships logging would-defer decisions without deferring
   (same discipline as the runner's own `RUNNER_MODE=shadow`), and flips on only after
   the shadow log shows zero false defers. A filter that eats a real wake is worse than
