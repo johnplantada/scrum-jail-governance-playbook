@@ -49,7 +49,7 @@ on the live org — see the writeups.
 ## The Core Idea
 
 Agents propose. You approve. **The platform, not an LLM, verifies your approval and
-enforces it** — GitHub's own review/merge and environment-approval primitives, not a
+enforces it** — GitHub's own review/merge and manual workflow-dispatch primitives, not a
 custom bot watching a chat stream.
 
 ```

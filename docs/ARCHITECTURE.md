@@ -73,7 +73,7 @@ scrum-jail-governance-playbook/
 ├── README.md            entry point + file inventory
 ├── RUNBOOK.md           afternoon setup, incl. ships-vs-builds + the gate-verification tests
 ├── emoji-gate.md        the authorization gate (historical filename; the mechanism is
-│                        merges + environment approvals, not chat emoji)
+│                        merges + manual deploy dispatches, not chat emoji)
 ├── patterns.md          13 misbehavior patterns + counter-patterns
 ├── blocker-ledger.md    the anti-"blocked loop" primitives
 ├── safe.md              scaled-agile without the theater
@@ -131,7 +131,7 @@ sequenceDiagram
     A->>GH: open a product PR from agent/it/* (agents never merge to main)
     GH->>GH: CI green + review/demo evidence → the Chairman merges
     GH->>W: the push to main runs VERIFY jobs only — the deploy job is skipped
-    Note over W: the merged change queues; nothing can deploy it automatically
+    Note over W: the merged change queues — nothing can deploy it automatically
     alt dispatched
         C->>W: Actions → Run workflow — the dispatch IS the authorization
         W->>GH: deploy runs · the Actions run history is the SHA-bound audit trail
@@ -165,7 +165,7 @@ Authority is declared, not improvised. `org-chart.yaml` is the runtime's source 
 
 ```mermaid
 flowchart TD
-    Board["🏛️ Board / Chairman<br/>holds the keys — the merge and the environment approval are the signing keys"]
+    Board["🏛️ Board / Chairman<br/>holds the keys — the merge and the deploy dispatch are the signing keys"]
     CEO["CEO<br/>chief-executive · sonnet · max_subagents 0"]
     BIZ["Business<br/>demand · sonnet · envelope 4 / 500k tokens"]
     IT["IT<br/>supply · sonnet · envelope 4 / 500k tokens"]
@@ -238,7 +238,7 @@ A naive agent loop, when it hits something only a human can do, re-states the bl
 burns tokens. Three primitives (see [`blocker-ledger.md`](../blocker-ledger.md)) fix this.
 
 **1 — The capability boundary.** A hard list of things *no* agent can ever do: hold credentials,
-move money, register a domain, or perform the governance merges and environment approvals.
+move money, register a domain, or perform the governance merges and deploy dispatches.
 These are the human's alone.
 
 **2 — The blocker ledger.** `blockers.yaml` is a durable operator queue. When an agent hits a
@@ -375,7 +375,7 @@ coordination, visibility, auditability, decision authority — are *system-of-re
 and the chat org implemented them by parsing a system of *conversation*: prose-policed
 conventions, plus a bot to verify what the platform could have enforced. On 2026-07-05 the live
 org demolished the whole stack in one move (no parallel run) and put the record where the
-output lives: GitHub Issues, PRs, environments, and committed ledgers, enforced by GitHub
+output lives: GitHub Issues, PRs, Actions runs, and committed ledgers, enforced by GitHub
 itself. The emoji survive only as ledger vocabulary. The before-measurements live in the
 business repo's `docs/MIGRATION-BASELINE.md`; the code lives in git history, which is where
 retired architecture belongs.

@@ -63,9 +63,9 @@ this template only carries the GitHub-native gate forward.)
        **capability-absence**: agents hold no payment credentials or prod access,
        so even a confused or compromised agent has nothing to spend or ship with
        directly, gate or no gate.
-   └── if any check fails (no CODEOWNERS review, no environment approval): the
-       PR cannot merge / the deploy cannot proceed — there's no separate "the
-       agent tried anyway" path to defend against
+   └── if any check fails: no CODEOWNERS review → the PR cannot merge; no manual
+       dispatch → the deploy never starts — there's no separate "the agent tried
+       anyway" path to defend against
 
 5. THE RECORD IS ALREADY MADE
    └── no separate confirmation post is required for money/org-shape — the merged
@@ -175,7 +175,7 @@ Both gates ship **dormant** and become binding only when there's something to ga
 `[CODEREVIEW]` gate is dormant until the review check is installed on the product repo
 (no check, no citation required), and the whole demo/review layer is dormant while the
 output predicate says nothing has shipped (safe.md). This is the gate's answer to "green tests
-aren't authorization": the environment approval stays a pure human authorization, with
+aren't authorization": the dispatch stays a pure human authorization, with
 correctness (review) and user-value (demo) proven *before* it, by parties who don't
 approve their own work.
 
@@ -220,9 +220,9 @@ nothing extra to compose: you deploy by dispatching the workflow when you're sat
 | Agent tries to merge its own `decisions.yaml` PR | Blocked by branch protection — a PR author's own approval doesn't satisfy a required CODEOWNERS review |
 | Agent tries to trigger a deploy | The deploy job runs only on `workflow_dispatch`; a push or merge can't start it, and the agent's `gh` token must be scoped so it can't dispatch (see credential hygiene above) |
 | Agent edits `decisions.yaml` directly on `main` | Can't — branch protection requires all changes via reviewed PR |
-| Agent acts before the PR merges / environment approves | Nothing in the runtime intercepts it — the action fails because the agent holds no payment credential or prod access. If it *could* have succeeded, fix the capability leak, not the prompt |
+| Agent acts before the PR merges / the Chairman dispatches | Nothing in the runtime intercepts it — the action fails because the agent holds no payment credential or prod access. If it *could* have succeeded, fix the capability leak, not the prompt |
 | Agent re-proposes with a different ceiling mid-review | Open a new PR/entry; don't silently edit an entry already under review — the diff you're reviewing must match what merges |
-| Agent posts a `[PROPOSAL]` and treats a Chairman 👍/comment as approval for a money/org-shape ask | Doesn't count — only a merged `decisions.yaml` entry or an approved deploy environment is authorization; a `[PROPOSAL]` issue is for asks that aren't money/org-shape in the first place |
+| Agent posts a `[PROPOSAL]` and treats a Chairman 👍/comment as approval for a money/org-shape ask | Doesn't count — only a merged `decisions.yaml` entry or the Chairman's deploy dispatch is authorization; a `[PROPOSAL]` issue is for asks that aren't money/org-shape in the first place |
 
 ---
 

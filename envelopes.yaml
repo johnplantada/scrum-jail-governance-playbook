@@ -13,8 +13,8 @@
 # LINEAGE: v1 ran these gates as Chairman emoji reactions (💰/🚀)
 # verified by a deterministic Registrar service; retired 2026-07-05
 # with the chat stack. The gates survived — only the mechanism
-# translated to GitHub-native primitives (merges and environment
-# approvals instead of reactions).
+# translated to GitHub-native primitives (merges and manual deploy
+# dispatches instead of reactions).
 
 # ── ENVELOPE FIELDS ──────────────────────────────────────────
 
@@ -188,7 +188,7 @@ reference_envelopes:
 # ── GLOBAL CONFIG (org-chart.yaml `global:` + `limits:`) ─────
 # Org-wide knobs. These are policy/behavior tuning, NOT authority — an agent can't
 # widen its own authority by editing them; that's what the envelope and the Chairman's
-# merge/environment gates are for.
+# merge/dispatch gates are for.
 #
 # model_ids         — tier (haiku/sonnet/opus) → exact API model id. The SINGLE source
 #                     of truth for tier→model resolution. A 💎 PROMOTE (a decisions.yaml
