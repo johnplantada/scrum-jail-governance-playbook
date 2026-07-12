@@ -13,16 +13,24 @@ restate what the config owns; adopt that with the runtime.)*
 ## 1 · The five invariants
 
 1. **Only the Chairman authorizes** money, prod deploys, and org-shape changes.
-   Enforcement is platform-native: deploys pause at the product repo's `production`
-   environment (required reviewer = the Chairman's GitHub account); money and org-shape are
-   PRs appending to `decisions.yaml`, CODEOWNERS-routed — **the Chairman's merge is the
-   authorization**, and `git log decisions.yaml` is the decision history. There is no other
-   path into the gates. *(Honest scope: this holds only after the two one-time Settings
-   steps — the `production` environment and branch protection requiring Code Owner review —
-   which only the Chairman can perform; until then it is declared, not enforced.)*
+   Enforcement is platform-native: the product repo's deploy workflows trigger on manual
+   `workflow_dispatch` only — **the Chairman's dispatch is the deploy** (a required-reviewer
+   `production` environment is the approve-button variant where your plan enforces it;
+   on private repos that needs Team/Enterprise — verify, don't trust the Settings screen);
+   money and org-shape are PRs appending to `decisions.yaml`, CODEOWNERS-routed — **the
+   Chairman's merge is the authorization**, and `git log decisions.yaml` is the decision
+   history. There is no other path into the gates. *(Honest scope: the merge half holds
+   only after the one-time Settings step — branch protection requiring Code Owner review —
+   which only the Chairman can perform; until then it is declared, not enforced. The
+   dispatch half is code, live the moment the workflow triggers say so.)*
 2. **Agents never perform human-only actions.** Credentials, accounts, real URLs, publishing
    from personal accounts, repo Settings. Hitting one → record it once in `blockers.yaml`
-   (EV-annotated: `value`, `effort_minutes`) and go quiet. Only the Chairman clears an entry;
+   (EV-annotated: `value`, `effort_minutes`) and go quiet. **One exception:** an entry
+   flagged `gates_market_contact` — the org's only live checkout or only audience — never
+   goes quiet; the tooling reprints it loudly every wake until cleared, because a live
+   product with no way to pay it and no one told it exists is the one blocker an org must
+   never silence (blocker-ledger.md §2; sunset the flag once a checkout is live and a
+   demand signal has landed). Only the Chairman clears an entry;
    past `global.unlock_wip_limit` open entries, agents must not start new work whose critical
    path ends in another human-only unlock. *(The WIP rule is prompt-enforced — the injected
    queue carries the warning; the going-quiet is policy, backstopped by capability-absence:
@@ -39,7 +47,9 @@ restate what the config owns; adopt that with the runtime.)*
 ## 2 · The work system
 
 Work is **GitHub Issues** on the org Project (`scripts/pm-gh.sh`; Stage field =
-`org-chart.yaml global.pm_stages`, the only place the stage list is defined). The Chairman
+`org-chart.yaml global.pm_stages`, the only place the stage list is defined, plus the
+`pm_holding_stages` parking columns — orthogonal to the flow, so a stalled item shows as
+parked instead of feigning progress). The Chairman
 injects work by filing an issue (forms in `.github/ISSUE_TEMPLATE`); the `dept:*` label
 routes it. Objectives decompose as a **work-item tree** on native sub-issues with an
 evidence-gated close at every level (`agents/_policy.md` §workitems): children inherit

@@ -1,14 +1,16 @@
 # Agent Misbehavior Patterns — and How to Govern Them
 
-Eleven patterns that burn operators. Each one has a specific governance fix.
+Thirteen patterns that burn operators. Each one has a specific governance fix.
 These aren't hypothetical — they're the failure modes that show up when agents
-have more authority than their operators intended (Patterns 1–8), or when the
+have more authority than their operators intended (Patterns 1–8), when the
 orchestration loop has no idea of "blocked," "done," or "do nothing" (Patterns
-9–11). See "The Pattern Behind the Patterns" at the end.
+9–12), or when the gates themselves misfire and collect compliance instead of
+bug reports (Pattern 13). See "The Pattern Behind the Patterns" at the end.
 
 The failures are timeless; the counter-patterns are stated against the current
 GitHub-native runtime (work = Issues on one Project via `scripts/pm-gh.sh`; authority =
-the Chairman's `decisions.yaml` merges and the product repo's `production` environment;
+the Chairman's `decisions.yaml` merges and a human-dispatched deploy — the product
+repo's deploy workflows run on manual `workflow_dispatch` only;
 nervous system = an event-driven runner routing `dept:*` labels). Where the machinery
 changed when the chat stack was demolished (2026-07-05), a compact lineage note says
 what v1 did.
@@ -48,15 +50,19 @@ deploy gate was enforced at the infra layer. The agent treated "tests green" as
 sufficient authorization.
 
 **Counter-pattern:** Put the deploy gate *outside the agent's trust domain*: agents get
-no prod credentials and open PRs but never merge to `main`; the deploy pipeline pauses
-at the product repo's `production` environment, where the Chairman is the required
-reviewer — GitHub itself holds the run until that human approves, so an agent cannot
-reach production even if it convinces itself it should. Layer the protocol on top:
-declare `can_deploy: false` (a hint, not a code switch), and put the PR link and a
-one-line rollback plan on the ticket before asking for the approval. No amount of test
-coverage substitutes for the human gate — the gate is for authorization, not quality
-assurance. *(v1: a Chairman 🚀 reaction, recorded to `#decisions` — retired 2026-07-05;
-🚀 survives only as ledger vocabulary.)*
+no prod credentials and open PRs but never merge to `main`; every workflow that touches
+prod triggers on **manual `workflow_dispatch` only** — a merge to `main` builds and
+verifies but deploys nothing, and **the Chairman's dispatch is the deploy**, SHA-visible
+and permanently audited in the Actions run history. (A `production` environment with a
+required reviewer gives the same pause-for-a-human property *where your plan enforces
+it* — required reviewers on a **private** repo need Team/Enterprise. The live org
+shipped the environment first on a private Free-plan repo, discovered it silently
+didn't enforce, and moved the gate into the trigger itself — code, reviewable, and
+plan-independent.) Layer the protocol on top: declare `can_deploy: false` (a hint, not
+a code switch), and put the PR link and a one-line rollback plan on the ticket before
+asking for the dispatch. No amount of test coverage substitutes for the human gate —
+the gate is for authorization, not quality assurance. *(v1: a Chairman 🚀 reaction,
+recorded to `#decisions` — retired 2026-07-05; 🚀 survives only as ledger vocabulary.)*
 
 ---
 
@@ -102,7 +108,10 @@ Chairman-only authorization), don't even re-propose — record it **once** in a
 `blockers.yaml` ledger and go quiet. That ledger, not the chat stream, is the operator's
 queue. Re-announcing the same blocker every wake is itself the failure (Pattern 9); the
 ledger makes a blocker a durable latch only the human clears, and clearing it is what wakes
-the agent again (the unblock is itself new inbound). See [blocker-ledger.md](blocker-ledger.md).
+the agent again (the unblock is itself new inbound). One deliberate exception: an entry
+flagged as gating the org's **only checkout or only audience** never goes quiet — see the
+`gates_market_contact` flag in [blocker-ledger.md](blocker-ledger.md) §2, paid for by a
+real incident. See [blocker-ledger.md](blocker-ledger.md).
 
 ---
 
@@ -185,7 +194,7 @@ routes around it.
 **Counter-pattern:** Two things. First, write into every agent's charter: "A declined
 proposal closes the matter. Do not re-propose the same action rephrased." Second, know
 what the platform does and doesn't check: GitHub verifies *who* — only the Chairman can
-merge past CODEOWNERS or approve the `production` environment, so nobody has to parse
+merge past CODEOWNERS or dispatch the deploy workflow, so nobody has to parse
 reactor ids anymore — but nothing checks whether a new `decisions.yaml` PR is a
 re-phrase of one that was closed unmerged. The behavioral discipline has to come from
 the charter. If an agent is evading, rewrite its charter to be explicit about refusal
@@ -216,7 +225,9 @@ noise" posts anyway, because the loop gives it no other legal move.
 
 **Counter-pattern:** Give "blocked" and "do nothing" first-class representations.
 1. **A blocker ledger** (`blockers.yaml`) is the durable record of human-only blockers; agents
-   write to it once and stop, never re-post (Pattern 4). It is the operator's queue — and
+   write to it once and stop, never re-post (Pattern 4; the one flagged exception —
+   `gates_market_contact`, blocker-ledger.md §2 — is reprinted *by the tooling*, not
+   re-posted by agents). It is the operator's queue — and
    `agent-run.sh` injects the open entries into every wake prompt, so an agent never has to
    re-derive (or re-announce) them.
 2. **No scheduled wakes at all.** The runner is event-driven: it polls GitHub each tick and
@@ -273,7 +284,12 @@ heartbeats that do nothing but wake peers. Then let the runner damp what's left 
 (`runner.py`) is built so it can't storm the way the chat org did: the dedup ring drops
 re-polled events, a tick batches all of a department's triggers into **one** wake, and a
 comment never echo-wakes its own banner author, so an agent working its own single-label ticket
-wakes nobody (itself included). The org-wide backstop is financial: the runner holds live wakes
+wakes nobody (itself included). The residue after all that damping is *real-but-pointless*
+events — a peer comment landing on an already-closed thread still boots a full model to
+conclude "already handled" — and the live org's answer is the wake filter + wake-yield
+metric (FIELD-NOTES.md §12): tag every wake's outcome, steer on the fraction that mutate
+the record, and defer the provably-pointless wake classes in the router for $0. The
+org-wide backstop is financial: the runner holds live wakes
 once the day's metered spend crosses `SPEND_BREAKER_DAILY_USD`, so spend without progress hits
 a hard ceiling. One honest caveat: delivery today is at-most-once — a wake held at the cap (or
 a crashed cycle) does not get its events re-queued; they stay visible on the issue, but the

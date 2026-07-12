@@ -8,7 +8,8 @@ control. It is the architectural companion to the conceptual docs
 ([`RUNBOOK.md`](../RUNBOOK.md)).
 
 > **One-line summary:** *Agents propose. The human Chairman authorizes by merging a
-> `decisions.yaml` PR (money, org-shape) or approving a `production` deployment (prod). GitHub
+> `decisions.yaml` PR (money, org-shape) or manually dispatching the deploy workflow (prod).
+> GitHub
 > — platform configuration, never an LLM and no longer a bot — enforces.* This repo packages
 > that model as copyable primitives plus a generator (`bin/orggen`) that stamps a fresh
 > governance-gated org.
@@ -27,7 +28,7 @@ flowchart LR
     PROD["🌐 scrum-jail<br/><b>The product — scrumjail.org</b><br/>React SPA · Go Lambda · AWS · Terraform"]
 
     GP -->|"orggen stamps an org<br/>make sync-playbook vendors the docs"| BIZ
-    BIZ -->|"IT agent opens PRs<br/>Chairman approves each deploy at the production environment"| PROD
+    BIZ -->|"IT agent opens PRs<br/>Chairman dispatches each deploy (workflow_dispatch)"| PROD
     PROD -->|"site CTAs / PLAYBOOK_URL link back"| GP
     BIZ -.->|"governance model extracted from the live org"| GP
 
@@ -59,8 +60,8 @@ contains **no runtime**. The runtime is deliberately thin — a handful of scrip
 - **Scripts** (the moving parts): `runner.py` + `wake-rules.yaml` (poll GitHub, route events to
   department wakes), `agent-run.sh` + `agent_cycle.py` (one headless Claude cycle per wake),
   `pm-gh.sh` (the ticket CLI over Issues + a Project).
-- **Platform** (the enforcing parts): branch protection + CODEOWNERS, a `production`
-  environment with a required reviewer, Actions CI.
+- **Platform** (the enforcing parts): branch protection + CODEOWNERS,
+  `workflow_dispatch`-only deploy workflows, Actions CI.
 
 The reference implementation of the scripts powers the live `scrum-jail-business` org;
 [`RUNBOOK.md`](../RUNBOOK.md) ("What This Repo Ships vs. What You Build") specifies each
@@ -72,7 +73,7 @@ scrum-jail-governance-playbook/
 ├── README.md            entry point + file inventory
 ├── RUNBOOK.md           afternoon setup, incl. ships-vs-builds + the gate-verification tests
 ├── emoji-gate.md        the authorization gate (historical filename; the mechanism is
-│                        merges + environment approvals, not chat emoji)
+│                        merges + manual deploy dispatches, not chat emoji)
 ├── patterns.md          13 misbehavior patterns + counter-patterns
 ├── blocker-ledger.md    the anti-"blocked loop" primitives
 ├── safe.md              scaled-agile without the theater
@@ -93,9 +94,10 @@ scrum-jail-governance-playbook/
 
 Every privileged action (spend money, deploy to prod, charter or dissolve a department, raise a
 model tier) flows through the same loop. The human is the only one who can authorize, and
-authorization is an act GitHub already knows how to gate: **a merge or a deployment approval**
-— something no agent can perform, because the agents' shared identity cannot merge to a
-protected `main` and is not on the environment's reviewer list.
+authorization is an act GitHub already knows how to gate: **a merge or a manual workflow
+dispatch** — something no agent can perform, because the agents' shared identity cannot merge
+to a protected `main`, and its token must not carry the Actions-write right that dispatching
+requires (the credential-hygiene rule in [`emoji-gate.md`](../emoji-gate.md)).
 
 **Money and org-shape** go through the decisions ledger:
 
@@ -118,7 +120,7 @@ sequenceDiagram
     end
 ```
 
-**Prod deploys** go through the product repo's environment gate:
+**Prod deploys** go through the product repo's dispatch-only trigger:
 
 ```mermaid
 sequenceDiagram
@@ -127,17 +129,22 @@ sequenceDiagram
     participant W as deploy.yml
     participant C as Chairman
     A->>GH: open a product PR from agent/it/* (agents never merge to main)
-    GH->>GH: CI green + review/demo evidence → the PR merges
-    GH->>W: merge to main triggers the deploy workflow
-    W->>W: pause at the production environment
-    GH-->>C: requests approval (required reviewer)
-    alt approved
-        C->>W: approve — the approval IS the authorization
-        W->>GH: deploy runs · GitHub's deployment log is the SHA-bound audit trail
-    else not approved
-        Note over W: the run stays paused, then expires — nothing ships
+    GH->>GH: CI green + review/demo evidence → the Chairman merges
+    GH->>W: the push to main runs VERIFY jobs only — the deploy job is skipped
+    Note over W: the merged change queues — nothing can deploy it automatically
+    alt dispatched
+        C->>W: Actions → Run workflow — the dispatch IS the authorization
+        W->>GH: deploy runs · the Actions run history is the SHA-bound audit trail
+    else not dispatched
+        Note over W: the change sits, indefinitely — nothing ships
     end
 ```
+
+*(A `production` environment with a required reviewer is the approve-button variant of this
+gate — use it only where your plan enforces it: on a **private** repo, required reviewers
+need Team/Enterprise, and a Free-plan Settings screen accepts them without enforcing. The
+live org learned this by shipping the environment first; the RUNBOOK's Test 2 exists so you
+learn it in a test instead.)*
 
 Why this works: the only authority is **platform configuration keyed to the Chairman's GitHub
 account**, checked by GitHub itself — there is no bot to verify a reactor, and nothing to
@@ -158,7 +165,7 @@ Authority is declared, not improvised. `org-chart.yaml` is the runtime's source 
 
 ```mermaid
 flowchart TD
-    Board["🏛️ Board / Chairman<br/>holds the keys — the merge and the environment approval are the signing keys"]
+    Board["🏛️ Board / Chairman<br/>holds the keys — the merge and the deploy dispatch are the signing keys"]
     CEO["CEO<br/>chief-executive · sonnet · max_subagents 0"]
     BIZ["Business<br/>demand · sonnet · envelope 4 / 500k tokens"]
     IT["IT<br/>supply · sonnet · envelope 4 / 500k tokens"]
@@ -175,7 +182,7 @@ An envelope has four fields (full reference + presets in [`envelopes.yaml`](../e
 | `max_subagents` | how many sub-teams this node may spawn | exceed it → open a `[CHARTER]` decisions.yaml PR, wait for the merge |
 | `daily_token_budget` | per-day token ceiling, metered per call into the spend ledger | enforced as a **brownout** (`budget_gate.py`): over-budget wakes skip — except direct, event-routed wakes, which always run; the org-wide daily $ cap is a separate breaker at the runner |
 | `can_spend` | almost always `false` | attempt → must open a `[SPEND]` decisions.yaml PR, wait for the merge |
-| `can_deploy` | almost always `false` | the deploy workflow pauses at `production` regardless — wait for the Chairman's approval |
+| `can_deploy` | almost always `false` | the deploy job runs only from a manual `workflow_dispatch` regardless — wait for the Chairman's dispatch |
 
 The six governance gates. The emoji survive from the chat era as **mnemonic ledger
 vocabulary** (`org-chart.yaml` → `governance:`) — nothing parses a reaction anymore; four of
@@ -187,7 +194,7 @@ the six are `decisions.yaml` `type` strings, and the other two are platform/file
 | `sunset` | ⚰️ | sunset (dissolve) a department | decisions.yaml PR (`type: sunset`) → Chairman's merge |
 | `promote` | 💎 | raise a node's model tier | decisions.yaml PR (`type: promote`) → Chairman's merge |
 | `fund` | 💰 | approve spend up to a stated ceiling | decisions.yaml PR (`type: spend`) → Chairman's merge |
-| `ship` | 🚀 | approve a production deploy | `production` environment → Chairman's required-reviewer approval |
+| `ship` | 🚀 | approve a production deploy | `workflow_dispatch`-only deploy workflow → the Chairman's manual dispatch |
 | `halt` | 🛑 | emergency stop — halts the **whole org** (not a per-proposal veto) | `.halt` flag file; only a human removes it |
 
 ---
@@ -231,7 +238,7 @@ A naive agent loop, when it hits something only a human can do, re-states the bl
 burns tokens. Three primitives (see [`blocker-ledger.md`](../blocker-ledger.md)) fix this.
 
 **1 — The capability boundary.** A hard list of things *no* agent can ever do: hold credentials,
-move money, register a domain, or perform the governance merges and environment approvals.
+move money, register a domain, or perform the governance merges and deploy dispatches.
 These are the human's alone.
 
 **2 — The blocker ledger.** `blockers.yaml` is a durable operator queue. When an agent hits a
@@ -282,7 +289,7 @@ decides whether the whole process layer is awake. Full rules in [`safe.md`](../s
 flowchart TD
     Cer["Any ceremony begins"] --> Pred{"last-ship.sh:<br/>green prod deploy on main?"}
     Pred -->|"shipped = no"| Dormant["Process layer dormant:<br/>no demo · no acceptance · no PI planning<br/>reviews close with one line; accepted PRs queue"]
-    Pred -->|"shipped = yes"| Active["code review + demo evidence on the product PR<br/>→ merge → deploy.yml pauses at production<br/>→ Chairman approves (the 🚀)"]
+    Pred -->|"shipped = yes"| Active["code review + demo evidence on the product PR<br/>→ merge → the change queues<br/>→ Chairman dispatches deploy.yml (the 🚀)"]
 ```
 
 This is why capabilities can ship **dormant** behind a charter: until the org actually ships
@@ -295,7 +302,7 @@ Two gates sit in front of any product-surface deploy (see [`safe.md`](../safe.md
 *correct* — in the live org the chat-era Reviewer department retired with the demolition, and
 review returns as a `claude-code-action` check on product PRs when needed — and **demo
 evidence** on the PR (checked mechanically, head-SHA-bound) proves the change *reaches a user*.
-Only then does the deploy workflow earn its pause at `production` for the Chairman's approval.
+Only then does the change earn the Chairman's dispatch.
 
 ---
 
@@ -317,8 +324,8 @@ flowchart LR
     Agents --> Inv
 ```
 
-Usage (the chairman identifier is your **GitHub username** — CODEOWNERS and the `production`
-environment's required-reviewer list both key off it; there are no bot ids and no channels to
+Usage (the chairman identifier is your **GitHub username** — CODEOWNERS keys off it, and the
+deploy dispatch is yours to click; there are no bot ids and no channels to
 configure):
 
 ```bash
@@ -368,7 +375,7 @@ coordination, visibility, auditability, decision authority — are *system-of-re
 and the chat org implemented them by parsing a system of *conversation*: prose-policed
 conventions, plus a bot to verify what the platform could have enforced. On 2026-07-05 the live
 org demolished the whole stack in one move (no parallel run) and put the record where the
-output lives: GitHub Issues, PRs, environments, and committed ledgers, enforced by GitHub
+output lives: GitHub Issues, PRs, Actions runs, and committed ledgers, enforced by GitHub
 itself. The emoji survive only as ledger vocabulary. The before-measurements live in the
 business repo's `docs/MIGRATION-BASELINE.md`; the code lives in git history, which is where
 retired architecture belongs.

@@ -13,8 +13,8 @@
 # LINEAGE: v1 ran these gates as Chairman emoji reactions (💰/🚀)
 # verified by a deterministic Registrar service; retired 2026-07-05
 # with the chat stack. The gates survived — only the mechanism
-# translated to GitHub-native primitives (merges and environment
-# approvals instead of reactions).
+# translated to GitHub-native primitives (merges and manual deploy
+# dispatches instead of reactions).
 
 # ── ENVELOPE FIELDS ──────────────────────────────────────────
 
@@ -94,16 +94,16 @@ envelope_fields:
       Declares whether this agent may push to production without a human
       gate. HONESTY NOTE: like can_spend, this is a declared hint — no
       runtime code branches on it. The real enforcement lives on the
-      platform: agents have no prod credentials, and every deploy pauses
-      at the product repo's `production` environment, whose required
-      reviewer is the Chairman.
+      platform: agents have no prod credentials, and the product repo's
+      deploy workflows trigger on manual workflow_dispatch only — no
+      push, merge, or agent action starts a deploy.
     guidance: >
-      ALWAYS false. Agents open PRs against the product repo; the deploy
-      run then pauses at the `production` environment until the Chairman
-      approves it in the GitHub UI. That approval is the authorization,
-      and GitHub's environment deployment log is the audit trail. Even
-      "trivial" deploys go through this gate — it costs 10 seconds and
-      has caught real accidents.
+      ALWAYS false. Agents open PRs against the product repo; a merge to
+      main builds and verifies but deploys nothing — the change waits
+      until the Chairman dispatches the deploy workflow by hand. That
+      dispatch is the authorization, and the Actions run history is the
+      SHA-bound audit trail. Even "trivial" deploys go through this gate
+      — it costs 10 seconds and has caught real accidents.
 
 # ── REFERENCE ENVELOPES (copy-paste into org-chart.yaml) ────
 
@@ -152,12 +152,12 @@ reference_envelopes:
 #                           total dollars (that's the spend breaker below).
 # can_spend / can_deploy  → hints, not switches — no runtime code branches on them.
 #                           The real backstop is capability-absence: no payment
-#                           credentials exist for an agent to use, and prod deploys
-#                           pause at the product repo's `production` environment.
-#                           The human-in-the-loop approval interface is the Chairman's
-#                           MERGE of a decisions.yaml PR (money, org-shape) and the
-#                           Chairman's environment approval (deploys); git log and
-#                           GitHub's environment log are the audit trail on top.
+#                           credentials exist for an agent to use, and the product
+#                           repo's deploy workflows run only from a manual
+#                           workflow_dispatch. The human-in-the-loop interface is the
+#                           Chairman's MERGE of a decisions.yaml PR (money, org-shape)
+#                           and the Chairman's DISPATCH of the deploy workflow; git log
+#                           and the Actions run history are the audit trail on top.
 #
 # A refused sub-team or an unapproved proposal is NOT an error. It is the governance
 # protocol working correctly. Design your agents to propose-and-wait, not to retry
@@ -188,7 +188,7 @@ reference_envelopes:
 # ── GLOBAL CONFIG (org-chart.yaml `global:` + `limits:`) ─────
 # Org-wide knobs. These are policy/behavior tuning, NOT authority — an agent can't
 # widen its own authority by editing them; that's what the envelope and the Chairman's
-# merge/environment gates are for.
+# merge/dispatch gates are for.
 #
 # model_ids         — tier (haiku/sonnet/opus) → exact API model id. The SINGLE source
 #                     of truth for tier→model resolution. A 💎 PROMOTE (a decisions.yaml

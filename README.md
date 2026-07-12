@@ -13,8 +13,9 @@ sure they don't. This is the governance system that keeps humans in the loop.
 **Cost**: $0 of infrastructure beyond GitHub itself (a private repo works fine; Claude
 usage is the running cost)  
 **What you get**: the complete governance layer for a multi-agent org — org templates, a
-generator, and the GitHub-native authority model (a `production` environment gate for
-deploys, a reviewed `decisions.yaml` ledger for money/org-shape) — plus precise contracts
+generator, and the GitHub-native authority model (a human-dispatched deploy gate —
+`workflow_dispatch`-only deploy workflows — and a reviewed `decisions.yaml` ledger for
+money/org-shape) — plus precise contracts
 for the thin runtime (a GitHub poller + wake runner) you build or bring yourself. See
 [RUNBOOK.md](RUNBOOK.md) "What This Repo Ships vs. What You Build" before planning
 your afternoon.
@@ -27,11 +28,11 @@ your afternoon.
 |---|---|
 | `org-chart.yaml` | Define your agents, their roles, and their authority envelopes |
 | `envelopes.yaml` | Reference for every envelope field — what it means, how to tune it |
-| `emoji-gate.md` | The authorization gate walkthrough — decisions.yaml/CODEOWNERS for money/org-shape, the `production` environment for deploys, why each step exists, and the pre-deploy code-review/demo chain |
+| `emoji-gate.md` | The authorization gate walkthrough — decisions.yaml/CODEOWNERS for money/org-shape, the `workflow_dispatch`-only deploy gate, why each step exists, and the pre-deploy code-review/demo chain |
 | `patterns.md` | **13** agent misbehavior patterns + the specific governance fix for each |
 | `blocker-ledger.md` | The blocker ledger + capability boundary + wake backpressure — stops the "blocked loop" |
 | `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output; the work-item tree with a closing rule per level; the `[CODEREVIEW]` + `[DEMO]` gates before a 🚀 |
-| `FIELD-NOTES.md` | **Field-tested mechanisms** from the live org — the event loop, spend guards, the `.halt` switch, single-flight locks, worker tool-scoping, model-tier pinning, typed handoffs, the work-item tree's closure gate — plus the graveyard of what the 2026-07-05 demolition retired, and what replaced each piece |
+| `FIELD-NOTES.md` | **Field-tested mechanisms** from the live org — the event loop, spend guards, the `.halt` switch, single-flight locks, worker tool-scoping, model-tier pinning, typed handoffs, the work-item tree's closure gate, the deterministic warden + engine-first wakes, wake yield + the wake filter — plus the graveyard of what the 2026-07-05 demolition retired, and what replaced each piece |
 | `RUNBOOK.md` | Step-by-step: set up your org in an afternoon |
 | `bin/orggen` | Generator that stamps a new governance-gated org skeleton from `_init/` |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How it all fits together, with Mermaid diagrams — the gate, the patterns, `orggen`, and where this repo sits in the wider Scrum Jail ecosystem |
@@ -48,7 +49,7 @@ on the live org — see the writeups.
 ## The Core Idea
 
 Agents propose. You approve. **The platform, not an LLM, verifies your approval and
-enforces it** — GitHub's own review/merge and environment-approval primitives, not a
+enforces it** — GitHub's own review/merge and manual workflow-dispatch primitives, not a
 custom bot watching a chat stream.
 
 ```
@@ -57,20 +58,23 @@ Agent opens a decisions.yaml PR (spend/charter/promote/sunset)
     → Your merge IS the authorization — git log decisions.yaml is the audit trail
       → Agent acts within the merged scope
 Agent opens a product PR toward a deploy
-  → CI green + an accepted [DEMO] → the deploy workflow pauses at the
-    `production` environment
-    → Your required-reviewer approval releases it — GitHub's own deployment
-      log is the audit trail
+  → CI green + an accepted [DEMO] → you merge → the change queues, deployed by
+    nothing automatically
+    → Your manual workflow_dispatch IS the deploy — GitHub's own Actions run
+      history is the audit trail
 ```
 
 Be precise about which layer stops what — the honest version is *stronger* than the
 slogan "enforced in code":
 
 - **Enforced by GitHub, not application code:** a `decisions.yaml` PR cannot merge
-  without your CODEOWNERS review once branch protection requires it; a deploy cannot
-  proceed past the `production` environment without your approval as its required
-  reviewer. Neither gate depends on a bot correctly parsing a reaction — they're the
-  same primitives GitHub uses to gate any human review or release.
+  without your CODEOWNERS review once branch protection requires it; a deploy job whose
+  only trigger is `workflow_dispatch` cannot start from any push, merge, or agent action
+  — only from your manual dispatch. Neither gate depends on a bot correctly parsing a
+  reaction — they're the same primitives GitHub uses to gate any human review or release.
+  (A required-reviewer `production` environment is the approve-button variant of the
+  deploy gate *where your plan enforces it* — on private repos that's Team/Enterprise;
+  the live org's private Free-plan repo is why dispatch-only is the reference gate.)
 - **Not automated at all:** nothing executes a `decisions.yaml` entry's payload for
   you. Money and org-shape changes take effect because the diff describing them landed
   on `main` — there's no code path from "PR merged" to "money moves" the way there is

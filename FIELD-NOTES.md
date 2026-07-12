@@ -23,11 +23,21 @@ source, you spend your engineering effort *suppressing* wakes (Part II §R1/§R2
 rebuild inverted the premise: don't rate-limit an abundant wake supply, make wakes
 scarce by construction.
 
-**How it works:** one poller (`scripts/runner.py`, the org's *only* scheduled process,
-cron'd via `runner-watch.sh` every ~5 minutes). Each tick: read a cursor → ask GitHub
+**How it works:** one poller (`scripts/runner.py`, the org's only scheduled process
+*that spends tokens* — the deterministic maintainers beside it, plain-cron log/metrics
+jobs and the warden engine of §11, never call a model; cron'd via `runner-watch.sh`
+every ~5 minutes). Each tick: read a cursor → ask GitHub
 what changed since (issues + comments on both repos, completed product-repo workflow
 runs) → normalize to events → route through `wake-rules.yaml` → wake the owning
 departments via `agent-run.sh` → advance the cursor.
+
+- **The runner self-deploys.** Each tick, `runner-watch.sh` fast-forwards the runtime
+  checkout to `origin/main` before running, so a merged org-repo PR goes live on its own
+  — no manual pull-and-restart after a merge. Fail-soft by construction: only on `main`,
+  only a clean fast-forward (never a merge, rebase, or dirty tree), the `.halt` switch
+  wins, and a pull that can't fast-forward logs it and runs the code already on disk —
+  it never aborts the tick. Counter-ratchet-clean: one existing watcher gained one step,
+  not a new watcher.
 
 - **There are no scheduled agent wakes at all.** No heartbeats, no standups, no wake
   floors — DESIGN.md §3 states it as an operating principle: **no event, no wake, no
@@ -65,6 +75,9 @@ The honest caveat, documented in the code itself: delivery is currently **at-mos
 — the cursor advances per tick even if a dispatched cycle crashes, so its events are not
 re-delivered. `agent-run.sh` makes the abort loud ("events were NOT re-queued; re-wake
 by hand if needed"); cursor hold-back on failure is an open follow-up.
+
+(What even scarce, deduped, batched wakes still waste — the real-but-pointless event —
+is §12's territory: measure wake *yield*, then filter in the router.)
 
 ---
 
@@ -311,6 +324,85 @@ in the mandates: decompose **just-in-time**, and never close around the gate's r
 
 ---
 
+## 11. The warden, reborn — a deterministic engine with a haiku residue
+
+**The failure:** the operator is single-threaded, and the org's picture of "what does
+the human need to do" and "does the board match the code" drifts the moment it's
+hand-built. The live org's Chairman action queue (one epic whose sub-issues are the
+human-only actions) was assembled once by the CEO — and began rotting immediately: 3 of
+8 entries stale within a day, because upkeep was nobody's *mechanical* job.
+
+**How it works:** the org re-chartered a `warden` department (2026-07-11, via a
+`decisions.yaml` charter — the name deliberately reclaimed from the retired chat-era
+checker, §R6) with an unusual shape: **the engine is a deterministic, token-free script;
+the agent brain is the org's smallest.**
+
+- **`scripts/warden.py`**, on plain launchd/cron, reconciles *desired state from ground
+  truth*: the Chairman-queue epic's sub-issues are derived from the open `blockers.yaml`
+  entries, Chairman-ready PRs, and open `[PROPOSAL]`s (each child keyed by a
+  `warden-source:` marker so the sync is idempotent); the project board is reconciled
+  **forward-only** from PR/code truth (backward drift is reported, never auto-moved, and
+  the holding columns are exempt — a parked item with a PR must not be yanked back);
+  in-flight friction between departments (merge conflicts, same-file PRs, unmet declared
+  dependencies) is convened as marker-managed `[SYNC]` issues labeled for both sides,
+  auto-closed when the fact clears.
+- **Pin the coordinates in the chart, not the code:** the queue epic's issue number and
+  the project number live in `org-chart.yaml` `global:` — the one place scripts resolve
+  them from, so recreating the board or the epic is a one-line re-pin.
+- **The haiku brain wakes only on `dept:warden` events** — the judgment residue the
+  engine flags, not the reconciliation itself. Its budget is the org's smallest on
+  purpose. Route the queue epic's churn to `dept:warden` so queue upkeep never wakes the
+  CEO.
+- **Engine-first wakes** — the commissioning lesson, paid for on the warden's first live
+  wake, which burned ~10 of its 37 turns *hunting the filesystem for its own script*.
+  When an agent's job is to act on a deterministic engine's output, run the engine
+  *before* the cycle and inject its output into the wake prompt ("your engine ALREADY
+  RAN this wake; here is its report") — never make the model rediscover or re-run what
+  the loop could hand it.
+
+Keep the checker deterministic when you build yours — the §R6 rule survived its own
+mechanism: a warden that needs a model to judge a violation is just another agent to
+argue with.
+
+---
+
+## 12. Wake yield and the wake filter — measure what a wake changed, then defer the pointless ones
+
+**The failure:** "no event, no wake, no spend" (§1) is necessary but not sufficient.
+Real events can still be pointless to wake on: a peer's comment landing on an
+**already-closed** thread, or the fourth consecutive wake in a row that mutates nothing
+— each boots a full model cycle whose entire output is "already handled, ending
+silently." The live org measured it: **60–75% of wakes mutated nothing**, ~$43 on an
+active day, invisible to every existing guard because each wake individually behaved
+correctly.
+
+**How it works — measure first, then filter:**
+
+- **Tag every wake with its outcome** (`wake_outcome.py`): did the cycle `ship`
+  (PR/commit), `post` (issue/comment mutation), or `noop`? One extra field on the spend
+  ledger row. The steering KPI this unlocks is **wake yield** — the fraction of wakes
+  that mutate the record. A `$/day` cap can't see this number: it happily rewards an org
+  that gets *cheaper at idling*. Yield is the difference between "spent less" and
+  "wasted less."
+- **Filter in the router, for $0** (`wake_filter.py`): a pure function over (event,
+  GitHub state, recent outcomes) that the runner consults before dispatching. The live
+  org's first two rules: **closed-thread echo defer** (a non-human comment on a closed
+  issue defers the wake) and **noop-streak cooldown** (N consecutive `noop` outcomes for
+  a department defers its next non-direct wake). Hard piercing rules ride above both:
+  a human's comment, an unsigned comment, a workflow run, or any direct/Chairman event
+  **always wakes** — the filter may only defer what provably cannot need a brain.
+- **Shadow first.** The filter ships logging would-defer decisions without deferring
+  (same discipline as the runner's own `RUNNER_MODE=shadow`), and flips on only after
+  the shadow log shows zero false defers. A filter that eats a real wake is worse than
+  every noop it prevents — this is the R2 lesson (measure, then enforce) applied one
+  layer up.
+
+This is the direct successor to §1's backpressure list: dedup, batching, and echo-skip
+remove *duplicate* wakes; yield + the filter remove *pointless* ones — and only the
+measurement layer can tell you which you have.
+
+---
+
 # Part II — Retired with the chat stack (2026-07-05)
 
 Six mechanisms from this file's previous edition died with the demolition
@@ -361,16 +453,17 @@ system of record moved to issues/PRs/ledgers — grep-able in a way channel scro
 was — but "what did we decide about the mug CTA?" is once again a search problem, not
 a recall query. If the org re-grows a memory, it will be over GitHub objects.
 
-**R6. The Warden.** A deterministic, non-LLM checker that matched process invariants
-against what agents actually *posted* — uncited demos, bare PR references, STATUS posts
-restating a hold — and filed a `[WARDEN]` alert past a weight threshold. Retired with
-the channels it read. **The philosophy — enforcement in code, not in a prompt — moved
-into CI and the platform:** `lint_constitution.py` and `decisions.py check` are required
-merge checks (`test_agent_workers.py` rides the same test job), CODEOWNERS routes every
-`decisions.yaml` PR to the Chairman, and the `production` environment holds deploys for
-his review. The one Warden duty without a successor is typed-handoff shape validation —
-planned as an Actions check, not built (§8). Keep it deterministic when you rebuild it:
-a warden that needs a model to judge a violation is just another agent to argue with.
+**R6. The Warden (chat-era).** A deterministic, non-LLM checker that matched process
+invariants against what agents actually *posted* — uncited demos, bare PR references,
+STATUS posts restating a hold — and filed a `[WARDEN]` alert past a weight threshold.
+Retired with the channels it read. **The philosophy — enforcement in code, not in a
+prompt — moved into CI and the platform:** `lint_constitution.py` and `decisions.py
+check` are required merge checks (`test_agent_workers.py` rides the same test job),
+CODEOWNERS routes every `decisions.yaml` PR to the Chairman, and deploys run only from
+the Chairman's manual `workflow_dispatch`. The typed-handoff validation duty found its
+Actions successor (§8, built). And the Warden itself came back: re-chartered 2026-07-11
+as a department around a deterministic engine (§11) — the philosophy held; only the
+channels it read didn't.
 
 ---
 

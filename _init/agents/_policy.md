@@ -16,8 +16,8 @@ runtime; this policy assumes they are installed.)*
   (tickets are `org#N`; Stage mirrors org-chart `pm_stages`; the `dept:*` label routes the
   wake). One ticket per task; the ticket's comment thread is its single source of truth.
 - **Product code** — PRs against `$PRODUCT_GH_REPO` (`gh pr …`), branch `agent/it/<desc>`.
-  Open PRs freely; **never merge to main** — CI and the Chairman's `production` environment
-  approval gate the merge (constitution, invariant 1).
+  Open PRs freely; **never merge to main** — CI gates the merge, and prod reaches users
+  only through the Chairman's manual `workflow_dispatch` (constitution, invariant 1).
 - **Peer conversation** — comments on the relevant issue or PR. Talk directly; don't route
   through the CEO what you two can settle. **Labels are the wake wiring:** when you pull a
   peer into a thread, add their `dept:*` label to the issue — every labeled department
@@ -44,8 +44,9 @@ runtime; this policy assumes they are installed.)*
 Actions only the Chairman can take (credentials, money, accounts, real URLs, repo Settings,
 publishing from personal accounts): **invoke the `blocker-triage` skill** — one
 `blockers.yaml` entry with honest `value:` and `effort_minutes:`, then end the cycle. Never
-flip an entry to `cleared`; never re-announce a ledgered blocker. **Respect the unlock WIP
-limit:** when the injected queue opens with the ⚠ warning (`global.unlock_wip_limit`
+flip an entry to `cleared`; never re-announce a ledgered blocker — the one entry that stays
+loud, `gates_market_contact` (the org's only checkout or only audience), is reprinted by
+the tooling, not by you. **Respect the unlock WIP limit:** when the injected queue opens with the ⚠ warning (`global.unlock_wip_limit`
 exceeded), do not start new work whose critical path ends in another human-only unlock —
 work what is already unblocked or end the cycle.
 
@@ -85,7 +86,9 @@ objective), `evidence:` (a mapping: a story cites a merged repo-qualified `pr` o
 has no product surface; epics and objectives close by rollup, so their mapping may be
 empty). Posted by `pm-gh.sh done`, which only closes after the facts are re-derived live
 (`scripts/workitems.py can-close` in the reference runtime — open children, PR merge
-state, the [DEMO] marker). Closing a work-item any other way skips the gate; don't.
+state, the [DEMO] marker). A cited `pr` is verified merged for EVERY kind — including
+untyped tickets and rollups — not only where the kind demands it; the kind's rules govern
+what suffices when nothing is cited. Closing a work-item any other way skips the gate; don't.
 
 ## §workitems — objectives decompose as a tree; only evidence closes it
 

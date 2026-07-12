@@ -2,7 +2,7 @@
 #
 # Why this file exists: agents can talk, write code, and open PRs, but they cannot perform
 # real-world unlocks (set cloud credentials, spend money, register accounts, provide URLs or
-# a mailing address, or approve a prod deploy). When blocked on one, an agent records it here
+# a mailing address, or dispatch a prod deploy). When blocked on one, an agent records it here
 # ONCE and goes quiet — no wake-spinning, no re-posted blocked status. This ledger, not any
 # status stream, is what the Chairman scans to see "what does a human need to do."
 #
@@ -15,8 +15,8 @@
 #
 # kind:  external-input = a credential/URL/address/account only the human can supply
 #        governance     = a Chairman authorization — a decisions.yaml merge (💰 fund ·
-#                         🏛️ charter · 💎 promote · ⚰️ sunset) or a 🚀 production-environment
-#                         deploy approval
+#                         🏛️ charter · 💎 promote · ⚰️ sunset) or a 🚀 prod-deploy dispatch
+#                         (the Chairman's manual workflow_dispatch)
 # needs: chairman (always, for now)
 # state: open | cleared
 # value: what clearing it unlocks — revenue (a conversion path goes live) | signal
@@ -38,3 +38,5 @@ blockers: []
   #   blocks: [deploy]
   #   opened: 2026-01-01
   #   state: open
+  #   # gates_market_contact: true  # RARE — only for the org's sole checkout/audience path;
+  #   #                             # stays loud every wake (see blocker-ledger.md §2)
