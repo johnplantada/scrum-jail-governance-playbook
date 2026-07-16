@@ -345,6 +345,41 @@ hand-built. The live org's Chairman action queue (one epic whose sub-issues are 
 human-only actions) was assembled once by the CEO — and began rotting immediately: 3 of
 8 entries stale within a day, because upkeep was nobody's *mechanical* job.
 
+**The failure this section originally undersold (2026-07-16):** the queue is not a
+tidiness feature — it is the org's **only channel for "we are waiting on you,"** and this
+note was read as optional until an org proved what that costs. A second org, stamped from
+this playbook, sat silent for five hours: every thread sequenced behind one product PR
+that had been open, clean and mergeable since 00:03; the supply department woke, said so,
+and correctly went quiet. Nothing was broken — invariants 2 and Pattern 12 were working
+exactly as designed, and *that is what produced the silence*. The Chairman saw an idle org
+and reasonably concluded his agents were broken.
+
+Worse, the omission was **invisible**. That org had inherited every moving part —
+`wake-rules.yaml` routed `dept:warden` from the bootstrap, `warden.py` was vendored
+repo-correct with 22 passing tests, the pre-wake engine injection was byte-identical. Only
+the *state* was missing: no department, no `dept:warden` label, no queue epic, no pin. So
+`warden.py` exited on an unresolvable `chairman_queue_issue` — and nothing noticed, because
+nothing wakes a department that doesn't exist. Every check you'd think to run said
+"installed."
+
+Two rules came out of it, both now enforced in `bin/orggen` rather than advised here:
+**the warden is an organ, not a department you choose** (stamped unconditionally;
+`--departments` cannot drop it), and **the pins are commissioning steps, not optional
+config** (`org-chart.yaml` ships them `null` and the stamp checklist makes setting them
+step 5). See patterns.md Pattern 14.
+
+**Assign the children to the human.** The original queue used a `Chairman:` title prefix
+and a `dept:warden` label and set no GitHub assignee — so reading it meant remembering to
+open the org repo's board. Pass the chart's `chairman.github` through to
+`gh issue create --assignee` and the queue lands in the one inbox every operator already
+reads: *Assigned to me*. A queue he must remember to visit is a queue he stops visiting.
+
+**Keep the queue epic UNTYPED.** The original was labeled `objective` — a repurposed
+Chairman objective from before the work-item tree existed. Once objectives are a reserved
+power (invariant 1), a container labeled `objective` is a lie that the taxonomy will
+eventually be asked to enforce. `workitems.py` permits an untyped side anywhere, so untyped
+parent + untyped children is a legal, honest tree: infrastructure, not work intake.
+
 **How it works:** the org re-chartered a `warden` department (2026-07-11, via a
 `decisions.yaml` charter — the name deliberately reclaimed from the retired chat-era
 checker, §R6) with an unusual shape: **the engine is a deterministic, token-free script;
