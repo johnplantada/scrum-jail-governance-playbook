@@ -351,6 +351,79 @@ either the gate is wrong or the mandate is — both are PRs, not prose habits.
 
 ---
 
+## Pattern 14: The Org That Couldn't Ask (silent blocking)
+
+**What it looks like:** The org goes quiet. No comments, no PRs, wakes returning "0 events
+→ 0 wakes" tick after tick. Every dashboard is green and nothing is happening. The operator
+concludes the agents are broken or lazy and starts debugging the wake path — which is
+working perfectly. The org is **correctly blocked on the human**, and has no way to say so.
+
+**Why it happens:** This is the compound interest on your own good invariants. Agents never
+perform human-only actions (invariant 2); they record the blocker once and **go quiet**
+(Pattern 9's cure). Departments decompose just-in-time, so downstream work isn't even
+ticketed yet (Pattern 12's cure). Each department, followed to the letter, produces silence
+— and silence is indistinguishable from idleness from the outside. In the live incident,
+every open thread sequenced behind one product PR that had been open, clean and mergeable
+for five hours; the supply department woke, read three new objectives, correctly said they
+self-gate behind that merge, and went quiet. Nothing was broken. **Nobody asked.**
+
+The trap is that "waiting on the Chairman" is *distributed*: each agent knows its own
+blocker, no agent knows the org's, and the human — the only one who can clear any of them —
+is the only party with no inbox. The blocker ledger is necessary but not sufficient: it is
+a file in a repo, and a file nobody is pushed to read is not a queue.
+
+**Counter-pattern:** One **Chairman action queue** — a single untyped epic whose sub-issues
+are exactly the things only the human can do, synced from ground truth by a deterministic,
+token-free engine (open ledger entries, Chairman-ready PRs, unanswered `[PROPOSAL]`s).
+Children appear when the fact appears and close themselves when it clears, so the queue can
+never rot into a stale to-do list. Assign each child to the human's actual account: a queue
+he must remember to visit is a queue he will stop visiting, and "assigned to me" is the one
+inbox every operator already reads. Own it with a **board-reporting** node — one that
+reports into the production chain can be told not to ask.
+
+Then hold the line in code: the org's ONE scheduled process should make "waiting on you"
+loud, and going quiet must never be the same thing as needing nothing. If the queue is
+empty and the org is silent, the org is genuinely idle — that is a different bug, and now
+you can tell the two apart.
+
+---
+
+## Pattern 15: Flavor-Text Authority (the power you never actually reserved)
+
+**What it looks like:** A power everyone "knows" belongs to the human — filing objectives,
+picking priorities, naming the roadmap — turns out to be reserved nowhere. The constitution
+enumerates its reserved powers and this isn't among them. A label or a template says so in
+prose (`objective` → *"Chairman work injection"*), which enforces nothing. And somewhere in
+a mandate, the *opposite* is written as a positive instruction: *"turn the north star into a
+small number of measurable `[OBJECTIVE]` issues."* An agent does exactly that, announces it
+transparently, and the human discovers his intake was never his.
+
+**Why it happens:** Reserved powers get written where the *enforcement* lives — money and
+deploys have gates, so they get clauses. Work intake has no gate, so nobody wrote the
+clause; the intent survived only as habit, a label description, and the fact that the human
+happened to be the one doing it. Then a mandate — usually inherited from a reference org
+where the same ambiguity was harmless — states the opposite, and the mandate wins, because
+a mandate is an instruction and a label description is decoration. **The agent that "broke"
+the rule is the one that read the docs.**
+
+This one hides especially well because there is nothing to catch it: authorship checks are
+impossible when every agent acts through the human's own token (`gh issue view N --json
+author` returns *his* login either way), so CI cannot tell the two apart, and the act looks
+like diligence — filling a real coverage gap — rather than a seizure.
+
+**Counter-pattern:** Reserved powers get **enumerated in the constitution**, not implied by
+a label. Then grep every mandate for text that contradicts them — the contradiction is the
+bug, and it's usually one sentence in one file. Where no platform gate is possible, gate at
+the boundary the wake itself creates: a per-wake env var the human's own shell never has,
+checked by a PreToolUse hook, refusing the *honest* path (the bare CLI call an obedient
+agent would make). Be honest in the doc that this is a backstop, not a wall — a token that
+can reach the API can route around any tool gate — and fix the mandate first, because the
+hook only holds a line the mandate already drew. Two tests, always: one that the gate
+refuses the real regression, and several that it never touches reading, discussing, or
+building *under* the thing it protects.
+
+---
+
 ## The Pattern Behind the Patterns
 
 These split into **two roots**, and you need both fixes:
