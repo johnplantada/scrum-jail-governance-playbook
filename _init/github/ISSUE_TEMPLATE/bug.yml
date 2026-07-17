@@ -1,0 +1,27 @@
+# Bug report (DESIGN.md §2).
+name: Bug
+description: "Something is broken in the product or the org tooling"
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: What happened
+      description: Include the exact error/output and where (URL, script, workflow run link).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened
+    validations:
+      required: true
+  - type: dropdown
+    id: department
+    attributes:
+      label: Owning department
+      options:
+{{DEPT_OPTIONS}}
+    validations:
+      required: true

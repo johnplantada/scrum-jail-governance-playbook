@@ -28,7 +28,10 @@ governance:
   promote: gem                  # 💎 raise a department's model tier (type: promote)
 
 limits:
-  global_max_agents: 16         # hard ceiling across the entire org
+  # Hard ceiling across the entire org. orggen computes it from the roster (every brain +
+  # its full sub-agent fan-out); test_subagent_gate.py fails any chart whose arithmetic
+  # exceeds it, so raising it is a deliberate, reviewed act (a charter PR), never drift.
+  global_max_agents: {{GLOBAL_MAX_AGENTS}}
 
 global:
   review_interval: {{REVIEW_INTERVAL}}    # wakes per iteration — the [REVIEW] cadence
@@ -46,6 +49,16 @@ global:
   # Same board Stage field, valid move target, kept out of the ordered list, and exempt
   # from any forward auto-reconcile (a parked item with a PR stays parked).
   pm_holding_stages: [Blocked, On-Hold]
+  # Coordinate pins — the ONE place scripts resolve these from, so recreating the board
+  # or the queue epic is a one-line re-pin. Set pm_project_number after
+  # scripts/github-pm-setup.sh prints the org Project's number. Set chairman_queue_issue
+  # to the epic whose sub-issues = what only the Chairman can do — scripts/warden.py
+  # syncs its children from ground truth (open blockers, Chairman-ready PRs, open
+  # [PROPOSAL]s) and exits before doing any work while this pin is missing. The queue
+  # epic is deliberately untyped (not an [OBJECTIVE] — infrastructure, not work intake).
+  # pm_project_number: <N>      # the org Project's number (gh project <N>)
+  # chairman_queue_issue: <N>   # the Chairman action queue epic (org#N)
+
   # Pinned API model id per brain tier — the ONE place tier→model resolution lives.
   # Everything else — ledger, wake banners, budget brownouts, 💎 PROMOTE — keeps speaking
   # in tiers; a 💎 changes an AGENT's tier, editing THIS map upgrades what a tier means

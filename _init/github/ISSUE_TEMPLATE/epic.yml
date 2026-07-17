@@ -1,0 +1,38 @@
+# Work-item tree level 2: an [EPIC] decomposes an [OBJECTIVE] under its ACCEPTED
+# [PROPOSAL]. Agents create these with `pm-gh.sh create --type epic --parent N` (which
+# links the sub-issue and inherits routing); this form is the Chairman/manual path —
+# the owning agent links it under the parent at triage (scripts/workitems.py link).
+# Epics close by rollup: every child feature closed. Nothing else closes them.
+name: Epic
+description: "A delivery track under an objective (work-item tree: objective → epic → feature → story)"
+title: "[EPIC] "
+labels: ["epic"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What this track delivers toward its objective, in one or two sentences.
+    validations:
+      required: true
+  - type: input
+    id: parent
+    attributes:
+      label: Parent objective
+      description: The org#N this epic decomposes — and the accepted [PROPOSAL] it descends from.
+      placeholder: "org#118, per accepted proposal org#120"
+    validations:
+      required: true
+  - type: dropdown
+    id: department
+    attributes:
+      label: Owning department
+      options:
+{{DEPT_OPTIONS}}
+    validations:
+      required: true
+  - type: textarea
+    id: features
+    attributes:
+      label: First features (optional)
+      description: Decompose just-in-time — name only what's next up, not the whole tree.

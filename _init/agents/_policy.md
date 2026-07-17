@@ -98,6 +98,13 @@ title prefix:
     [OBJECTIVE] → [PROPOSAL]*   competing means; epics descend from the ACCEPTED one
     [OBJECTIVE] → [EPIC] → [FEATURE] → [STORY]
 
+**The root is not yours.** `[OBJECTIVE]` is the Chairman's work intake — it has no
+agent-creatable parent because no agent opens one, ever (DESIGN.md invariant 1). `pm-gh.sh`
+mints only `--type epic|feature|story`, and `scripts/objective_gate.py` refuses the
+bare-`gh issue create --label objective` path during a wake. A mission pillar with no ticket
+is a `[PROPOSAL]` naming the objective you would file; the Chairman's filing is the answer.
+Opening it yourself reads as coverage and is actually a transfer of the Chairman's power to you.
+
 A story's plan is the `## Plan` section of the story body — never a separate issue.
 Children are born with `scripts/pm-gh.sh create --type epic|feature|story --parent N`:
 kind prefix + label applied, the parent's `dept:*` routing inherited (the runner routes

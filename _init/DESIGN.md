@@ -5,14 +5,16 @@ owner participates as the **Chairman of the Board**, and GitHub is the substrate
 lives where the output lives, enforced by the platform, not parsed out of chat. Parameters
 live in `org-chart.yaml`, routing in `wake-rules.yaml`, procedure in `.claude/skills/`,
 per-role duty in `agents/*.md`. This file states only what must stay true.
-*(`wake-rules.yaml`, the skills, and every script named below ship with the reference
-runtime, not with this stamp — see the README. The reference org also lints prose against
-these sources in CI (`scripts/lint_constitution.py`) so the constitution can't silently
-restate what the config owns; adopt that with the runtime.)*
+*(`wake-rules.yaml`, the skills, and every script named below are stamped into this repo
+by `orggen` alongside this constitution. CI lints prose against these sources
+(`scripts/lint_constitution.py`) so the constitution can't silently restate what the
+config owns.)*
 
 ## 1 · The five invariants
 
-1. **Only the Chairman authorizes** money, prod deploys, and org-shape changes.
+1. **Only the Chairman authorizes** money, prod deploys, and org-shape changes — **and only
+   the Chairman opens `[OBJECTIVE]`s**, the org's work intake. Agents decompose what the
+   Chairman files; they never file a sibling.
    Enforcement is platform-native: the product repo's deploy workflows trigger on manual
    `workflow_dispatch` only — **the Chairman's dispatch is the deploy** (a required-reviewer
    `production` environment is the approve-button variant where your plan enforces it;
@@ -23,6 +25,15 @@ restate what the config owns; adopt that with the runtime.)*
    only after the one-time Settings step — branch protection requiring Code Owner review —
    which only the Chairman can perform; until then it is declared, not enforced. The
    dispatch half is code, live the moment the workflow triggers say so.)*
+   Work intake alone has no platform gate: every agent holds the Chairman's own GitHub token,
+   so an authorship check reads the Chairman's login for a CEO-opened objective exactly as
+   for the Chairman's own (`runner.py`'s identity banner exists for this reason). It is gated
+   where the wake is real — `scripts/objective_gate.py`, a PreToolUse hook, refuses an
+   objective-minting command whenever `AGENT_NAME` is set, and `pm-gh.sh` mints only
+   `--type epic|feature|story`. An agent that finds a mission pillar with no ticket opens a
+   `[PROPOSAL]`; the Chairman's own filing is the answer. *(Honest scope: a backstop, not a
+   wall — the token can still reach the API around Bash. It refuses the honest path, which
+   is the one that actually drifted.)*
 2. **Agents never perform human-only actions.** Credentials, accounts, real URLs, publishing
    from personal accounts, repo Settings. Hitting one → record it once in `blockers.yaml`
    (EV-annotated: `value`, `effort_minutes`) and go quiet. **One exception:** an entry
@@ -72,9 +83,9 @@ wakes) before going live.
 
 Cross-role handoffs carry a fenced yaml payload in the relevant issue/PR comment — typed,
 not prose-by-convention. Required keys per type live in `scripts/handoff_check.py`
-(documented in `agents/_policy.md` §handoffs; keep the two in sync — the reference org
-CI-tests it). The handoff-validator workflow fails a malformed payload and replies with
-the missing keys; both ship with the reference runtime scripts.
+(documented in `agents/_policy.md` §handoffs; keep the two in sync — CI tests it). The
+handoff-validator workflow fails a malformed payload and replies with the missing keys;
+both ship in the stamped runtime.
 
 ## 5 · Counter-ratchet
 

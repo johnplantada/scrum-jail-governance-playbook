@@ -1,0 +1,39 @@
+# Work-item tree level 4: a [STORY] is one unit of work under a [FEATURE]. Agents
+# create these with `pm-gh.sh create --type story --parent N` — decomposed just-in-time,
+# when the feature is next up, never the whole tree at once. This form is the manual
+# path; the owning agent links it under its feature at triage (workitems.py link).
+#
+# A story closes ONLY with evidence (pm-gh.sh done --pr <merged PR> | --done-when "…");
+# its plan is the `## Plan` section of THIS issue — deliberately not a separate issue.
+name: Story
+description: "A single unit of work under a feature — closes only with evidence"
+title: "[STORY] "
+labels: ["story"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What
+      description: The work, concretely. Small enough for one PR or one sitting.
+    validations:
+      required: true
+  - type: textarea
+    id: done_when
+    attributes:
+      label: Done-when
+      description: The evidence line the closing [CLOSE] will cite — a merged PR for code, one verifiable sentence otherwise.
+      placeholder: "e.g. PR merged and the /pricing page returns 200 with the new copy."
+    validations:
+      required: true
+  - type: input
+    id: parent
+    attributes:
+      label: Parent feature
+      placeholder: "org#123"
+    validations:
+      required: true
+  - type: textarea
+    id: plan
+    attributes:
+      label: Plan (optional)
+      description: How, step by step. Lives here in the story body — plans are not issues.

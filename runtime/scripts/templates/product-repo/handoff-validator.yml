@@ -1,0 +1,59 @@
+# TEMPLATE — copy to $PRODUCT_GH_REPO/.github/workflows/handoff-validator.yml
+# and copy the org repo's scripts/handoff_check.py to scripts/handoff_check.py.
+#
+# Typed-handoff validator for the PRODUCT side (org DESIGN.md §4): [DEMO] is posted as
+# a comment on the product PR and [CODEREVIEW] as a PR review, so this repo is where
+# their payloads must be checked. Successor to the chat-era Go validator + the Warden's
+# malformed-payload citation (demolished 2026-07-05). A payload missing required keys
+# (schema: scripts/handoff_check.py REQUIRED) fails this run and gets a reply naming
+# the missing keys; the org runner routes the events back to the owning department.
+name: handoff-validator
+
+on:
+  issue_comment:
+    types: [created, edited]
+  pull_request_review:
+    types: [submitted, edited]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  validate:
+    # Coarse prefilter; handoff_check.py applies the real paragraph-start marker rule
+    # (mid-paragraph line starts — e.g. wrap-landed markers — are prose, not handoffs).
+    if: contains(github.event.comment.body || github.event.review.body, '[AGREEMENT]') || contains(github.event.comment.body || github.event.review.body, '[DEMO]') || contains(github.event.comment.body || github.event.review.body, '[CODEREVIEW]') || contains(github.event.comment.body || github.event.review.body, '[CLOSE]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate the typed payload
+        id: check
+        env:
+          BODY: ${{ github.event.comment.body || github.event.review.body }}
+        run: |
+          set +e
+          printf '%s' "$BODY" | python3 scripts/handoff_check.py > problems.txt
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          cat problems.txt
+          exit 0
+      - name: Reply with the missing keys
+        if: steps.check.outputs.rc != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: |
+          {
+            echo "⚠️ **Malformed typed handoff** — the payload does not match the schema:"
+            echo
+            echo '```'
+            cat problems.txt
+            echo '```'
+            echo
+            echo "Fix the fenced yaml payload and edit or repost."
+          } > reply.md
+          gh api "repos/${{ github.repository }}/issues/${ISSUE}/comments" -F body=@reply.md
+      - name: Fail the run on a malformed payload
+        if: steps.check.outputs.rc != '0'
+        run: exit 1

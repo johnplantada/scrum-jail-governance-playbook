@@ -1,0 +1,30 @@
+# Decisions ledger — Board authorizations as reviewed merges (DESIGN.md).
+#
+# An agent proposing a spend, charter, promotion, or sunset opens a PR that appends ONE
+# entry here. .github/CODEOWNERS routes the PR to the Chairman; **the Chairman's merge IS
+# the authorization** — the diff is exactly what was approved, and `git log decisions.yaml`
+# is the complete, tamper-evident decision history of the company. Nothing here takes
+# effect until it is on main.
+#
+# This is the ONLY authorization path for money and org-shape changes in this org —
+# there is no emoji fallback. CI validates this file with `scripts/decisions.py check`
+# (unique ids, required fields).
+#
+# Entry schema (all fields required unless noted):
+#   id:               kebab-case-slug, unique forever
+#   type:             spend | charter | promote | sunset
+#   dept:             proposing department
+#   what:             the decision, concretely — what will exist/change/be spent
+#   why:              expected value — what it unblocks or which metric it moves
+#   cost_usd:         number (0 for pure org-shape decisions)
+#   chairman_minutes: human time the decision commits beyond the merge itself
+#   reversibility:    one-way | reversible — plus how to undo it if reversible
+#   unblocks:         [work items / issues]
+#   proposed:         YYYY-MM-DD
+#   payload:          (charter/promote/sunset only) the same yaml the registrar would
+#                     parse from a [CHARTER]/[PROMOTE]/[SUNSET] post — kept so execution
+#                     stays mechanical whichever path authorized it
+
+# No decisions yet — a fresh org. The first entry will be the Chairman's first merged
+# [SPEND] or [CHARTER] proposal PR (invoke the board-proposals skill to open one).
+decisions: []

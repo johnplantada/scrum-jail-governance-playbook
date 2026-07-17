@@ -1,0 +1,34 @@
+# Feature proposal (DESIGN.md §2). The owning agent turns this into
+# acceptance criteria + a plan and posts it back on the issue for a 👍 before building.
+name: Feature
+description: "A concrete product/tooling change to build"
+title: "[FEATURE] "
+labels: ["feature"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What
+      description: The change, in plain language. Two sentences is fine — the agent drafts the spec.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why / expected effect
+      description: What it unblocks or which metric it should move.
+    validations:
+      required: true
+  - type: dropdown
+    id: department
+    attributes:
+      label: Owning department
+      options:
+{{DEPT_OPTIONS}}
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria (optional)
+      description: Leave blank to have the owning agent propose them for your 👍.
