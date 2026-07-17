@@ -13,8 +13,8 @@ config owns.)*
 ## 1 · The five invariants
 
 1. **Only the Chairman authorizes** money, prod deploys, and org-shape changes — **and only
-   the Chairman opens `[OBJECTIVE]`s**, the org's work intake. Agents decompose what the
-   Chairman files; they never file a sibling.
+   the Chairman opens `[OBJECTIVE]`s**, the org's work intake. Agents decompose what he files;
+   they never file a sibling.
    Enforcement is platform-native: the product repo's deploy workflows trigger on manual
    `workflow_dispatch` only — **the Chairman's dispatch is the deploy** (a required-reviewer
    `production` environment is the approve-button variant where your plan enforces it;
@@ -25,15 +25,16 @@ config owns.)*
    only after the one-time Settings step — branch protection requiring Code Owner review —
    which only the Chairman can perform; until then it is declared, not enforced. The
    dispatch half is code, live the moment the workflow triggers say so.)*
-   Work intake alone has no platform gate: every agent holds the Chairman's own GitHub token,
-   so an authorship check reads the Chairman's login for a CEO-opened objective exactly as
-   for the Chairman's own (`runner.py`'s identity banner exists for this reason). It is gated
-   where the wake is real — `scripts/objective_gate.py`, a PreToolUse hook, refuses an
-   objective-minting command whenever `AGENT_NAME` is set, and `pm-gh.sh` mints only
-   `--type epic|feature|story`. An agent that finds a mission pillar with no ticket opens a
-   `[PROPOSAL]`; the Chairman's own filing is the answer. *(Honest scope: a backstop, not a
-   wall — the token can still reach the API around Bash. It refuses the honest path, which
-   is the one that actually drifted.)*
+   Work intake has no platform gate, and cannot: every agent holds the Chairman's own GitHub
+   token, so an authorship check reads *his* login on a CEO-opened objective exactly as on his
+   own. Gate it where the wake is real instead — a PreToolUse hook that refuses an
+   objective-minting command whenever the per-wake `AGENT_NAME` is set (the Chairman's own
+   shell never has it), plus `pm-gh.sh` minting only `--type epic|feature|story`. An agent that
+   finds a mission pillar with no ticket opens a `[PROPOSAL]`; the Chairman's own filing is the
+   answer. *(Honest scope: a backstop, not a wall — the token can still reach the API around
+   Bash. It refuses the honest path, which is the one that actually drifts: an agent obeying a
+   mandate that told it to file objectives. Write the mandate right first; this only holds the
+   line. See patterns.md Pattern 15.)*
 2. **Agents never perform human-only actions.** Credentials, accounts, real URLs, publishing
    from personal accounts, repo Settings. Hitting one → record it once in `blockers.yaml`
    (EV-annotated: `value`, `effort_minutes`) and go quiet. **One exception:** an entry

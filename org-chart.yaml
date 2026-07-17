@@ -64,11 +64,15 @@ global:
   # with a PR must not be yanked back into the flow while the blocker holds).
   pm_holding_stages: [Blocked, On-Hold]
 
-  # OPTIONAL pins for a warden-style reconciler (FIELD-NOTES.md §11) — the ONE place
-  # scripts resolve these coordinates from, so recreating the board or the queue epic
-  # is a one-line re-pin. Uncomment when you build one.
-  # chairman_queue_issue: <N>   # the epic whose sub-issues = what only the human can do
-  # pm_project_number: <N>      # the org Project's number (gh project <N>)
+  # REQUIRED pins (FIELD-NOTES.md §11) — the ONE place scripts resolve these coordinates
+  # from, so recreating the board or the queue epic is a one-line re-pin. These were once
+  # documented as OPTIONAL, "uncomment when you build one" — and a stamped org duly skipped
+  # them, then sat silently blocked on its Chairman for five hours with no way to tell him
+  # (patterns.md Pattern 14). The queue is not a reconciler nicety; it is the org's only
+  # channel for "we are waiting on you." warden.py exits before doing any work without the
+  # pin, and because nothing wakes a department that doesn't exist, the omission is silent.
+  chairman_queue_issue: <N>   # the UNTYPED epic whose sub-issues = what only the human can do
+  pm_project_number: <N>      # the org Project's number (gh project <N>)
 
   # Model tier → exact API model id. The ONE place tier→model resolution lives. Everything
   # else (spend ledger, wake banners, budget brownouts, 💎 PROMOTE) keeps speaking in
@@ -122,6 +126,28 @@ departments:
       can_deploy: false
     teams: []
 
+  # ── WARDEN ───────────────────────────────────────────────────
+  # NOT optional, and not a department you choose — an organ every org gets (orggen stamps
+  # it; --departments cannot drop it). It is the org's only channel for "we are waiting on
+  # you": every department blocks on the Chairman eventually, records it, and correctly goes
+  # quiet, so without a queue the org looks idle while it waits (patterns.md Pattern 14 —
+  # written after a stamped org that had ALL the plumbing, and none of the state, sat silent
+  # for five hours). Engine-first (FIELD-NOTES.md §11): a DETERMINISTIC script does the
+  # reconciling (Chairman queue, board, [SYNC] convening) on plain cron — token-free; this
+  # smallest-budget haiku brain wakes only on dept:warden events for the judgment residue.
+  # Reports to the BOARD: a node reporting into the production chain could be told not to ask.
+  # Requires global.chairman_queue_issue above to be pinned, or its engine no-ops.
+  - name: warden
+    role: hygiene
+    reports_to: board
+    model: haiku
+    envelope:
+      max_subagents: 0            # the script does the work; there is nothing to fan out
+      daily_token_budget: 100000
+      can_spend: false
+      can_deploy: false
+    teams: []
+
   # ── ADD MORE DEPARTMENTS BELOW ────────────────────────────────
   # Chartering a department is a Board act: open a PR appending a [CHARTER] entry to
   # decisions.yaml whose payload is exactly the node you'd add below; the Chairman's
@@ -147,18 +173,5 @@ departments:
   #     can_deploy: false
   #   teams: []
   #
-  # ── A WARDEN (hygiene) DEPARTMENT ─────────────────────────────
-  # The engine-first shape the live org chartered 2026-07-11 (FIELD-NOTES.md §11): a
-  # DETERMINISTIC script does the reconciling (Chairman queue, board, [SYNC] convening)
-  # on plain cron — token-free; this smallest-budget haiku brain wakes only on
-  # dept:warden events for the judgment residue the script flags.
-  # - name: warden
-  #   role: hygiene
-  #   reports_to: board
-  #   model: haiku
-  #   envelope:
-  #     max_subagents: 0
-  #     daily_token_budget: 100000
-  #     can_spend: false
-  #     can_deploy: false
-  #   teams: []
+  # (The warden used to be offered here, commented out, as an optional extra to copy. That
+  # framing is exactly what produced Pattern 14 — it is a real department above now.)

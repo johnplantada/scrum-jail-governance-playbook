@@ -66,6 +66,16 @@ ARCHETYPES = {
 # org had no way to tell the Chairman it was waiting).
 DEFAULT_DEPARTMENTS = ["ceo", "business", "it", "warden"]
 
+# The warden is an ORGAN, not a department you choose — every org gets one, and --departments
+# cannot drop it. It is the org's only channel for "we are waiting on you": every department
+# blocks on the Chairman eventually, records it, and correctly goes quiet, and without a queue
+# the result is an org that looks idle while it waits. Modeling it as an optional extra is what
+# left a stamped org silently blocked for five hours (patterns.md Pattern 14) — the routing,
+# the script, and the tests were all present; only the department, the label, and the pin were
+# missing, so nothing woke it and the omission was invisible. Reports to the BOARD: a node that
+# reported into the production chain could be told not to ask.
+WARDEN = ("warden", "hygiene", "board")
+
 
 def read(path):
     with open(path, encoding="utf-8") as f:
@@ -101,8 +111,27 @@ def departments(spec):
 def dept_block(name, role, reports_to, model, max_sub, budget, note):
     """One org-chart departments: entry, generated from the same tuple that stamps the agent
     mandate — so the chart and agents/ can never disagree about who exists."""
+    is_ceo = name == "ceo"
+    is_warden = name == WARDEN[0]
+    max_sub = 0 if (is_ceo or is_warden) else 4
+    budget = 300000 if is_ceo else 100000 if is_warden else 500000
+    model = "haiku" if is_warden else "sonnet"
+    sub_note = ("CEO escalates; it doesn't spawn sub-teams itself" if is_ceo
+                else "the script does the work; there is nothing to fan out" if is_warden
+                else "May spawn sub-teams within this cap")
+    # The warden's brain is only the judgment residue its deterministic engine flags, so it
+    # runs the org's cheapest tier on its smallest budget — see agents/warden.md.
+    preamble = (
+        "  # Hygiene + the Chairman action queue — an organ, not a chosen department. Reports\n"
+        "  # to the BOARD so it can always say what the org is waiting on the Chairman for.\n"
+        "  # Its engine (scripts/warden.py) is deterministic and token-free; this brain only\n"
+        "  # handles what the script flags, hence the org's smallest envelope.\n"
+        "  # REQUIRES global.chairman_queue_issue to be pinned — see RUNBOOK commissioning.\n"
+        if is_warden else ""
+    )
     return (
         f"  # ── {name.upper()} ────────────────────────────────\n"
+        f"{preamble}"
         f"  - name: {name}\n"
         f"    role: {role}\n"
         f"    reports_to: {reports_to}\n"
@@ -237,16 +266,14 @@ def cmd_init(args):
     for doc in VENDORED_DOCS:
         src = os.path.join(REPO, doc)
         if os.path.exists(src):
-            write(os.path.join(target, "playbook", doc), read(src))
-    write(os.path.join(target, "playbook", "SOURCE.md"),
-          "# Vendored snapshot\n\nplaybook/ mirrors the governance golden. Do not hand-edit the\n"
-          "vendored docs — change them in the golden and re-run `make sync-playbook`.\n\n"
-          f"Source: scrum-jail-governance-playbook @ {golden_sha()}\n"
-          f"Vendored files: {' '.join(VENDORED_DOCS)}\n")
+            write(os.path.join(target, doc), read(src))
 
-    # 3. org-chart.yaml — the departments: block, the roster-derived agent ceiling, and the
-    #    cadences, from the SAME dept list that stamps the mandates below.
-    dept_blocks = "\n".join(dept_block(*d) for d in depts)
+    # 2. org-chart.yaml — from the _init template; the departments: block is generated from the
+    #    SAME dept list that stamps the agent mandates (below), so the chart and agents/ can never
+    #    disagree about who exists.
+    # The warden is appended unconditionally — --departments picks the org's *business*
+    # shape, never whether it can ask the Chairman for anything.
+    dept_blocks = "\n".join(dept_block(*d) for d in depts + [WARDEN])
     chart = fill(read(os.path.join(INIT, "org-chart.yaml")),
                  PRODUCT=product, CHAIRMAN_GITHUB=chairman, DEPARTMENTS=dept_blocks,
                  GLOBAL_MAX_AGENTS=max_agents,
@@ -291,12 +318,18 @@ def cmd_init(args):
         mandate = fill(base, NAME=name, ROLE=role, REPORTS_TO=reports_to,
                        PRODUCT=product, GOAL=goal)
         write(os.path.join(target, "agents", f"{name}.md"), mandate)
+    # The warden gets a real mandate, not the generic skeleton: its job is engine-first and
+    # judgment-residue-only, which the department template cannot express. agent-run.sh hard-
+    # fails without this file, so a stamped warden with no mandate is a wake that always errors.
+    write(os.path.join(target, "agents", "warden.md"),
+          fill(read(os.path.join(INIT, "agents", "warden.md")), PRODUCT=product))
 
     # 8. A short README for the new org.
     write(os.path.join(target, "README.md"), org_readme(org, product, depts))
 
     print(f"✓ stamped {org} → {target}")
-    print(f"  product: {product}   chairman: {chairman}   departments: {', '.join(d[0] for d in depts)}")
+    print(f"  product: {product}   chairman: {chairman}   departments: {', '.join(d[0] for d in depts)}"
+          f"   + {WARDEN[0]} (organ — your action queue; see step 5)")
     print(f"  org repo: {org_gh_repo}   product repo: {product_gh_repo}")
     print(f"  global_max_agents: {max_agents} (every brain + its fan-out — raising it is a charter act)")
     print("\nNext steps (RUNBOOK.md — vendored in playbook/ — walks through each one):")
@@ -312,18 +345,31 @@ def cmd_init(args):
     print("        environment with you as required reviewer where your plan enforces it;")
     print("     b) org repo → Settings → Branches → protect main: require a PR + require")
     print("        Code Owner review (this makes the decisions.yaml merge gate binding).")
-    print("  4. Run scripts/github-pm-setup.sh — dept:* labels + the org Project with the")
-    print("     Stage field from org-chart.yaml pm_stages. Pin the printed project number")
-    print("     as org-chart.yaml global.pm_project_number.")
-    print("  5. Warden wiring: create the Chairman action queue epic (a plain issue, NOT an")
-    print("     [OBJECTIVE]) and pin its number as global.chairman_queue_issue — warden.py")
-    print("     exits before doing any work while the pin is missing.")
-    print("  6. Customize the CUSTOMIZE markers: the CEO Mission (agents/ceo.md), VISION.md,")
-    print("     and — if you stamped compliance — its corpus. The other mandates are ready.")
-    print("  7. File the first [OBJECTIVE] issue (Chairman only — the objective_gate hook")
-    print("     enforces this) to inject work, then run the runner in RUNNER_MODE=shadow;")
-    print("     flip to live once the logged would-be wakes look right (make tick / make logs).")
-    print("  8. Read playbook/blocker-ledger.md + playbook/safe.md before week 2.")
+    print("  4. Run scripts/github-pm-setup.sh — dept:* labels (incl. dept:warden, org repo")
+    print("     only) + the org Project with the Stage field from org-chart.yaml pm_stages.")
+    print("  5. COMMISSION THE CHAIRMAN QUEUE — org-chart.yaml ships two null pins and the")
+    print("     org is not finished until both are set. Skipping this is the single most")
+    print("     expensive omission in this playbook (patterns.md Pattern 14): warden.py exits")
+    print("     before doing any work, so the org silently loses its only way to tell you it")
+    print("     is blocked — while the routing, the script and its tests all look installed.")
+    print("       a) open ONE issue, UNTYPED, labeled dept:warden, assigned to yourself,")
+    print("          titled e.g. '[QUEUE] Chairman action queue' — its sub-issues become the")
+    print("          things only you can do (untyped on purpose: it is infrastructure, and")
+    print("          objectives are yours alone per invariant 1);")
+    print("       b) pin its number as global.chairman_queue_issue, and the Project's number")
+    print("          as global.pm_project_number;")
+    print("       c) schedule scripts/warden.py sync (launchd/cron, ~4h) and confirm with")
+    print("          `python3 scripts/warden.py audit` — it must name a real pending action.")
+    print("  6. File the first [OBJECTIVE] issue (labeled dept:ceo) to inject work — YOU file")
+    print("     objectives, always; agents decompose them and open a [PROPOSAL] to ask for a")
+    print("     new one (invariant 1). Then run the runner in RUNNER_MODE=shadow; flip to")
+    print("     live once the logged would-be wakes look right.")
+    print("  7. Customize agents/*.md — especially the CEO (decomposing YOUR objectives into")
+    print("     epics, reviews, PI cadence per safe.md). The stamped files are skeletons;")
+    print("     agents/warden.md is not — it ships complete. Re-read any mandate you edit")
+    print("     against invariant 1: a mandate that tells an agent to 'turn the north star")
+    print("     into objectives' silently repeals your work intake (Pattern 15).")
+    print("  8. Read blocker-ledger.md + safe.md before week 2.")
 
 
 def org_readme(org, product, depts):
