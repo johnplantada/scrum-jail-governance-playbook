@@ -1,0 +1,10 @@
+# Python deps for the Claude Agent SDK agent runner (scripts/agent_cycle.py).
+# Install into the repo venv that agent-run.sh invokes by absolute path:
+#   python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
+# The SDK drives the logged-in `claude` runtime (subscription auth, no API key);
+# `claude` and `node` must be on PATH (agent-run.sh prepends /opt/homebrew/bin).
+claude-agent-sdk==0.2.110
+# org-chart/blockers/metrics parsing (agent_model.py, blockers.py, metrics_watch.py).
+# Absent → ledger injection and model resolution fail SILENTLY (they're behind
+# `|| fallback` guards), so keep it pinned.
+pyyaml==6.0.3

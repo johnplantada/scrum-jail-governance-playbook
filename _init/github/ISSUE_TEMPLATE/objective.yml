@@ -1,0 +1,39 @@
+# Chairman work injection (DESIGN.md §2): filing this issue IS the wake.
+# The department dropdown maps to a dept:* label at triage (runner wake-rules).
+#
+# CHAIRMAN ONLY. Work intake is a reserved power (DESIGN.md invariant 1) — no agent opens an
+# objective. An agent that finds a mission pillar with no ticket files a [PROPOSAL] naming the
+# objective it would open; the Chairman's filing here is the answer. The dropdown below picks
+# the OWNER of the work, never its author.
+name: Objective
+description: "Chairman → org: an outcome to achieve (Chairman only — agents file a [PROPOSAL])"
+title: "[OBJECTIVE] "
+labels: ["objective"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What should be true when this is done? One measurable sentence beats a paragraph.
+      placeholder: "e.g. A visitor can buy the product end-to-end and the receipt cites the live checkout URL."
+    validations:
+      required: true
+  - type: dropdown
+    id: department
+    attributes:
+      label: Owning department
+      options:
+{{DEPT_OPTIONS}}
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Budget ceiling, deadline, hard requirements, things explicitly out of scope.
+      placeholder: "e.g. $0 pre-spend; no new accounts without a ledger entry; done by Friday."
+  - type: input
+    id: budget
+    attributes:
+      label: Budget ceiling (USD)
+      placeholder: "0"

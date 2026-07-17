@@ -79,13 +79,19 @@ scrum-jail-governance-playbook/
 ├── safe.md              scaled-agile without the theater
 ├── envelopes.yaml       authority-envelope field reference + presets
 ├── org-chart.yaml       a concrete example org (the runtime's parameter file)
-├── bin/orggen           the generator — stamps a new org from _init/
-└── _init/               the template orggen fills in
-    ├── DESIGN.md         the constitution (PRODUCT/GOAL placeholders)
-    ├── org-chart.yaml    chart template (chairman + departments)
-    ├── blockers.yaml     empty human-task ledger
-    ├── .env.example      the env contract your runtime reads
-    └── agents/           _policy.md (shared) + department.tmpl.md
+├── bin/orggen           the generator — stamps a complete org from _init/ + runtime/
+├── _init/               the governance templates orggen fills in
+│   ├── DESIGN.md         the constitution (PRODUCT/GOAL placeholders)
+│   ├── VISION.md         the one-page why + who (PRODUCT/GOAL placeholders)
+│   ├── org-chart.yaml    chart template (chairman + departments)
+│   ├── blockers.yaml     empty human-task ledger
+│   ├── .env.example      the env contract the runtime reads
+│   ├── github/           CODEOWNERS + issue forms (dropdowns stamped from the roster)
+│   └── agents/           _policy.md (shared) + department.tmpl.md + role mandates
+│                         (ceo.md, warden.md, compliance.md)
+└── runtime/             the runtime, stamped verbatim — scripts/ (runner, pm-gh,
+                         agent-run, warden, gates, tests), .claude/ (settings + skills),
+                         org CI workflows, the operator Makefile, decisions.yaml seed
 ```
 
 ---

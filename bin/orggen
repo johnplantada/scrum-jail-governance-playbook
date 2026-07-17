@@ -2,38 +2,69 @@
 """orggen — stamp a new governance-gated multi-agent org from this golden playbook.
 
 Mirrors the lambdagen/spagen golden-example generators: the pattern lives here, and orggen
-copies + parameterizes it into a fresh org repo. It stamps the GOVERNANCE + BEHAVIORAL layer
-(org-chart, constitution, agent mandates, blocker + env seeds, the playbook docs). The
-RUNTIME — the Python/gh scripts the constitution names (runner.py + wake-rules.yaml,
-agent-run.sh, pm-gh.sh, workitems.py, blockers.py, spend_log.py, decisions.py, last-ship.sh,
-github-pm-setup.sh, the .claude/skills) — is a separate dependency living in the reference
-org repo; orggen prints how to bring it in.
+copies + parameterizes it into a fresh org repo. It stamps BOTH layers:
+
+  GOVERNANCE (from _init/, parameterized): org-chart.yaml, DESIGN.md, VISION.md, agents/
+  (role mandates for ceo/warden/compliance, the generic template for the rest, the shared
+  _policy.md), blockers.yaml, decisions.yaml, .env.example, .github/ (CODEOWNERS + issue
+  forms with the department dropdowns generated from the roster), wake-rules.yaml
+  (generated from the same roster), and the vendored playbook/ docs pinned to this
+  golden's commit.
+
+  RUNTIME (from runtime/, verbatim): scripts/ (runner, pm-gh, agent-run, warden, the
+  gates, tests), .claude/ (settings.json guardrails + hooks, the governance skills),
+  .github/workflows CI, the Makefile, .gitignore.
+
+Everything that names a department — org-chart departments:, agents/, wake-rules.yaml,
+the issue-form dropdowns, limits.global_max_agents — is generated from ONE roster, so
+the seven surfaces can never disagree about who exists.
 
   orggen init <target-dir> [--org NAME] [--product NAME] [--goal GOAL]
               [--chairman-github USERNAME] [--product-repo OWNER/REPO]
-              [--departments ceo,business,it]
+              [--departments ceo,business,it,warden]
 
 Example:
-  bin/orggen init ../acme-org --product "acme.com" --chairman-github yourhandle \\
-      --product-repo yourhandle/acme
+  bin/orggen init ../acme-org --product "acme.com" --goal "$10k/month" \\
+      --chairman-github yourhandle --product-repo yourhandle/acme
 """
 import argparse
 import os
+import shutil
+import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INIT = os.path.join(REPO, "_init")
+RUNTIME = os.path.join(REPO, "runtime")
 
-# Docs copied verbatim into the new org (the playbook it keeps next to its config).
-VERBATIM_DOCS = ["patterns.md", "safe.md", "blocker-ledger.md", "emoji-gate.md",
-                 "envelopes.yaml", "FIELD-NOTES.md", "RUNBOOK.md"]
+# Docs vendored into the new org's playbook/ (pinned via playbook/SOURCE.md; the stamped
+# Makefile's sync-playbook/check-playbook keep it honest). MUST match the Makefile's
+# PLAYBOOK_VENDORED list — check-playbook diffs exactly these files.
+VENDORED_DOCS = ["patterns.md", "safe.md", "blocker-ledger.md", "emoji-gate.md",
+                 "envelopes.yaml", "README.md", "RUNBOOK.md", "org-chart.yaml",
+                 "FIELD-NOTES.md"]
 
-# (name, role, reports_to). The CEO reports to the board; the rest to the CEO.
-DEFAULT_DEPARTMENTS = [
-    ("ceo", "chief-executive", "board"),
-    ("business", "demand", "ceo"),
-    ("it", "supply", "ceo"),
-]
+# Department archetypes: name → (role, reports_to, model, max_subagents, budget, note).
+# ceo/business/it are the production chain; warden and compliance are independent organs
+# reporting to the board (warden: the deterministic hygiene engine's judgment residue —
+# the cheapest node the org can hold; compliance: the assurance second line).
+ARCHETYPES = {
+    "ceo":        ("chief-executive", "board", "sonnet", 0, 300000,
+                   "CEO escalates; it doesn't spawn sub-teams itself"),
+    "business":   ("demand", "ceo", "sonnet", 4, 500000,
+                   "May spawn sub-teams within this cap"),
+    "it":         ("supply", "ceo", "sonnet", 4, 500000,
+                   "May spawn sub-teams within this cap"),
+    "compliance": ("assurance", "board", "sonnet", 4, 500000,
+                   "May spawn sub-teams within this cap"),
+    "warden":     ("hygiene", "board", "haiku", 0, 100000,
+                   "The engine (warden.py) is deterministic; the brain gets no fan-out"),
+}
+
+# The default roster. The warden ships wired from day 0 — the reference org learned that
+# a runtime with warden.py but no chartered warden department dead-ends silently (the
+# org had no way to tell the Chairman it was waiting).
+DEFAULT_DEPARTMENTS = ["ceo", "business", "it", "warden"]
 
 # The warden is an ORGAN, not a department you choose — every org gets one, and --departments
 # cannot drop it. It is the org's only channel for "we are waiting on you": every department
@@ -59,25 +90,25 @@ def write(path, text):
 
 def fill(text, **kv):
     for k, v in kv.items():
-        text = text.replace("{{" + k + "}}", v).replace("__" + k + "__", v)
+        text = text.replace("{{" + k + "}}", str(v)).replace("__" + k + "__", str(v))
     return text
 
 
 def departments(spec):
-    if not spec:
-        return DEFAULT_DEPARTMENTS
+    """→ ordered list of (name, role, reports_to, model, max_subagents, budget, note)."""
+    names = ([s.strip() for s in spec.split(",") if s.strip()]
+             if spec else list(DEFAULT_DEPARTMENTS))
+    if "ceo" not in names:
+        names.insert(0, "ceo")
     out = []
-    for name in [s.strip() for s in spec.split(",") if s.strip()]:
-        if name == "ceo":
-            out.append(("ceo", "chief-executive", "board"))
-        else:
-            out.append((name, name, "ceo"))
-    if not any(d[0] == "ceo" for d in out):
-        out.insert(0, DEFAULT_DEPARTMENTS[0])
+    for name in names:
+        role, reports_to, model, max_sub, budget, note = ARCHETYPES.get(
+            name, (name, "ceo", "sonnet", 4, 500000, "May spawn sub-teams within this cap"))
+        out.append((name, role, reports_to, model, max_sub, budget, note))
     return out
 
 
-def dept_block(name, role, reports_to):
+def dept_block(name, role, reports_to, model, max_sub, budget, note):
     """One org-chart departments: entry, generated from the same tuple that stamps the agent
     mandate — so the chart and agents/ can never disagree about who exists."""
     is_ceo = name == "ceo"
@@ -106,12 +137,103 @@ def dept_block(name, role, reports_to):
         f"    reports_to: {reports_to}\n"
         f"    model: {model}                 # default tier; a sustained raise is a 💎 decisions.yaml PR\n"
         f"    envelope:\n"
-        f"      max_subagents: {max_sub}            # {sub_note}\n"
+        f"      max_subagents: {max_sub}            # {note}\n"
         f"      daily_token_budget: {budget}\n"
         f"      can_spend: false\n"
         f"      can_deploy: false\n"
         f"    teams: []\n"
     )
+
+
+def wake_rules(depts):
+    """The runner's routing table, generated from the roster. First matching rule wins.
+    dept:* labels route issues, comments, and PRs to their owner; unlabeled PRs default
+    by repo (org → ceo: a Chairman merge un-parks org-shape work; product → the supply
+    department: the pipeline owner); product workflow runs wake the supply department."""
+    names = [d[0] for d in depts]
+    supply = next((n for n, r, *_ in depts if r == "supply"), "ceo")
+    head = (
+        "# Wake rules — the runner's routing table (generated by orggen from the roster;\n"
+        "# edit freely — it is data, reviewed like everything else).\n"
+        "#\n"
+        "# scripts/runner.py polls GitHub each tick, normalizes what changed into events, and\n"
+        "# this table decides who wakes. Auditable, diffable, and PR-reviewed.\n"
+        "#\n"
+        "# Event fields a rule can match (all optional; a rule matches when every given field does):\n"
+        "#   kind:     issue | pr | comment | run\n"
+        "#   repo:     org | product\n"
+        "#   label:    a label present on the item (e.g. dept:it — the routing signal)\n"
+        "#   workflow: the workflow file name, for kind: run (e.g. deploy.yml)\n"
+        "#   conclusion: success | failure — for kind: run\n"
+        "#   pr_state: open | merged | closed — for kind: pr (merged vs closed-without-merge)\n"
+        "#\n"
+        '# wake: a department name, or "from-label" to route to the item\'s dept:* label.\n'
+        "# First matching rule wins; an event matching nothing wakes nobody (and shadow mode logs it).\n"
+        "\n"
+        "rules:\n"
+        "  # Work injection + ticket traffic: whoever the dept:* label names owns the wake.\n"
+    )
+    issue_rules = "".join(
+        f'  - match: {{kind: issue, label: "dept:{n}"}}\n    wake: from-label\n'
+        for n in names)
+    comment_rule = ("  - match: {kind: comment}\n"
+                    "    wake: from-label          # a comment on a routed issue re-wakes its owner\n")
+    pr_head = (
+        "\n"
+        "  # PR traffic (the reference org's lesson: the Chairman merged a charter and nobody\n"
+        "  # woke). A dept:* label wins, same contract as issues; an unlabeled PR defaults by\n"
+        "  # repo — org PRs are org-shape work (the CEO owns acting on what a Chairman merge\n"
+        f"  # un-parks), product PRs belong to {supply} (the pipeline owner). Every PR bump\n"
+        "  # routes — opened, merged, and closed alike; pr_state is there for finer-grained rules.\n"
+    )
+    pr_rules = "".join(
+        f'  - match: {{kind: pr, label: "dept:{n}"}}\n    wake: from-label\n'
+        for n in names)
+    pr_defaults = (
+        "  - match: {kind: pr, repo: org}\n"
+        "    wake: ceo\n"
+        "  - match: {kind: pr, repo: product}\n"
+        f"    wake: {supply}\n")
+    run_rules = (
+        "\n"
+        "  # Deploy state changes: merged ≠ live must stay loud.\n"
+        "  - match: {kind: run, repo: product, workflow: deploy.yml}\n"
+        f"    wake: {supply}\n"
+        "\n"
+        f"  # The review loop: evidence/review runs wake {supply} to act on verdicts.\n"
+        "  - match: {kind: run, repo: product, workflow: code-review.yml}\n"
+        f"    wake: {supply}\n"
+        "  - match: {kind: run, repo: product, workflow: demo-evidence.yml, conclusion: failure}\n"
+        f"    wake: {supply}\n")
+    return head + issue_rules + comment_rule + pr_head + pr_rules + pr_defaults + run_rules
+
+
+def dept_options(depts, for_objective=False):
+    """Issue-form department dropdown options: the executing departments (never warden —
+    hygiene is not a work intake target; ceo only on the objective form, decorated)."""
+    lines = [f"        - {n}" for n, *_ in depts if n not in ("ceo", "warden")]
+    if for_objective:
+        lines.append("        - ceo (decompose & delegate)")
+    return "\n".join(lines)
+
+
+def copy_tree(src, dst):
+    for root, dirs, files in os.walk(src):
+        dirs[:] = [d for d in dirs if d != "__pycache__"]
+        rel = os.path.relpath(root, src)
+        for f in files:
+            s = os.path.join(root, f)
+            d = os.path.join(dst, rel, f) if rel != "." else os.path.join(dst, f)
+            os.makedirs(os.path.dirname(d), exist_ok=True)
+            shutil.copy2(s, d)
+
+
+def golden_sha():
+    try:
+        return subprocess.run(["git", "-C", REPO, "rev-parse", "--short", "HEAD"],
+                              capture_output=True, text=True, check=True).stdout.strip()
+    except Exception:
+        return "unknown"
 
 
 def cmd_init(args):
@@ -125,9 +247,23 @@ def cmd_init(args):
     org_gh_repo = f"{chairman}/{org}"
     product_gh_repo = args.product_repo or f"{chairman}/<product-repo>"
     depts = departments(args.departments)
+    # Every brain + its full fan-out — test_subagent_gate.py holds the chart to this.
+    max_agents = sum(1 + d[4] for d in depts)
 
-    # 1. Verbatim playbook docs.
-    for doc in VERBATIM_DOCS:
+    # 1. The RUNTIME, verbatim (scripts/, .claude/, .github/workflows, Makefile,
+    #    decisions.yaml seed, .gitignore — stored dot-less in the golden).
+    copy_tree(RUNTIME, target)
+    os.rename(os.path.join(target, "gitignore"), os.path.join(target, ".gitignore"))
+    for sh in ("scripts", os.path.join("scripts", "hooks")):
+        d = os.path.join(target, sh)
+        for f in os.listdir(d):
+            p = os.path.join(d, f)
+            if os.path.isfile(p) and (f.endswith(".sh") or f == "pre-commit"):
+                os.chmod(p, 0o755)
+
+    # 2. The vendored playbook/ — this golden's docs, pinned so the stamped Makefile's
+    #    check-playbook can detect hand-edits (edits belong here, then `make sync-playbook`).
+    for doc in VENDORED_DOCS:
         src = os.path.join(REPO, doc)
         if os.path.exists(src):
             write(os.path.join(target, doc), read(src))
@@ -140,23 +276,47 @@ def cmd_init(args):
     dept_blocks = "\n".join(dept_block(*d) for d in depts + [WARDEN])
     chart = fill(read(os.path.join(INIT, "org-chart.yaml")),
                  PRODUCT=product, CHAIRMAN_GITHUB=chairman, DEPARTMENTS=dept_blocks,
+                 GLOBAL_MAX_AGENTS=max_agents,
                  REVIEW_INTERVAL="20", PI_INTERVAL="3", UNLOCK_WIP_LIMIT="5")
     write(os.path.join(target, "org-chart.yaml"), chart)
 
-    # 3. Constitution + ledger + env (substituted from _init/).
-    write(os.path.join(target, "DESIGN.md"), fill(read(os.path.join(INIT, "DESIGN.md")), PRODUCT=product, GOAL=goal))
+    # 4. Constitution + vision + ledgers + env (substituted from _init/).
+    write(os.path.join(target, "DESIGN.md"),
+          fill(read(os.path.join(INIT, "DESIGN.md")), PRODUCT=product, GOAL=goal))
+    write(os.path.join(target, "VISION.md"),
+          fill(read(os.path.join(INIT, "VISION.md")), PRODUCT=product, GOAL=goal))
     write(os.path.join(target, "blockers.yaml"), read(os.path.join(INIT, "blockers.yaml")))
     write(os.path.join(target, ".env.example"),
           fill(read(os.path.join(INIT, ".env.example")),
                ORG_GH_REPO=org_gh_repo, PRODUCT_GH_REPO=product_gh_repo))
 
-    # 4. Agents: the shared policy, the reusable template (product filled, names left as
-    #    placeholders), and one stamped mandate per department.
+    # 5. wake-rules.yaml — generated from the roster.
+    write(os.path.join(target, "wake-rules.yaml"), wake_rules(depts))
+
+    # 6. .github/ — CODEOWNERS routes decisions.yaml to the Chairman; the issue forms'
+    #    department dropdowns come from the roster (warden excluded — hygiene is not a
+    #    work-intake target; ceo only on the objective form).
+    gh_init = os.path.join(INIT, "github")
+    write(os.path.join(target, ".github", "CODEOWNERS"),
+          fill(read(os.path.join(gh_init, "CODEOWNERS")), CHAIRMAN_GITHUB=chairman))
+    tmpl_dir = os.path.join(gh_init, "ISSUE_TEMPLATE")
+    for f in sorted(os.listdir(tmpl_dir)):
+        text = fill(read(os.path.join(tmpl_dir, f)),
+                    ORG_GH_REPO=org_gh_repo,
+                    DEPT_OPTIONS=dept_options(depts, for_objective=(f == "objective.yml")))
+        write(os.path.join(target, ".github", "ISSUE_TEMPLATE", f), text)
+
+    # 7. Agents: the shared policy, one stamped mandate per department (a role-specific
+    #    template from _init/agents/<name>.md when one exists — ceo, warden, compliance —
+    #    else the generic department template), and the reusable template itself.
     write(os.path.join(target, "agents", "_policy.md"), read(os.path.join(INIT, "agents", "_policy.md")))
     tmpl = read(os.path.join(INIT, "agents", "department.tmpl.md"))
     write(os.path.join(target, "agents", "department.tmpl.md"), fill(tmpl, PRODUCT=product))
-    for name, role, reports_to in depts:
-        mandate = fill(tmpl, NAME=name, ROLE=role, REPORTS_TO=reports_to, PRODUCT=product)
+    for name, role, reports_to, *_ in depts:
+        role_tmpl = os.path.join(INIT, "agents", f"{name}.md")
+        base = read(role_tmpl) if os.path.exists(role_tmpl) else tmpl
+        mandate = fill(base, NAME=name, ROLE=role, REPORTS_TO=reports_to,
+                       PRODUCT=product, GOAL=goal)
         write(os.path.join(target, "agents", f"{name}.md"), mandate)
     # The warden gets a real mandate, not the generic skeleton: its job is engine-first and
     # judgment-residue-only, which the department template cannot express. agent-run.sh hard-
@@ -164,26 +324,25 @@ def cmd_init(args):
     write(os.path.join(target, "agents", "warden.md"),
           fill(read(os.path.join(INIT, "agents", "warden.md")), PRODUCT=product))
 
-    # 5. A short README for the new org.
+    # 8. A short README for the new org.
     write(os.path.join(target, "README.md"), org_readme(org, product, depts))
 
     print(f"✓ stamped {org} → {target}")
     print(f"  product: {product}   chairman: {chairman}   departments: {', '.join(d[0] for d in depts)}"
           f"   + {WARDEN[0]} (organ — your action queue; see step 5)")
     print(f"  org repo: {org_gh_repo}   product repo: {product_gh_repo}")
-    print("\nNext steps (RUNBOOK.md walks through each one):")
-    print("  1. Bring the RUNTIME — orggen stamps the governance layer only. The Python/gh")
-    print("     scripts (runner.py + wake-rules.yaml, agent-run.sh, pm-gh.sh, workitems.py,")
-    print("     blockers.py, spend_log.py, decisions.py, last-ship.sh, github-pm-setup.sh, the")
-    print("     .claude/skills) live in the reference org repo that runs the live Scrum Jail")
-    print("     org (private) — copy them into scripts/ here, or build to their contracts.")
-    print("     Also seed decisions.yaml, .github/CODEOWNERS (route /decisions.yaml to the")
-    print("     Chairman), and .github/ISSUE_TEMPLATE from the reference repo.")
-    print("  2. Create the org repo on GitHub and push this directory; `gh auth login`,")
+    print(f"  global_max_agents: {max_agents} (every brain + its fan-out — raising it is a charter act)")
+    print("\nNext steps (RUNBOOK.md — vendored in playbook/ — walks through each one):")
+    print("  1. Local runtime: python3 -m venv .venv && .venv/bin/pip install -r")
+    print("     scripts/requirements.txt; run `make test` — the stamped org's suite must be")
+    print("     green before anything else. Install the guard hook:")
+    print("     cp scripts/hooks/pre-commit .git/hooks/ (after git init).")
+    print("  2. GitHub: create the org repo and push this directory; `gh auth login`,")
     print("     then `gh auth refresh -s project`. `cp .env.example .env` and fill it in.")
     print("  3. Chairman Settings — the two human-only steps no agent can perform:")
-    print("     a) product repo → Settings → Environments → new environment `production`,")
-    print("        required reviewer = you (this IS the 🚀 deploy gate);")
+    print("     a) product repo: every prod-deploy workflow triggers on workflow_dispatch")
+    print("        ONLY (your manual dispatch IS the 🚀 deploy gate) — or a `production`")
+    print("        environment with you as required reviewer where your plan enforces it;")
     print("     b) org repo → Settings → Branches → protect main: require a PR + require")
     print("        Code Owner review (this makes the decisions.yaml merge gate binding).")
     print("  4. Run scripts/github-pm-setup.sh — dept:* labels (incl. dept:warden, org repo")
@@ -214,17 +373,18 @@ def cmd_init(args):
 
 
 def org_readme(org, product, depts):
-    rows = "\n".join(f"| {n} | {r} | `dept:{n}` |" for n, r, _ in depts)
+    rows = "\n".join(f"| {n} | {r} | `dept:{n}` |" for n, r, *_ in depts)
     return f"""# {org} — autonomous org
 
 A governance-gated multi-agent org for **{product}**, stamped from the
-[scrum-jail-governance-playbook](https://github.com/johnplantada/scrum-jail-governance-playbook).
+[scrum-jail-governance-playbook](https://github.com/johnplantada/scrum-jail-governance-playbook)
+— governance layer AND runtime (scripts/, .claude/, CI) in one stamp.
 
-GitHub-native: work is Issues + one Project, wakes route on `dept:*` labels, and agents
-propose while **the Chairman's merge/approval is the authorization** — enforced by the
-platform (the product repo's `production` environment, CODEOWNERS + branch protection on
-`decisions.yaml`). See `DESIGN.md` for the constitution and `org-chart.yaml` for the
-tree + envelopes.
+GitHub-native: work is Issues + one Project, wakes route on `dept:*` labels
+(wake-rules.yaml), and agents propose while **the Chairman's merge/approval is the
+authorization** — enforced by the platform (`workflow_dispatch`-only deploys,
+CODEOWNERS + branch protection on `decisions.yaml`). See `DESIGN.md` for the
+constitution and `org-chart.yaml` for the tree + envelopes.
 
 ## Departments
 
@@ -234,19 +394,26 @@ tree + envelopes.
 
 ## Governance & operability docs
 - `DESIGN.md` — the one-page constitution (the five invariants)
+- `VISION.md` — the one-page why + who
 - `org-chart.yaml` — who exists, envelopes, cadences, model tiers
 - `blockers.yaml` — the EV-ordered human-task ledger (the Chairman's queue)
-- plus the playbook docs copied alongside (patterns, SAFe cadence, blocker ledger,
-  field notes, RUNBOOK)
+- `decisions.yaml` — the Board ledger (money/org-shape; merge = authorization)
+- `playbook/` — the vendored governance golden (patterns, SAFe cadence, blocker
+  ledger, field notes, RUNBOOK), pinned in `playbook/SOURCE.md`
+
+## Operate
+`make` prints the operator surface: `tick` / `preview` / `logs` / `halt` / `resume` /
+`blockers` / `warden` / `test` / `sync-playbook` / `check-playbook`.
 
 ## Setup
-1. Bring the runtime scripts (runner/pm-gh/agent-run + skills) from the reference org
-   repo — orggen stamps the governance layer only; see RUNBOOK.md.
+1. `python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt`; `make test`.
 2. `gh auth login` + `gh auth refresh -s project`; `cp .env.example .env` and fill it in.
-3. Chairman Settings: the product repo's `production` environment (required reviewer =
-   you) and branch protection + CODEOWNERS review on this repo's `main`.
-4. `scripts/github-pm-setup.sh` → file the first `[OBJECTIVE]` issue →
-   `RUNNER_MODE=shadow`, then live.
+3. Chairman Settings: `workflow_dispatch`-only deploy workflows on the product repo
+   (or a required-reviewer `production` environment) and branch protection + Code Owner
+   review on this repo's `main`.
+4. `scripts/github-pm-setup.sh`, pin `pm_project_number`; create the Chairman action
+   queue epic, pin `chairman_queue_issue`.
+5. File the first `[OBJECTIVE]` → `RUNNER_MODE=shadow`, then live.
 """
 
 
@@ -259,10 +426,11 @@ def main():
     pi.add_argument("--product", help="the product the org runs (default: org name)")
     pi.add_argument("--goal", help="the org's north-star goal, e.g. '$10k/month' (default: placeholder)")
     pi.add_argument("--chairman-github", help="your GitHub username — the decision authority "
-                                              "(CODEOWNERS + production environment; default: leave placeholder)")
+                                              "(CODEOWNERS + deploy dispatch; default: leave placeholder)")
     pi.add_argument("--product-repo", help="owner/repo of the product repo agents PR into "
                                            "(default: <chairman>/<product-repo> placeholder)")
-    pi.add_argument("--departments", help="comma names; ceo always included (default: ceo,business,it)")
+    pi.add_argument("--departments", help="comma names; ceo always included "
+                                          "(default: ceo,business,it,warden; archetypes also: compliance)")
     pi.set_defaults(func=cmd_init)
     args = p.parse_args()
     args.func(args)

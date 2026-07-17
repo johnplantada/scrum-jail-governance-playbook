@@ -9,14 +9,14 @@
 Your agents went rogue. Or you're about to give them real authority and want to make
 sure they don't. This is the governance system that keeps humans in the loop.
 
-**Setup time**: 2-4 hours for the governance layer, plus building a thin runtime  
+**Setup time**: an afternoon — the stamp now includes the runtime  
 **Cost**: $0 of infrastructure beyond GitHub itself (a private repo works fine; Claude
 usage is the running cost)  
-**What you get**: the complete governance layer for a multi-agent org — org templates, a
-generator, and the GitHub-native authority model (a human-dispatched deploy gate —
+**What you get**: a complete multi-agent org in one stamp — the governance layer (org
+templates, the GitHub-native authority model: a human-dispatched deploy gate —
 `workflow_dispatch`-only deploy workflows — and a reviewed `decisions.yaml` ledger for
-money/org-shape) — plus precise contracts
-for the thin runtime (a GitHub poller + wake runner) you build or bring yourself. See
+money/org-shape) AND the runtime that runs it (the GitHub poller + wake runner, the
+ticket CLI, the deterministic warden, the PreToolUse gates, spend metering, CI). See
 [RUNBOOK.md](RUNBOOK.md) "What This Repo Ships vs. What You Build" before planning
 your afternoon.
 
@@ -34,7 +34,9 @@ your afternoon.
 | `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output; the work-item tree with a closing rule per level; the `[CODEREVIEW]` + `[DEMO]` gates before a 🚀 |
 | `FIELD-NOTES.md` | **Field-tested mechanisms** from the live org — the event loop, spend guards, the `.halt` switch, single-flight locks, worker tool-scoping, model-tier pinning, typed handoffs, the work-item tree's closure gate, the deterministic warden + engine-first wakes, wake yield + the wake filter — plus the graveyard of what the 2026-07-05 demolition retired, and what replaced each piece |
 | `RUNBOOK.md` | Step-by-step: set up your org in an afternoon |
-| `bin/orggen` | Generator that stamps a new governance-gated org skeleton from `_init/` |
+| `bin/orggen` | Generator that stamps a complete org — governance from `_init/`, runtime from `runtime/` — with every department surface (chart, mandates, wake rules, issue-form dropdowns, agent ceiling) generated from one roster |
+| `runtime/` | The full runtime, stamped verbatim: `scripts/` (runner + wake router, `pm-gh.sh`, the work-item closure gate, `agent-run.sh`, the deterministic warden, the subagent/objective PreToolUse gates, spend metering, unit tests), `.claude/` (guardrail settings + the governance skills), org CI, the operator Makefile |
+| `_init/agents/` | The shared `_policy.md`, the generic department template, and ready role mandates: `ceo`, `warden` (hygiene organ), `compliance` (assurance second line) |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How it all fits together, with Mermaid diagrams — the gate, the patterns, `orggen`, and where this repo sits in the wider Scrum Jail ecosystem |
 
 The first 8 patterns are about agents with **too much authority**. Patterns 9–13 (idle
@@ -101,24 +103,27 @@ supported path.
 
 Two ways in:
 
-**A. Generate a fresh org skeleton (recommended):**
+**A. Generate a fresh org (recommended):**
 ```bash
 bin/orggen init ../my-org --product "myproduct.com" --goal "$10k/month" \
-  --chairman-github <YOUR_GITHUB_USERNAME> --departments ceo,business,it
+  --chairman-github <YOUR_GITHUB_USERNAME> --departments ceo,business,it,warden
 ```
-Stamps a new org repo from `_init/`: `org-chart.yaml` (its `departments:` block generated from
-`--departments`, so the chart and `agents/` always match), `DESIGN.md` (product + goal filled),
-`agents/` (one file per department + the shared `_policy.md`), `blockers.yaml`, `.env.example`,
-and the playbook docs — then prints the next steps. `--org`, `--goal`, and `--departments` are
-optional (defaults: target dir name, a placeholder goal, and `ceo,business,it`).
+Stamps a complete org repo: governance (`org-chart.yaml`, `DESIGN.md`, `VISION.md`,
+`agents/` with role mandates, `blockers.yaml`, `decisions.yaml`, `.env.example`,
+`.github/` CODEOWNERS + issue forms) and the runtime (`scripts/`, `.claude/`, CI,
+Makefile, `wake-rules.yaml`), plus the vendored `playbook/` docs pinned to this golden's
+commit. Everything that names a department is generated from the one `--departments`
+roster, so the seven surfaces can never disagree. `--org`, `--goal`, and `--departments`
+are optional (defaults: target dir name, a placeholder goal, and `ceo,business,it,warden`;
+`compliance` is a ready archetype too).
 
 **B. Fork this repo** as your org repo and edit `org-chart.yaml` by hand.
 
 Then, either way:
 1. **Follow `RUNBOOK.md`** — including the gate verification tests
 2. **Read `patterns.md`, `blocker-ledger.md`, and `safe.md`** — before your agents go live
-3. **Read `FIELD-NOTES.md`** when you build your runtime — it's the mechanisms the live
-   org added after going live, each one paid for by a real failure
+3. **Read `FIELD-NOTES.md`** to understand the runtime you now run — it's the mechanisms
+   the live org added after going live, each one paid for by a real failure
 
 Full setup instructions: [RUNBOOK.md](RUNBOOK.md)
 

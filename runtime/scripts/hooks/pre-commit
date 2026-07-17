@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Refuse commits in the RUNTIME checkout (the main worktree). Org-repo changes must go through
+# an isolated worktree (scripts/org-worktree.sh) so agents never collide on the shared runtime
+# tree. A linked worktree has `.git` as a FILE (a gitdir pointer); the main checkout has it as a
+# DIRECTORY — that's how we tell them apart. Deliberate human commits can override.
+top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+if [ -d "$top/.git" ] && [ -z "${ALLOW_RUNTIME_COMMIT:-}" ]; then
+  echo "✋ refusing to commit in the runtime checkout ($top)." >&2
+  echo "   Org-repo changes go through an isolated worktree so agents don't collide:" >&2
+  echo "     wt=\$(scripts/org-worktree.sh new <branch-suffix>)   # edit under \$wt" >&2
+  echo "     ( cd \"\$wt\" && git add -A && git commit -m … && git push -u origin … && gh pr create )" >&2
+  echo "   Deliberate human commit override:  ALLOW_RUNTIME_COMMIT=1 git commit …" >&2
+  exit 1
+fi
+exit 0

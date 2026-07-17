@@ -28,7 +28,10 @@ governance:
   promote: gem                  # 💎 raise a department's model tier (type: promote)
 
 limits:
-  global_max_agents: 16         # hard ceiling across the entire org
+  # Hard ceiling across the entire org. orggen computes it from the roster (every brain +
+  # its full sub-agent fan-out); test_subagent_gate.py fails any chart whose arithmetic
+  # exceeds it, so raising it is a deliberate, reviewed act (a charter PR), never drift.
+  global_max_agents: {{GLOBAL_MAX_AGENTS}}
 
 global:
   review_interval: {{REVIEW_INTERVAL}}    # wakes per iteration — the [REVIEW] cadence

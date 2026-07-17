@@ -1,0 +1,53 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(sudo:*)",
+      "Bash(dd:*)",
+      "Bash(mkfs:*)",
+      "Bash(shutdown:*)",
+      "Bash(reboot:*)",
+      "Bash(halt:*)",
+      "Bash(diskutil:*)",
+      "Bash(:(){:|:&};:)",
+      "Bash(rm -rf /)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf ~/*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Read(./.env)",
+      "Read(**/.env)"
+    ]
+  },
+  "_hooks_note": [
+    "Hook commands run in the SESSION's cwd, not the project root, so a bare relative path",
+    "breaks the moment anything cds away — and a hook that cannot find its script ERRORS,",
+    "which BLOCKS the tool call instead of failing open. That is the opposite of what both",
+    "gates promise in their docstrings. Hence $CLAUDE_PROJECT_DIR (set by Claude Code to the",
+    "project root) and the `|| true`: a missing, broken, or unreadable gate must never brick",
+    "a cycle. Verified 2026-07-16 by cd-ing outside the repo — both gates go quiet, and the",
+    "org keeps working. Do not shorten these back to `python3 scripts/<gate>.py`."
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/subagent_gate.py\" || true"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/objective_gate.py\" || true"
+          }
+        ]
+      }
+    ]
+  }
+}

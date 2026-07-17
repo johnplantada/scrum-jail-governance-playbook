@@ -1,0 +1,79 @@
+# TEMPLATE — copy to $PRODUCT_REPO/.github/workflows/code-review.yml
+#
+# Machine floor for product-PR code review. The deterministic part that must be green on
+# the PR head SHA before a PR is merge-worthy; model judgement (a `claude-code-action`
+# review — GITHUB-NATIVE-PLAN.md) sits ON TOP of this when the org re-adds it.
+#
+# The steps below are the review floor the org's own history says matters most: a secret /
+# open-IAM scan (the prod-PR-#77 "open S3 bucket" class of bug), static analysis, and type
+# checks. Lines marked ADAPT assume the documented repo layout (frontend/ React via npm,
+# backend/ Go Lambda) — adjust to reality when copying.
+name: code-review
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: code-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review-floor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # gitleaks/diff need history
+
+      - name: Stamp the review with the exact code under review
+        run: |
+          mkdir -p review
+          { echo "sha=$(git rev-parse HEAD)"; echo "ref=${{ github.ref }}"; date -u +"generated=%Y-%m-%dT%H:%M:%SZ"; } | tee review/provenance.txt
+
+      # 1. Secrets / open-IAM scan — the highest-signal floor. Catches committed keys and,
+      #    with the custom rules, world-open buckets / permissive policies before merge.
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+
+      - name: IAM / infra exposure scan (checkov)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .                 # ADAPT: point at your terraform/ dir
+          soft_fail: false             # a public-bucket / open-policy finding FAILS the run
+          quiet: true
+
+      # 2. Static analysis + types — backend
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'                     # ADAPT: match backend/go.mod
+          cache-dependency-path: backend/go.sum  # ADAPT
+      - name: go vet
+        working-directory: backend               # ADAPT
+        run: go vet ./... 2>&1 | tee ../review/go-vet.txt
+
+      # 3. Static analysis + types — frontend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'                     # ADAPT
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json  # ADAPT
+      - name: lint + typecheck
+        working-directory: frontend              # ADAPT
+        run: |
+          npm ci
+          npm run lint 2>&1      | tee ../review/lint.txt
+          npm run typecheck 2>&1 | tee ../review/typecheck.txt   # ADAPT: tsc --noEmit
+
+      - name: Upload the review floor bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-review-${{ github.event.pull_request.number || github.run_id }}
+          path: review/
+          retention-days: 30

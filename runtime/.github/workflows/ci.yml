@@ -1,0 +1,79 @@
+name: CI
+
+# Every push to main and every PR. The `test` and `lint` jobs are the required
+# status checks that gate a merge (see branch protection on main).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same branch/PR cancels the in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax (every script — globbed, so new scripts are covered automatically)
+        run: python3 -m py_compile scripts/*.py
+      - name: Python unit tests (every scripts/test_*.py)
+        run: |
+          set -e
+          for t in scripts/test_*.py; do
+            echo "→ $t"
+            PYTHONPATH=scripts python3 "$t"
+          done
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck scripts
+        uses: ludeeus/action-shellcheck@master
+        with:
+          severity: error
+          scandir: ./scripts
+      # The constitution linter: DESIGN.md / agents/*.md / .claude/skills must reference
+      # their single sources of truth (org-chart.yaml parameters, CLI flag surfaces,
+      # version-controlled skills) instead of restating values that then drift.
+      - name: Constitution lint (docs vs. sources of truth)
+        run: python3 scripts/lint_constitution.py
+      - name: Blocker-runbook lint (every open human-only subtask ships with an actionable runbook)
+        run: python3 scripts/blockers.py lint
+      - name: Decisions-ledger check
+        run: python3 scripts/decisions.py check
+
+  # playbook/ is a vendored snapshot of the governance golden, pinned in playbook/SOURCE.md.
+  # Hard-fail if the vendored files were hand-edited (they must match the pinned golden
+  # commit exactly — edits belong in the golden, then `make sync-playbook`). Freshness is
+  # advisory: a pin behind golden main emits a warning, not a failure, so golden merges
+  # don't break unrelated PRs here.
+  playbook-drift:
+    name: playbook drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone the golden and check out the pinned commit
+        run: |
+          pin=$(sed -n 's/^Source: scrum-jail-governance-playbook @ //p' playbook/SOURCE.md)
+          test -n "$pin" || { echo "::error::no pinned commit in playbook/SOURCE.md"; exit 1; }
+          git clone https://github.com/johnplantada/scrum-jail-governance-playbook.git /tmp/golden
+          git -C /tmp/golden checkout --detach "$pin"
+      - name: Vendored copy matches its pin (hand-edit check)
+        run: make check-playbook GOLDEN_REPO=/tmp/golden
+      - name: Warn if the pin trails golden main
+        run: |
+          pin=$(git -C /tmp/golden rev-parse HEAD)
+          head=$(git -C /tmp/golden rev-parse origin/main)
+          if [ "$pin" != "$head" ]; then
+            echo "::warning::playbook/ is pinned at $(git -C /tmp/golden rev-parse --short "$pin") but golden main is at $(git -C /tmp/golden rev-parse --short "$head") — run: make sync-playbook"
+          fi

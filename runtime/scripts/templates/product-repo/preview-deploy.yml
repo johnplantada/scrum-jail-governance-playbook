@@ -1,0 +1,66 @@
+# TEMPLATE — copy to $PRODUCT_REPO/.github/workflows/preview-deploy.yml
+#
+# Ephemeral preview deploy per PR, for the [DEMO] gate (org DESIGN.md §12): Business
+# accepts a demo by FETCHING a real URL and checking the acceptance criteria against
+# the live page — observation, not trust in IT's pasted evidence. Each PR's frontend
+# build syncs to a per-PR prefix in the existing site bucket and the URL is commented
+# on the PR (that URL goes in the [DEMO] post).
+#
+# Reuses the same OIDC role + bucket the deploy.yml pipeline already has (set up at
+# first prod ship). Lines marked ADAPT must be aligned with deploy.yml when copying —
+# same role var, same bucket var, same build steps.
+#
+# Cleanup: previews live under previews/pr-<N>/ and are inert static files; prune with
+# `aws s3 rm --recursive s3://$BUCKET/previews/pr-<N>/` when a PR closes (or add a
+# lifecycle rule on the previews/ prefix).
+name: preview-deploy
+
+on:
+  pull_request:
+
+permissions:
+  id-token: write      # OIDC to AWS — same mechanism as deploy.yml
+  contents: read
+  pull-requests: write # to comment the preview URL
+
+concurrency:
+  group: preview-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'                     # ADAPT: match deploy.yml
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json  # ADAPT
+
+      - name: Build the frontend
+        working-directory: frontend              # ADAPT: mirror deploy.yml's build steps
+        run: |
+          npm ci
+          npm run build
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}   # ADAPT: same var deploy.yml uses
+          aws-region: ${{ vars.AWS_REGION }}                # ADAPT
+
+      - name: Sync to the per-PR preview prefix
+        run: |
+          aws s3 sync frontend/dist "s3://${{ vars.SITE_BUCKET }}/previews/pr-${{ github.event.number }}/" --delete  # ADAPT: bucket var + dist dir
+
+      - name: Comment the preview URL on the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # ADAPT: site host — CloudFront domain or S3 website endpoint serving the bucket
+          URL: https://your-site-host.example/previews/pr-${{ github.event.number }}/
+        run: |
+          gh pr comment "${{ github.event.number }}" --repo "${{ github.repository }}" \
+            --body "🔍 Preview for this PR: $URL (head ${{ github.event.pull_request.head.sha }}) — cite this URL in the [DEMO]; Business verifies the acceptance criteria against it directly." \
+            --edit-last --create-if-none

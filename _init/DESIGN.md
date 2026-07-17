@@ -5,10 +5,10 @@ owner participates as the **Chairman of the Board**, and GitHub is the substrate
 lives where the output lives, enforced by the platform, not parsed out of chat. Parameters
 live in `org-chart.yaml`, routing in `wake-rules.yaml`, procedure in `.claude/skills/`,
 per-role duty in `agents/*.md`. This file states only what must stay true.
-*(`wake-rules.yaml`, the skills, and every script named below ship with the reference
-runtime, not with this stamp — see the README. The reference org also lints prose against
-these sources in CI (`scripts/lint_constitution.py`) so the constitution can't silently
-restate what the config owns; adopt that with the runtime.)*
+*(`wake-rules.yaml`, the skills, and every script named below are stamped into this repo
+by `orggen` alongside this constitution. CI lints prose against these sources
+(`scripts/lint_constitution.py`) so the constitution can't silently restate what the
+config owns.)*
 
 ## 1 · The five invariants
 
@@ -84,9 +84,9 @@ wakes) before going live.
 
 Cross-role handoffs carry a fenced yaml payload in the relevant issue/PR comment — typed,
 not prose-by-convention. Required keys per type live in `scripts/handoff_check.py`
-(documented in `agents/_policy.md` §handoffs; keep the two in sync — the reference org
-CI-tests it). The handoff-validator workflow fails a malformed payload and replies with
-the missing keys; both ship with the reference runtime scripts.
+(documented in `agents/_policy.md` §handoffs; keep the two in sync — CI tests it). The
+handoff-validator workflow fails a malformed payload and replies with the missing keys;
+both ship in the stamped runtime.
 
 ## 5 · Counter-ratchet
 

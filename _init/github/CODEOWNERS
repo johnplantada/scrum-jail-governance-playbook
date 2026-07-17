@@ -1,0 +1,5 @@
+# Decision authority (DESIGN.md invariant 1): any PR touching the decisions
+# ledger is routed to the Chairman — his review+merge is the Board authorization.
+# Requires branch protection with "Require review from Code Owners" on main to be
+# binding (ledgered: github-codeowners-branch-protection).
+/decisions.yaml @{{CHAIRMAN_GITHUB}}

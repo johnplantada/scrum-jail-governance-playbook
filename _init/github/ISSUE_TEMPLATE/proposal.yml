@@ -1,0 +1,35 @@
+# Agent → Chairman proposal: the discussion surface before a decision. A Chairman 👍 (or
+# comment) here is direction only — money/org-shape changes take effect solely via a
+# decisions.yaml PR whose CODEOWNERS-routed merge is the authorization (DESIGN.md invariant 1).
+name: Proposal
+description: "Agent → Chairman: a bet, spend, or org change that needs a human verdict"
+title: "[PROPOSAL] "
+labels: ["proposal"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What is proposed
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why now / expected value
+      description: What it unblocks, which metric it moves, and the cheapest test of it.
+    validations:
+      required: true
+  - type: input
+    id: cost
+    attributes:
+      label: Cost (USD + Chairman-minutes)
+      placeholder: "e.g. $0 + 10 Chairman-minutes"
+    validations:
+      required: true
+  - type: textarea
+    id: reversibility
+    attributes:
+      label: Reversibility / rollback
+      description: One-way doors get extra scrutiny — say which kind this is.
+    validations:
+      required: true

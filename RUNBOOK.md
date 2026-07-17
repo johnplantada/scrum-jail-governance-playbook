@@ -15,37 +15,47 @@ external service is GitHub itself — you already have it if you're reading this
 
 ## What This Repo Ships vs. What You Build
 
-Read this first — it is the difference between an afternoon that works and an
-afternoon of hunting for files that don't exist.
+Read this first. Since the runtime landed in `runtime/`, the answer is: **the stamp is
+the whole org** — governance layer AND runtime. What's left for you is GitHub itself
+(repos, the two Chairman-only Settings steps) and your product.
 
 **Ships in this repo (usable today, no other dependencies):**
 
 | Piece | What it is |
 |---|---|
-| `bin/orggen` | Generator — stamps a new org repo from `_init/` (run it right now) |
-| `_init/org-chart.yaml` | Org tree + envelope template the generator fills in |
-| `_init/DESIGN.md` | The constitution template (invariants, gates, guardrails) |
-| `_init/agents/` | The shared `_policy.md` + the per-department mandate template |
+| `bin/orggen` | Generator — stamps a complete org repo from `_init/` + `runtime/` (run it right now) |
+| `_init/org-chart.yaml` | Org tree + envelope template; `departments:`, `global_max_agents`, wake rules, and the issue-form dropdowns are all generated from one roster |
+| `_init/DESIGN.md` | The constitution template (invariants — incl. Chairman-only work intake — gates, guardrails) |
+| `_init/VISION.md` | The one-page why + who template |
+| `_init/agents/` | The shared `_policy.md`, the generic department template, and role mandates for `ceo`, `warden` (hygiene organ), `compliance` (assurance second line) |
 | `_init/blockers.yaml` | The blocker ledger, empty and documented |
-| `_init/.env.example` | The env contract your runtime will read |
-| The docs | `emoji-gate.md` (the gate walkthrough — kept its historical filename for link stability, even though the mechanism it now documents is `decisions.yaml`/`workflow_dispatch`, not chat emoji), `envelopes.yaml`, `patterns.md`, `blocker-ledger.md`, `safe.md`, `FIELD-NOTES.md` |
+| `_init/.env.example` | The env contract the runtime reads (identity lives ONLY here — the scripts carry no fallback repos) |
+| `_init/github/` | CODEOWNERS (decisions.yaml → the Chairman) + the issue forms, dropdowns stamped from the roster |
+| `runtime/scripts/` | The full runtime: `runner.py` + generated `wake-rules.yaml`, `pm-gh.sh`, `workitems.py`, `agent-run.sh`, `warden.py`, the PreToolUse gates (`subagent_gate.py`, `objective_gate.py`), spend metering, the cadence + output predicates, and the unit tests CI runs |
+| `runtime/.claude/` | `settings.json` (deny-list + fail-open hook wiring) and the governance skills (`blocker-triage`, `board-proposals`, `org-worktree`, `safe-cadence`) |
+| `runtime/.github/workflows/` + `runtime/Makefile` | The org CI (tests, linters, ShellCheck, playbook-drift) and the operator surface (`make tick/preview/logs/halt/…`) |
+| The docs | `emoji-gate.md` (the gate walkthrough — kept its historical filename for link stability, even though the mechanism it now documents is `decisions.yaml`/`workflow_dispatch`, not chat emoji), `envelopes.yaml`, `patterns.md`, `blocker-ledger.md`, `safe.md`, `FIELD-NOTES.md` — vendored into each stamped org's `playbook/`, pinned in `playbook/SOURCE.md` |
 
-**You build or bring (the runtime — NOT included here):**
+**You bring (NOT included here):**
+
+| Component | What it is |
+|---|---|
+| GitHub itself | The org repo (push the stamped directory) + your product repo(s); Issues + one Project (a `Stage` single-select, provisioned by `scripts/github-pm-setup.sh`); Actions for CI and the deploy workflow — every prod-touching job triggered by **`workflow_dispatch` only** (the deploy gate); branch protection making CODEOWNERS review binding |
+| The product | Whatever the org runs. `scripts/templates/product-repo/` ships adaptable CI for it (code-review, demo-evidence, preview-deploy, the handoff validator, the metrics endpoint contract) |
+| Claude | The Claude Code SDK on your plan (`scripts/requirements.txt`); agents run headless through `agent-run.sh` |
+
+**Component contracts (the spec)** — the shipped runtime implements these; they remain
+the contract if you ever replace a piece with your own:
 
 | Component | Its contract (what the docs assume it does) |
 |---|---|
-| GitHub itself | The org repo (this stamped skeleton) + your product repo(s); Issues + one Project (a `Stage` single-select) for work tracking; Actions for CI and the deploy workflow — every prod-touching job triggered by **`workflow_dispatch` only** (the deploy gate); `.github/CODEOWNERS` + branch protection routing `decisions.yaml` PRs to the Chairman |
 | `pm-gh.sh` | The ticket CLI — `create`/`tasks`/`move`/`comment`/`comments`/`done`, plus the work-item tree verbs: `create --type epic\|feature\|story --parent N` (kind label + prefix, routing inherited, native sub-issue link) and `tree --id N` — mapped onto Issues + the Project's `Stage` field; ticket ids are `org#N` (the issue number) |
 | `workitems.py` | The tree's closure gate (safe.md): `can-close` re-derives the facts live — no open children; story evidence = merged repo-qualified PR or done-when; feature evidence = accepted `[DEMO]` or done-when — and `pm-gh.sh done` refuses to close a work-item the gate rejects, posting the typed `[CLOSE]` payload when it passes |
-| `runner.py` + `wake-rules.yaml` | The poller: each tick, diffs GitHub (issues, comments on both repos, workflow runs on the product repo) against a saved cursor, normalizes to events, and routes each through the rules table to wake the owning department |
+| `runner.py` + `wake-rules.yaml` | The poller: each tick, diffs GitHub (issues + PRs, comments on both repos, workflow runs on the product repo) against a saved cursor, normalizes to events, and routes each through the rules table to wake the owning department |
 | `agent-run.sh` | Runs one headless Claude cycle per wake — loads the department's mandate + `agents/_policy.md` + the open `blockers.yaml` queue, single-flight-locks so two wakes of the same agent never race, respects the `.halt` kill switch |
 | `decisions.py check` (CI) | Validates every `decisions.yaml`-touching PR (unique ids, required fields) so a malformed entry can't merge |
 
-The reference implementation of that runtime powers the live Scrum Jail org and is
-private — it's ordinary scripts wrapping `gh`, small enough to write your own from the
-contracts above. This playbook ships the governance layer and specifies each runtime
-component's contract precisely enough to build your own thin version — none is more
-than a small script.
+The same runtime powers the live Scrum Jail org.
 
 ---
 
@@ -72,17 +82,28 @@ Generate a fresh org skeleton from this repo's templates:
 
 ```bash
 bin/orggen init ../my-org --product "myproduct.com" --goal "$10k/month" \
-  --chairman-github <YOUR_GITHUB_USERNAME> --departments ceo,business,it
+  --chairman-github <YOUR_GITHUB_USERNAME> --departments ceo,business,it,warden
 ```
 
 Verify what you got — every one of these files now exists and is yours to edit:
 
 ```bash
 ls -A ../my-org
-# .env.example  DESIGN.md  README.md  agents/  blockers.yaml  org-chart.yaml  + the docs
+# .claude/ .env.example .github/ .gitignore DESIGN.md Makefile README.md VISION.md
+# agents/ blockers.yaml decisions.yaml org-chart.yaml playbook/ scripts/ wake-rules.yaml
 cat ../my-org/org-chart.yaml   # your chairman's GitHub username + one department block per --departments
 ls ../my-org/agents            # _policy.md + one stamped mandate per department
+cat ../my-org/wake-rules.yaml  # the runner's routing table, generated from the same roster
 ```
+
+The stamp includes the **runtime** (`scripts/`, `.claude/`, the CI workflows, the
+Makefile) and the **vendored playbook** (`playbook/`, pinned to this golden's commit —
+`make check-playbook` keeps it honest). The departments you name generate *seven*
+surfaces in lockstep: the org-chart block, the agent mandate, the wake rules, the issue-form
+dropdowns, the `dept:*` labels (via `github-pm-setup.sh` reading the chart), the agent
+ceiling, and the README roster — adding a department later means touching those same seven
+(the reference org once shipped a follow-up commit for a forgotten dropdown; the generator
+exists so you don't).
 
 (Prefer to work by hand? Fork this repo instead and edit `org-chart.yaml` from the
 template at the repo root. `orggen` exists so the chart and `agents/` can never
@@ -159,35 +180,32 @@ stand up beyond a handful of GitHub Settings clicks and one setup script.
 
 ---
 
-## Step 4 — Build or Bring the Runtime (the honest step)
+## Step 4 — Install the Runtime Locally (20 min)
 
-This is the part this repo does **not** do for you. You need three components from the
-table at the top: `pm-gh.sh`, `runner.py` + `wake-rules.yaml`, and `agent-run.sh`. Build
-them in any language; the contracts are small:
+The runtime ships with the stamp — this step is installing its dependencies and proving
+it green, not building it. In your stamped org repo:
 
-- **pm-gh.sh**: `create --project <dept> --title "…" [--assigned <dept>] [--desc "…"]
-  [--priority 1-5] [--due YYYY-MM-DD]`, `tasks --project <dept> [--all]`,
-  `move --id N --to <Stage>`, `comment`/`comments --id N`, `done --id N`. Each verb is a
-  thin wrapper over `gh issue`/`gh project` calls — `create` opens an issue carrying the
-  `dept:*` label, adds it to the Project, and sets `Stage` to the first `pm_stages`
-  entry; `move` edits the `Stage` field on the matching Project item.
-- **runner.py + wake-rules.yaml**: each tick, read a saved cursor, ask GitHub what
-  changed since (issues + comments on both repos, workflow runs on the product repo),
-  normalize each into an event (`kind`, `repo`, `label`, `workflow`, `conclusion`), and
-  match it against `wake-rules.yaml`'s rules table — first match wins, an event matching
-  nothing wakes nobody. A rule's `wake:` is either a literal department or
-  `from-label` (route to whichever `dept:*` label the event carries). Advance the
-  cursor; GitHub is the durable queue, so a closed laptop just means a longer backlog
-  drained oldest-first at the next tick. Guards, every tick: a `.halt` file in the repo
-  root stops the tick outright; a daily spend cap stops it from firing *live* wakes
-  (routing still logs) once the metered spend ledger crosses it.
-- **agent-run.sh `<department>`**: load `agents/<name>.md`, run one headless Claude
-  cycle with that mandate + `agents/_policy.md` + the open `blockers.yaml` entries as
-  context, then exit. Single-flight per department — two concurrent wakes of the same
-  agent race the same product-repo branch or the same ticket, so lock on the agent name
-  (a plain `mkdir`-based lock is portable and enough).
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
+make test          # unit tests + constitution lint + blocker lint + decisions check
+cp .env.example .env   # fill in ORG_GH_REPO / PRODUCT_GH_REPO / PRODUCT_REPO
+cp scripts/hooks/pre-commit .git/hooks/   # refuse accidental commits in the runtime checkout
+```
 
-When your runtime is up, smoke-test it:
+The identity env vars have **no fallback defaults** in the scripts (a runtime silently
+talking to someone else's repo is worse than one that refuses to start — the reference
+org learned this porting its own runtime, which carried the previous org's repo slug in
+six files). `runner.py` exits with a clear message until `.env` is filled in; the
+read-only predicates (`last-ship.sh`, `pi-tick.sh`) degrade safely instead.
+
+How the pieces fit (the contracts live in the table at the top): `runner.py` polls
+GitHub and routes events through `wake-rules.yaml`; `agent-run.sh` runs one locked,
+metered, headless Claude cycle per wake; `pm-gh.sh` is the ticket CLI the agents use;
+the `.claude/settings.json` hooks enforce the subagent cap and Chairman-only work
+intake inside each cycle. Guards, every tick: a `.halt` file stops everything; the
+daily spend cap holds live wakes once `state/spend.jsonl` crosses it.
+
+Smoke-test against GitHub (after Step 3's provisioning):
 
 ```bash
 scripts/pm-gh.sh create --project ceo --title "CEO online" --desc "smoke test"
@@ -353,26 +371,26 @@ exists to prevent.
 
 ## What This Doesn't Cover
 
-This playbook covers the governance layer — the human-in-the-loop controls that
-keep agents from acting beyond their mandate. It does not cover:
+This playbook covers the governance layer and ships the runtime that enforces it. It
+does not cover:
 
-- **The runtime itself** — `pm-gh.sh`, `runner.py`, and `agent-run.sh` are yours to
-  build against the contracts in Step 4; the reference implementation is private
-- **What your agents should actually do** — that's your `agents/<name>.md` files
+- **What your agents should actually do** — that's your `agents/<name>.md` files (the
+  stamped mandates carry `CUSTOMIZE` markers where your org's substance goes)
+- **Your product** — `scripts/templates/product-repo/` gives you adaptable CI, not an app
 - **Multi-tenant or team setups** — the org-chart is single-Chairman by design
 - **Security hardening** — `.env`/secrets need standard secrets management, and scoping
   the `gh` token each agent runs under is on you
 
 For the hard-won operational mechanisms the live org runs — wake backpressure numbers,
 single-flight locks, worker tool-scoping, deploy-hold hibernation, and more — see
-[FIELD-NOTES.md](FIELD-NOTES.md) before you build Step 4.
+[FIELD-NOTES.md](FIELD-NOTES.md); the shipped runtime implements them.
 
 ---
 
 ## Quick Reference — the runtime command surface
 
-These are the commands the reference runtime exposes; whatever you build in Step 4
-should have equivalents. They are a contract, not shipped binaries:
+These are the commands the stamped runtime exposes (`make` with no target prints the
+operator surface):
 
 | Task | Reference shape |
 |---|---|
