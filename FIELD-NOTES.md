@@ -266,11 +266,15 @@ gate acts on gets a schema.
 
 **The honest enforcement status:** the chat-era enforcers (the bus's malformed-payload
 warning, the Warden citation — Part II §R6) died in the demolition; their Actions
-successor is now built. `scripts/handoff_check.py` holds the authoritative key list,
-the handoff-validator workflow runs it on every comment that leads a **paragraph** with
-a handoff marker (a malformed payload fails the run and gets a reply naming the missing
-keys), and a CI test keeps `_policy.md` §handoffs — the human-readable copy — from
-drifting off the code. Paragraph-leading, not line-leading, is a paid-for lesson: the
+successor was built next — and became a paid-for lesson of its own: a hosted workflow
+triggered on every marker-bearing comment runs at agent frequency, and its rounded-up
+per-job minutes helped burn the account's monthly Actions quota in days (patterns.md
+Pattern 17), so the per-comment hosted validator is **retired by default**.
+`scripts/handoff_check.py` remains the authoritative key list — it checks every comment
+that leads a **paragraph** with a handoff marker (a malformed payload fails with a
+reply naming the missing keys), its home is operator-local compute (the runner's wake
+path; the pre-push CI suite of §13), and a CI test keeps `_policy.md` §handoffs — the
+human-readable copy — from drifting off the code. Paragraph-leading, not line-leading, is a paid-for lesson: the
 original any-line-start rule fired on a hard line-wrap that landed a bare `[CODEREVIEW]`
 mention at column 0 in ordinary prose, and the agent's response was to write around the
 checker rather than report it (patterns.md Pattern 13). The banner norm means a real
@@ -453,10 +457,60 @@ correctly.
   the shadow log shows zero false defers. A filter that eats a real wake is worse than
   every noop it prevents — this is the R2 lesson (measure, then enforce) applied one
   layer up.
+- **The flip is runtime config, and it will sit unflipped.** `WAKE_FILTER_MODE` lives
+  in the runner host's `.env`, which no PR can edit — the live org named the
+  shadow→live flip as a "companion action" in a PR body, nothing tracked it, and the
+  storm it would have stopped burned for another day. A shadow→live flip is a
+  `blockers.yaml` entry with the exact edit as its `action:`, opened the moment the
+  shadow audit passes (blocker-ledger.md §2). Two verification traps, both paid for:
+  the wrapper re-sources `.env` every tick (no restart needed), but a tick already in
+  flight logs its verdicts late under the OLD env — read the *next* tick's
+  `wake-filter.jsonl` `mode` field before declaring the filter live; and on a host
+  running sibling orgs, confirm which org's `.env` you edited — the live flip landed
+  in the neighbor's first.
 
 This is the direct successor to §1's backpressure list: dedup, batching, and echo-skip
 remove *duplicate* wakes; yield + the filter remove *pointless* ones — and only the
 measurement layer can tell you which you have.
+
+---
+
+## 13. The zero-spend CI gate — the suite runs at push time, on the operator's machine
+
+**The failure:** Pattern 17 (patterns.md) — the metered-CI burn. A per-comment hosted
+validator billed a rounded-up minute at agent frequency, drained the account's monthly
+Actions quota in days, and GitHub's block-at-quota took CI dark **account-wide**: every
+required status check unreportable, every PR unmergeable without an admin override,
+governance stalled in two orgs at once.
+
+**How it works:** the org spends **$0** on hosted Actions and runs the CI suite where
+compute is free — on the operator's machine, at push time.
+
+- **A `pre-push` hook mirrors `ci.yml` job-for-job** (`scripts/hooks/pre-push`): python
+  syntax + every unit test; shellcheck + the constitution/blockers/decisions linters;
+  playbook drift checked against the pin via a cheap `--shared` clone of the local
+  golden checkout — warn-and-skip when it can't be evaluated, because a stale local
+  golden must not block a push it can't judge. `SKIP_CI_HOOK=1 git push` is the
+  deliberate override, and the hook's refusal message names it, so the escape hatch is
+  never a secret.
+- **Wired once, covers every worktree:** `make install-hooks` sets
+  `core.hooksPath = scripts/hooks` on the runtime repo. Linked worktrees share repo
+  config, so the isolated PR worktrees (`org-worktree.sh`) and the runtime checkout all
+  run the same hooks with no per-clone setup.
+- **Hosted workflows are off by default** (`gh workflow disable` — reversible with
+  `enable`), and re-enabling anything needs the Pattern 17 budget line first. The
+  `workflow_dispatch`-only deploy gate keeps its workflow: rare-and-deliberate is what
+  the quota is *for*. Budget facts and rules live in the reference org's
+  `docs/actions-budget.md`.
+- **Honesty note:** a git hook is per-clone convention, not server enforcement — an
+  unhooked clone can push, and nothing on GitHub's side refuses it. That trade is
+  deliberate: required status checks are exactly the coupling that turned quota
+  exhaustion into a merge freeze. Where the plan supports branch protection with
+  required *reviews* (no status checks), keep it — the review gate doesn't ride the
+  meter.
+
+**The counter-ratchet line:** this replaces the hosted CI workflow (disabled, not
+deleted) — one gate moved, none added.
 
 ---
 
