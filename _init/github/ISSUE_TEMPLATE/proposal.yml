@@ -1,4 +1,4 @@
-# Agent → Chairman proposal: the discussion surface before a decision. A Chairman 👍 (or
+# Agent → Chairman proposal: the discussion surface before a decision. A Chairman thumbs-up reaction (or
 # comment) here is direction only — money/org-shape changes take effect solely via a
 # decisions.yaml PR whose CODEOWNERS-routed merge is the authorization (DESIGN.md invariant 1).
 name: Proposal

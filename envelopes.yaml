@@ -10,7 +10,7 @@
 # The cost of a too-wide envelope is your agent doing something
 # you can't take back.
 #
-# LINEAGE: v1 ran these gates as Chairman emoji reactions (💰/🚀)
+# LINEAGE: v1 ran these gates as Chairman chat reactions
 # verified by a deterministic Registrar service; retired 2026-07-05
 # with the chat stack. The gates survived — only the mechanism
 # translated to GitHub-native primitives (merges and manual deploy
@@ -191,8 +191,8 @@ reference_envelopes:
 # merge/dispatch gates are for.
 #
 # model_ids         — tier (haiku/sonnet/opus) → exact API model id. The SINGLE source
-#                     of truth for tier→model resolution. A 💎 PROMOTE (a decisions.yaml
-#                     entry now, not an emoji) changes an AGENT's tier; editing this map
+#                     of truth for tier→model resolution. A PROMOTE (a decisions.yaml
+#                     entry) changes an AGENT's tier; editing this map
 #                     changes what a tier MEANS for the whole org. Pin ids so a
 #                     provider's silent default can't drift you onto a different model.
 # pm_stages         — the ordered kanban columns (To-Do, Doing, Staged, Demo, Done),

@@ -34,7 +34,7 @@ the whole org** — governance layer AND runtime. What's left for you is GitHub 
 | `runtime/scripts/` | The full runtime: `runner.py` + generated `wake-rules.yaml`, `pm-gh.sh`, `workitems.py`, `agent-run.sh`, `warden.py`, the PreToolUse gates (`subagent_gate.py`, `objective_gate.py`), spend metering, the cadence + output predicates, and the unit tests CI runs |
 | `runtime/.claude/` | `settings.json` (deny-list + fail-open hook wiring) and the governance skills (`blocker-triage`, `board-proposals`, `org-worktree`, `safe-cadence`) |
 | `runtime/.github/workflows/` + `runtime/Makefile` | The org CI (tests, linters, ShellCheck, playbook-drift) and the operator surface (`make tick/preview/logs/halt/…`) |
-| The docs | `emoji-gate.md` (the gate walkthrough — kept its historical filename for link stability, even though the mechanism it now documents is `decisions.yaml`/`workflow_dispatch`, not chat emoji), `envelopes.yaml`, `patterns.md`, `blocker-ledger.md`, `safe.md`, `FIELD-NOTES.md` — vendored into each stamped org's `playbook/`, pinned in `playbook/SOURCE.md` |
+| The docs | `authorization-gate.md` (the gate walkthrough — `decisions.yaml` merges + `workflow_dispatch` deploys), `envelopes.yaml`, `patterns.md`, `blocker-ledger.md`, `safe.md`, `FIELD-NOTES.md` — vendored into each stamped org's `playbook/`, pinned in `playbook/SOURCE.md` |
 
 **You bring (NOT included here):**
 
@@ -117,9 +117,8 @@ disagree about who exists.)
 
 1. Confirm `chairman.github` is your GitHub username
 2. Set the governance vocabulary (`charter`/`sunset`/`fund`/`ship`/`halt`/`promote`) —
-   leave the defaults unless you want different words. This is ledger language now — a
-   `decisions.yaml` entry's `type` field and the corresponding issue/PR prose — not a
-   chat emoji a bot listens for
+   leave the defaults unless you want different words. This is ledger language — a
+   `decisions.yaml` entry's `type` field and the corresponding issue/PR prose
 3. Adjust envelopes: start with the `department_head` preset, tighten after you see how
    the agents behave
 
@@ -277,7 +276,7 @@ reach*:
       required review, **or dispatch the deploy workflow** — branch protection and the
       dispatch-only trigger are what actually stop it, not a prompt instruction (an
       agent-visible token with Actions-write rights can self-authorize a deploy; see
-      the credential-hygiene note in emoji-gate.md)
+      the credential-hygiene note in authorization-gate.md)
 
 If all four pass, your governance layer is live.
 

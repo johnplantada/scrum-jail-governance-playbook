@@ -1,5 +1,5 @@
 # Feature proposal (DESIGN.md §2). The owning agent turns this into
-# acceptance criteria + a plan and posts it back on the issue for a 👍 before building.
+# acceptance criteria + a plan and posts it back on the issue for a thumbs-up before building.
 name: Feature
 description: "A concrete product/tooling change to build"
 title: "[FEATURE] "
@@ -31,4 +31,4 @@ body:
     id: acceptance
     attributes:
       label: Acceptance criteria (optional)
-      description: Leave blank to have the owning agent propose them for your 👍.
+      description: Leave blank to have the owning agent propose them for your thumbs-up.

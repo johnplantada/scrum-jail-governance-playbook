@@ -5,8 +5,8 @@ is the other half — the mechanisms the live Scrum Jail org grew *after* going 
 built in response to a real failure that cost real tokens (or nearly shipped a real
 mistake). None is speculative; every mechanism in Part I is running today. Part II is
 the graveyard: on **2026-07-05** the org demolished its entire chat-era runtime
-(Mattermost, the bus/pm/registrar/memory/vox services, the watcher fleet, emoji
-approvals) and went GitHub-native — retiring about half of this file's previous edition
+(Mattermost, the bus/pm/registrar/memory/vox services, the watcher fleet,
+chat-reaction approvals) and went GitHub-native — retiring about half of this file's previous edition
 in one afternoon. What replaced each mechanism (or deliberately didn't) is a field note
 in itself. For each entry: what it is, the failure it exists to prevent, and how the
 real implementation works — so you can build the same thing into your runtime without
@@ -120,7 +120,7 @@ everything else trusts (§6).
 
 ---
 
-## 3. The 🛑 kill switch — one file, checked by every loop
+## 3. The kill switch — one file, checked by every loop
 
 **The failure it forecloses:** an autonomous org you can only stop by hunting down its
 processes. The stop button must be dumber than the org.
@@ -232,7 +232,7 @@ standard: a mechanism that claims to save tokens must log the evidence.
 ## 7. Model-tier pinning — a tier is a name; its meaning lives in one map
 
 **The failure it forecloses:** the org talks in *tiers* everywhere — `model: sonnet` in
-the chart, "sonnet" in the spend ledger, a 💎 PROMOTE that raises an agent to opus. But
+the chart, "sonnet" in the spend ledger, a PROMOTE that raises an agent to opus. But
 "sonnet" is not a model; it's a label that has to resolve to an *exact* API id at the
 call boundary. Let each caller resolve it however it likes and a provider's silent
 default (or a half-updated script) can drift two agents onto two different models while
@@ -244,7 +244,7 @@ a tier becomes an id (`sonnet → claude-sonnet-5`, …). A tiny resolver
 resolves the cycle's brain and every worker spec's tier as it builds the SDK options;
 argv, banners, ledger rows, and brownouts keep speaking tiers. Anything already shaped
 like a full id passes through unchanged, so you can pin an exact id in an emergency
-without touching the chart. The governance payoff is the clean split: a **💎 PROMOTE**
+without touching the chart. The governance payoff is the clean split: a **PROMOTE**
 changes *one agent's* tier; editing the **map** upgrades what a tier *means* for the
 whole org, in one line — two changes, two authorities, one obvious place each.
 

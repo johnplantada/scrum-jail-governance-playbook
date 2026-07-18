@@ -20,17 +20,15 @@ chairman:
 
 governance:
   # The gate vocabulary — ledger `type` strings for decisions.yaml entries and issue/PR
-  # prose. Explicitly NOT a chat emoji: in v1 these were reaction emojis a Registrar
-  # parsed; authorization is now the Chairman's merge (decisions.yaml PR) or manual
-  # deploy dispatch (workflow_dispatch). The names keep their emoji flavor so the ledger
-  # stays human-skimmable.
-  charter: classical_building   # 🏛️  charter a new department
-  sunset:  coffin               # ⚰️  dissolve a department or team
-  promote: gem                  # 💎  raise an agent's model tier
-  fund:    moneybag             # 💰  approve spend up to a stated ceiling
-  ship:    rocket               # 🚀  approve a production deploy
-  halt:    octagonal_sign       # 🛑  emergency stop — a .halt file in the repo root halts
-                                #     the runner and every agent cycle; only a human clears it
+  # prose. Authorization is the Chairman's merge (decisions.yaml PR) or manual deploy
+  # dispatch (workflow_dispatch); these names are ledger language, nothing more.
+  charter: new-department       # charter a new department
+  sunset:  dissolve             # dissolve a department or team
+  promote: tier-raise           # raise an agent's model tier
+  fund:    spend-ceiling        # approve spend up to a stated ceiling
+  ship:    prod-deploy          # approve a production deploy
+  halt:    emergency-stop       # a .halt file in the repo root halts the runner and
+                                # every agent cycle; only a human clears it
 
 limits:
   global_max_agents: 16         # Org-wide agent ceiling, CI-checked: the reference tests fail
@@ -75,8 +73,8 @@ global:
   pm_project_number: <N>      # the org Project's number (gh project <N>)
 
   # Model tier → exact API model id. The ONE place tier→model resolution lives. Everything
-  # else (spend ledger, wake banners, budget brownouts, 💎 PROMOTE) keeps speaking in
-  # tiers; a 💎 changes an AGENT's tier, editing THIS map upgrades what a tier MEANS
+  # else (spend ledger, wake banners, budget brownouts, PROMOTE) keeps speaking in
+  # tiers; a PROMOTE changes an AGENT's tier, editing THIS map upgrades what a tier MEANS
   # org-wide. Pin ids so a provider's silent default can't drift you onto a different model.
   model_ids:
     haiku:  "<haiku-model-id>"     # cheapest tier that reliably does the job

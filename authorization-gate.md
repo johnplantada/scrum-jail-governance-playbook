@@ -15,7 +15,7 @@ and verifies but deploys nothing; the Chairman's manual dispatch *is* the deploy
 same gate *where your plan enforces it* — required reviewers on a **private** repo need
 Team/Enterprise; the live org's private Free-plan repo is why the dispatch-only trigger
 is the reference gate. Verify whichever you use — RUNBOOK Test 2.) (Older versions of this doc
-described a chat-based variant — typed message, emoji reaction, a Registrar bot verifying
+described a chat-based variant — typed message, chat reaction, a Registrar bot verifying
 the reactor over a WebSocket. That mechanism is retired here, not offered as an equally
 valid alternative: it was unenforceable in code and prose-policed by convention. If you
 want to run coordination over chat, that's a fork/adaptation decision for your own org —
@@ -58,7 +58,7 @@ this template only carries the GitHub-native gate forward.)
        agent action can start it — only a manual dispatch
    └── nothing executes a merged decisions.yaml entry's payload automatically —
        money and org-shape changes take effect because the diff landed on `main`,
-       the same way there was deliberately no code path from "Chairman reacted 💰"
+       the same way there was deliberately no code path from a chat-reaction approval
        to "money moves" in the retired model. The backstop is still
        **capability-absence**: agents hold no payment credentials or prod access,
        so even a confused or compromised agent has nothing to spend or ship with
@@ -93,7 +93,7 @@ dispatch button doesn't page you. (If your plan enforces a required-reviewer
 **Step 3 — Merge and Dispatch Are the Signature**
 There's no separate authorization action layered on top — the review *is* the
 authorization for money/org-shape, and the dispatch *is* the deploy. This is a stronger
-property than an emoji convention: GitHub already refuses to let a PR merge without
+property than a chat-reaction convention: GitHub already refuses to let a PR merge without
 satisfying its protection rules, and a `workflow_dispatch`-only deploy job simply has no
 trigger an agent can pull. There's no bot in between whose logic could drift from what
 the platform actually enforces.
@@ -229,7 +229,7 @@ nothing extra to compose: you deploy by dispatching the workflow when you're sat
 | Agent edits `decisions.yaml` directly on `main` | Can't — branch protection requires all changes via reviewed PR |
 | Agent acts before the PR merges / the Chairman dispatches | Nothing in the runtime intercepts it — the action fails because the agent holds no payment credential or prod access. If it *could* have succeeded, fix the capability leak, not the prompt |
 | Agent re-proposes with a different ceiling mid-review | Open a new PR/entry; don't silently edit an entry already under review — the diff you're reviewing must match what merges |
-| Agent posts a `[PROPOSAL]` and treats a Chairman 👍/comment as approval for a money/org-shape ask | Doesn't count — only a merged `decisions.yaml` entry or the Chairman's deploy dispatch is authorization; a `[PROPOSAL]` issue is for asks that aren't money/org-shape in the first place |
+| Agent posts a `[PROPOSAL]` and treats a Chairman thumbs-up/comment as approval for a money/org-shape ask | Doesn't count — only a merged `decisions.yaml` entry or the Chairman's deploy dispatch is authorization; a `[PROPOSAL]` issue is for asks that aren't money/org-shape in the first place |
 
 ---
 

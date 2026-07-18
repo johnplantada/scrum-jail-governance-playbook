@@ -38,8 +38,8 @@ that PR to the Chairman, and **the Chairman's merge is the authorization**: noth
 takes effect until it's on `main`, and `git log decisions.yaml` is the audit trail.
 (The `[PROPOSAL]` issue form is the discussion surface on the way there.) If any tool
 within the agent's reach can move money, that tool is the vulnerability — remove the
-credential, don't patch the prompt. *(v1: a Chairman 💰 reaction, recorded by the
-Registrar to `#decisions` — retired 2026-07-05; 💰 survives only as ledger vocabulary.)*
+credential, don't patch the prompt. *(v1: a Chairman chat-reaction approval, recorded by the
+Registrar to `#decisions` — retired 2026-07-05.)*
 
 ---
 
@@ -64,8 +64,8 @@ didn't enforce, and moved the gate into the trigger itself — code, reviewable,
 plan-independent.) Layer the protocol on top: declare `can_deploy: false` (a hint, not
 a code switch), and put the PR link and a one-line rollback plan on the ticket before
 asking for the dispatch. No amount of test coverage substitutes for the human gate —
-the gate is for authorization, not quality assurance. *(v1: a Chairman 🚀 reaction,
-recorded to `#decisions` — retired 2026-07-05; 🚀 survives only as ledger vocabulary.)*
+the gate is for authorization, not quality assurance. *(v1: a Chairman chat-reaction approval,
+recorded to `#decisions` — retired 2026-07-05.)*
 
 ---
 
@@ -203,7 +203,7 @@ re-phrase of one that was closed unmerged. The behavioral discipline has to come
 the charter. If an agent is evading, rewrite its charter to be explicit about refusal
 finality, then restart it.
 
-(A note on 🛑, because it's easy to misread as a per-proposal veto: it isn't one. The
+(A note on the kill switch, because it's easy to misread as a per-proposal veto: it isn't one. The
 kill switch is a `.halt` file in the repo root — `make halt` drops it, `make resume`
 clears it — and while it exists `runner.py` skips every tick and `agent-run.sh` refuses
 every wake. Only a human removes it (DESIGN.md invariant 5). The everyday "no" to a
@@ -466,7 +466,7 @@ run is usually a run you chose not to care about).
 was not started because recent account payments have failed or your spending limit needs
 to be increased." Runs die in ~2 seconds with zero steps executed. Nothing agent-side
 changed — and because required status checks live in CI, every PR in every org sharing
-the account is suddenly unmergeable except by the admin override emoji-gate.md warns
+the account is suddenly unmergeable except by the admin override authorization-gate.md warns
 erodes the gate.
 
 **Why it happens:** Hosted CI is metered, and the meter is unforgiving: GitHub bills each

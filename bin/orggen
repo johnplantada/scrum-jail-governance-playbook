@@ -40,7 +40,7 @@ RUNTIME = os.path.join(REPO, "runtime")
 # Docs vendored into the new org's playbook/ (pinned via playbook/SOURCE.md; the stamped
 # Makefile's sync-playbook/check-playbook keep it honest). MUST match the Makefile's
 # PLAYBOOK_VENDORED list — check-playbook diffs exactly these files.
-VENDORED_DOCS = ["patterns.md", "safe.md", "blocker-ledger.md", "emoji-gate.md",
+VENDORED_DOCS = ["patterns.md", "safe.md", "blocker-ledger.md", "authorization-gate.md",
                  "envelopes.yaml", "README.md", "RUNBOOK.md", "org-chart.yaml",
                  "FIELD-NOTES.md"]
 
@@ -143,7 +143,7 @@ def dept_block(name, role, reports_to, model, max_sub, budget, note):
         f"  - name: {name}\n"
         f"    role: {role}\n"
         f"    reports_to: {reports_to}\n"
-        f"    model: {model}                 # default tier; a sustained raise is a 💎 decisions.yaml PR\n"
+        f"    model: {model}                 # default tier; a sustained raise is a `type: promote` decisions.yaml PR\n"
         f"    envelope:\n"
         f"      max_subagents: {max_sub}            # {note}\n"
         f"      daily_token_budget: {budget}\n"
@@ -367,7 +367,7 @@ def cmd_init(args):
     print("     then `gh auth refresh -s project`. `cp .env.example .env` and fill it in.")
     print("  3. Chairman Settings — the two human-only steps no agent can perform:")
     print("     a) product repo: every prod-deploy workflow triggers on workflow_dispatch")
-    print("        ONLY (your manual dispatch IS the 🚀 deploy gate) — or a `production`")
+    print("        ONLY (your manual dispatch IS the deploy gate) — or a `production`")
     print("        environment with you as required reviewer where your plan enforces it;")
     print("     b) org repo → Settings → Branches → protect main: require a PR + require")
     print("        Code Owner review (this makes the decisions.yaml merge gate binding).")

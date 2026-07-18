@@ -3,7 +3,7 @@
 This document explains **how the governance playbook is put together** and the mechanism it
 encodes: how a fleet of autonomous LLM agents can do real work while a human stays firmly in
 control. It is the architectural companion to the conceptual docs
-([`emoji-gate.md`](../emoji-gate.md), [`patterns.md`](../patterns.md),
+([`authorization-gate.md`](../authorization-gate.md), [`patterns.md`](../patterns.md),
 [`blocker-ledger.md`](../blocker-ledger.md), [`safe.md`](../safe.md)) and the setup walkthrough
 ([`RUNBOOK.md`](../RUNBOOK.md)).
 
@@ -23,9 +23,9 @@ software organizations. Each repo stands alone, but they only make full sense as
 
 ```mermaid
 flowchart LR
-    GP["📓 scrum-jail-governance-playbook<br/><b>Methodology</b><br/>authorization gate · 13 patterns · orggen generator"]
-    BIZ["🏛️ scrum-jail-business<br/><b>The autonomous org — runtime</b><br/>Python scripts over gh · runner.py + wake-rules.yaml · Claude agents"]
-    PROD["🌐 scrum-jail<br/><b>The product — scrumjail.org</b><br/>React SPA · Go Lambda · AWS · Terraform"]
+    GP["scrum-jail-governance-playbook<br/><b>Methodology</b><br/>authorization gate · 17 patterns · orggen generator"]
+    BIZ["scrum-jail-business<br/><b>The autonomous org — runtime</b><br/>Python scripts over gh · runner.py + wake-rules.yaml · Claude agents"]
+    PROD["scrum-jail<br/><b>The product — scrumjail.org</b><br/>React SPA · Go Lambda · AWS · Terraform"]
 
     GP -->|"orggen stamps an org<br/>make sync-playbook vendors the docs"| BIZ
     BIZ -->|"IT agent opens PRs<br/>Chairman dispatches each deploy (workflow_dispatch)"| PROD
@@ -72,9 +72,8 @@ small script.
 scrum-jail-governance-playbook/
 ├── README.md            entry point + file inventory
 ├── RUNBOOK.md           afternoon setup, incl. ships-vs-builds + the gate-verification tests
-├── emoji-gate.md        the authorization gate (historical filename; the mechanism is
-│                        merges + manual deploy dispatches, not chat emoji)
-├── patterns.md          13 misbehavior patterns + counter-patterns
+├── authorization-gate.md  the authorization gate — merges + manual deploy dispatches
+├── patterns.md          17 misbehavior patterns + counter-patterns
 ├── blocker-ledger.md    the anti-"blocked loop" primitives
 ├── safe.md              scaled-agile without the theater
 ├── envelopes.yaml       authority-envelope field reference + presets
@@ -103,7 +102,7 @@ model tier) flows through the same loop. The human is the only one who can autho
 authorization is an act GitHub already knows how to gate: **a merge or a manual workflow
 dispatch** — something no agent can perform, because the agents' shared identity cannot merge
 to a protected `main`, and its token must not carry the Actions-write right that dispatching
-requires (the credential-hygiene rule in [`emoji-gate.md`](../emoji-gate.md)).
+requires (the credential-hygiene rule in [`authorization-gate.md`](../authorization-gate.md)).
 
 **Money and org-shape** go through the decisions ledger:
 
@@ -157,9 +156,9 @@ account**, checked by GitHub itself — there is no bot to verify a reactor, and
 evade short of the platform. One honest caveat: CODEOWNERS alone only *routes* the review;
 the branch-protection rule "require review from Code Owners" is what makes it *binding*, and
 that is a repo-Settings step a human must actually perform. The RUNBOOK's gate-verification
-tests exist precisely to prove you flipped it. The 🛑 emergency stop is not a gate at all — it
+tests exist precisely to prove you flipped it. The emergency stop is not a gate at all — it
 is a `.halt` flag file that stops the runner and every agent cycle, and only a human removes
-it. See [`emoji-gate.md`](../emoji-gate.md) for the full loop, the `decisions.yaml` entry
+it. See [`authorization-gate.md`](../authorization-gate.md) for the full loop, the `decisions.yaml` entry
 schema, and the common-mistakes table.
 
 ---
@@ -171,7 +170,7 @@ Authority is declared, not improvised. `org-chart.yaml` is the runtime's source 
 
 ```mermaid
 flowchart TD
-    Board["🏛️ Board / Chairman<br/>holds the keys — the merge and the deploy dispatch are the signing keys"]
+    Board["Board / Chairman<br/>holds the keys — the merge and the deploy dispatch are the signing keys"]
     CEO["CEO<br/>chief-executive · sonnet · max_subagents 0"]
     BIZ["Business<br/>demand · sonnet · envelope 4 / 500k tokens"]
     IT["IT<br/>supply · sonnet · envelope 4 / 500k tokens"]
@@ -190,18 +189,18 @@ An envelope has four fields (full reference + presets in [`envelopes.yaml`](../e
 | `can_spend` | almost always `false` | attempt → must open a `[SPEND]` decisions.yaml PR, wait for the merge |
 | `can_deploy` | almost always `false` | the deploy job runs only from a manual `workflow_dispatch` regardless — wait for the Chairman's dispatch |
 
-The six governance gates. The emoji survive from the chat era as **mnemonic ledger
-vocabulary** (`org-chart.yaml` → `governance:`) — nothing parses a reaction anymore; four of
-the six are `decisions.yaml` `type` strings, and the other two are platform/file mechanisms:
+The six governance gates (`org-chart.yaml` → `governance:` holds the ledger vocabulary —
+nothing parses a reaction anymore); four of the six are `decisions.yaml` `type` strings,
+and the other two are platform/file mechanisms:
 
-| Gate | Mnemonic | Action | Mechanism |
-|---|---|---|---|
-| `charter` | 🏛️ | charter a new department | decisions.yaml PR (`type: charter`) → Chairman's merge |
-| `sunset` | ⚰️ | sunset (dissolve) a department | decisions.yaml PR (`type: sunset`) → Chairman's merge |
-| `promote` | 💎 | raise a node's model tier | decisions.yaml PR (`type: promote`) → Chairman's merge |
-| `fund` | 💰 | approve spend up to a stated ceiling | decisions.yaml PR (`type: spend`) → Chairman's merge |
-| `ship` | 🚀 | approve a production deploy | `workflow_dispatch`-only deploy workflow → the Chairman's manual dispatch |
-| `halt` | 🛑 | emergency stop — halts the **whole org** (not a per-proposal veto) | `.halt` flag file; only a human removes it |
+| Gate | Action | Mechanism |
+|---|---|---|
+| `charter` | charter a new department | decisions.yaml PR (`type: charter`) → Chairman's merge |
+| `sunset` | sunset (dissolve) a department | decisions.yaml PR (`type: sunset`) → Chairman's merge |
+| `promote` | raise a node's model tier | decisions.yaml PR (`type: promote`) → Chairman's merge |
+| `fund` | approve spend up to a stated ceiling | decisions.yaml PR (`type: spend`) → Chairman's merge |
+| `ship` | approve a production deploy | `workflow_dispatch`-only deploy workflow → the Chairman's manual dispatch |
+| `halt` | emergency stop — halts the **whole org** (not a per-proposal veto) | `.halt` flag file; only a human removes it |
 
 ---
 
@@ -222,7 +221,7 @@ mindmap
       Channel flood
       Domain expansion
       Double execution
-      Emoji-gate evasion
+      Authorization-gate evasion
     No concept of blocked, done, or nothing, patterns 9 to 12
       Idle restatement
       Process theater
@@ -295,7 +294,7 @@ decides whether the whole process layer is awake. Full rules in [`safe.md`](../s
 flowchart TD
     Cer["Any ceremony begins"] --> Pred{"last-ship.sh:<br/>green prod deploy on main?"}
     Pred -->|"shipped = no"| Dormant["Process layer dormant:<br/>no demo · no acceptance · no PI planning<br/>reviews close with one line; accepted PRs queue"]
-    Pred -->|"shipped = yes"| Active["code review + demo evidence on the product PR<br/>→ merge → the change queues<br/>→ Chairman dispatches deploy.yml (the 🚀)"]
+    Pred -->|"shipped = yes"| Active["code review + demo evidence on the product PR<br/>→ merge → the change queues<br/>→ Chairman dispatches deploy.yml"]
 ```
 
 This is why capabilities can ship **dormant** behind a charter: until the org actually ships
@@ -304,7 +303,7 @@ iteration and PI boundaries are derived from closed `[REVIEW]` issues, not from 
 longer exists.
 
 Two gates sit in front of any product-surface deploy (see [`safe.md`](../safe.md) /
-[`emoji-gate.md`](../emoji-gate.md)): an independent **code review** proves the code is
+[`authorization-gate.md`](../authorization-gate.md)): an independent **code review** proves the code is
 *correct* — in the live org the chat-era Reviewer department retired with the demolition, and
 review returns as a `claude-code-action` check on product PRs when needed — and **demo
 evidence** on the PR (checked mechanically, head-SHA-bound) proves the change *reaches a user*.
@@ -324,7 +323,7 @@ flowchart LR
     Args["orggen init &lt;target&gt;<br/>product · goal · chairman GitHub username · product repo · departments"] --> Tup["departments(): one tuple per department<br/>name, role, reports_to"]
     Tup --> Chart["org-chart.yaml<br/>departments: block"]
     Tup --> Agents["agents/&lt;name&gt;.md<br/>one mandate per tuple"]
-    Args --> Docs["copy VERBATIM_DOCS (7):<br/>patterns · safe · emoji-gate · envelopes · blocker-ledger · FIELD-NOTES · RUNBOOK"]
+    Args --> Docs["copy VERBATIM_DOCS (7):<br/>patterns · safe · authorization-gate · envelopes · blocker-ledger · FIELD-NOTES · RUNBOOK"]
     Args --> Fill["fill DESIGN.md + .env.example<br/>copy blockers.yaml · stamp a README"]
     Chart --> Inv(["Invariant: one tuple list →<br/>chart and agents/ never disagree"])
     Agents --> Inv
@@ -374,7 +373,7 @@ Same philosophy — *the pattern lives in a golden repo, and a generator copies 
 
 The first version of this architecture ran on chat: Mattermost as the medium, five Go services
 (bus, pm, registrar, memory, vox) as the runtime, a fleet of watcher scripts for wakes, and a
-governance gate that was literally an emoji — the Registrar parsed `reaction_added` events off
+governance gate that was literally a chat reaction — the Registrar parsed `reaction_added` events off
 a WebSocket and verified the reactor's user id in code. It worked, and every pattern in
 [`patterns.md`](../patterns.md) was earned there. But the properties it was chasing —
 coordination, visibility, auditability, decision authority — are *system-of-record* properties,
@@ -382,7 +381,8 @@ and the chat org implemented them by parsing a system of *conversation*: prose-p
 conventions, plus a bot to verify what the platform could have enforced. On 2026-07-05 the live
 org demolished the whole stack in one move (no parallel run) and put the record where the
 output lives: GitHub Issues, PRs, Actions runs, and committed ledgers, enforced by GitHub
-itself. The emoji survive only as ledger vocabulary. The before-measurements live in the
+itself. The reaction gate is gone entirely — only the plain-word ledger vocabulary remains. The
+before-measurements live in the
 business repo's `docs/MIGRATION-BASELINE.md`; the code lives in git history, which is where
 retired architecture belongs.
 

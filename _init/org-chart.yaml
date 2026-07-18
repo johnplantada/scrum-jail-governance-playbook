@@ -17,15 +17,15 @@ chairman:
   github: "{{CHAIRMAN_GITHUB}}"   # decision authority: CODEOWNERS + manual workflow_dispatch of deploys
 
 governance:
-  # The gate vocabulary (ledger language — decisions.yaml `type`, issue/PR prose). In the
-  # chat era these were reaction emojis a registrar parsed; authorization is now the
-  # Chairman's merge (decisions.yaml PR) or manual deploy dispatch (workflow_dispatch).
-  charter: classical_building   # 🏛️ new top-level department (decisions.yaml type: charter)
-  sunset: coffin                # ⚰️ dissolve a department/team (type: sunset)
-  fund: moneybag                # 💰 spend up to a stated ceiling (type: spend)
-  ship: rocket                  # 🚀 prod deploy (the Chairman's manual workflow_dispatch)
-  halt: octagonal_sign          # 🛑 whole-org stop — a .halt file; only a human clears it
-  promote: gem                  # 💎 raise a department's model tier (type: promote)
+  # The gate vocabulary (ledger language — decisions.yaml `type`, issue/PR prose).
+  # Authorization is the Chairman's merge (decisions.yaml PR) or manual deploy
+  # dispatch (workflow_dispatch); these names are ledger language, nothing more.
+  charter: new-department       # new top-level department (decisions.yaml type: charter)
+  sunset: dissolve              # dissolve a department/team (type: sunset)
+  fund: spend-ceiling           # spend up to a stated ceiling (type: spend)
+  ship: prod-deploy             # prod deploy (the Chairman's manual workflow_dispatch)
+  halt: emergency-stop          # whole-org stop — a .halt file; only a human clears it
+  promote: tier-raise           # raise a department's model tier (type: promote)
 
 limits:
   # Hard ceiling across the entire org. orggen computes it from the roster (every brain +
@@ -58,8 +58,8 @@ global:
   chairman_queue_issue: null   # ← the UNTYPED epic whose sub-issues = what only the human can do
   pm_project_number: null      # ← the org Project's number (gh project <N>)
   # Pinned API model id per brain tier — the ONE place tier→model resolution lives.
-  # Everything else — ledger, wake banners, budget brownouts, 💎 PROMOTE — keeps speaking
-  # in tiers; a 💎 changes an AGENT's tier, editing THIS map upgrades what a tier means
+  # Everything else — ledger, wake banners, budget brownouts, PROMOTE — keeps speaking
+  # in tiers; a PROMOTE changes an AGENT's tier, editing THIS map upgrades what a tier means
   # org-wide. Update to current model ids when you stamp a new org.
   model_ids:
     haiku: claude-haiku-4-5
@@ -71,4 +71,4 @@ departments:
   # ── ADD MORE DEPARTMENTS BELOW ────────────────────────────────
   # A new top-level department is a Board act: a decisions.yaml PR (type: charter) whose
   # payload is the new block, opened via the board-proposals skill. The Chairman's merge
-  # IS the 🏛️ — then the block above gets added in the same change.
+  # IS the charter — then the block above gets added in the same change.

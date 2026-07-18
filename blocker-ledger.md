@@ -18,8 +18,7 @@ world or in the owner's account, not just an approval:
 - providing a real-world value: a public URL, a mailing address, a phone number
 - the authorization acts themselves: merging a `decisions.yaml` PR past CODEOWNERS,
   dispatching a prod deploy (`workflow_dispatch`), changing repo Settings
-  *(v1: these were chat reactions — 💰/🚀/🏛️/💎; retired 2026-07-05 with the chat stack. The
-  emoji survive as `decisions.yaml` type mnemonics, not reactions.)*
+  *(v1: these were chat-reaction approvals; retired 2026-07-05 with the chat stack.)*
 
 Write this list into the shared policy every agent loads (`agents/_policy.md`). An agent that
 hits one of these has exactly one correct move, below — **not** "try harder," and **not**
