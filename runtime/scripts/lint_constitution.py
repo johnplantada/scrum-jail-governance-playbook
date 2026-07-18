@@ -123,13 +123,20 @@ def check_stages(path, text, stages, holding=()):
 
 # --- check 3: referenced skills are version-controlled -----------------------------
 
-SKILL_REF = re.compile(r"`([a-z][a-z0-9-]*)`\s+skill")
+# A skill reference is a backticked or bolded name followed by "skill" (optionally
+# "domain skill"). The bold form requires a hyphenated name so prose like "**every**
+# skill" can't false-positive — all real skill names are kebab-case. The bold+"domain
+# skill" form is the exact shape that dangled undetected: two mandates named their
+# authoritative tool in bold while no .claude/skills/ copy existed, and CI stayed green.
+SKILL_REF = re.compile(
+    r"(?:`([a-z][a-z0-9-]*)`|\*\*([a-z][a-z0-9]*(?:-[a-z0-9]+)+)\*\*)\s+(?:domain\s+)?skill")
 
 
 def check_skills(path, text, root):
     findings = []
     for lineno, line in enumerate(text.splitlines(), 1):
-        for name in SKILL_REF.findall(line):
+        for m in SKILL_REF.finditer(line):
+            name = m.group(1) or m.group(2)
             candidates = [
                 os.path.join(root, ".claude", "skills", name, "SKILL.md"),
                 os.path.join(root, "agents", "skills", f"{name}.md"),

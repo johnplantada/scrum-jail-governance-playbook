@@ -6,11 +6,14 @@ existed — the tests pin that each historical drift class stays detectable.
 
 Run: PYTHONPATH=scripts python3 scripts/test_lint_constitution.py  (CI does this)
 """
+import os
+import tempfile
 import unittest
 
 from lint_constitution import (
     canonical_stages,
     check_cadence,
+    check_skills,
     check_stages,
     holding_stages,
 )
@@ -92,6 +95,45 @@ class TestStages(unittest.TestCase):
         line = "`To-Do → Doing → Frozen`"
         hits = check_stages("d.md", line, STAGES, HOLDING)
         self.assertTrue(any("non-canonical" in h for h in hits))
+
+
+class TestSkillRefs(unittest.TestCase):
+    def _root_with(self, *skills):
+        root = tempfile.mkdtemp()
+        for name in skills:
+            d = os.path.join(root, ".claude", "skills", name)
+            os.makedirs(d)
+            with open(os.path.join(d, "SKILL.md"), "w", encoding="utf-8") as fh:
+                fh.write("---\nname: %s\n---\n" % name)
+        return root
+
+    def test_backtick_ref_missing_flagged(self):
+        root = self._root_with()
+        hits = check_skills("d.md", "invoke the `org-worktree` skill", root)
+        self.assertTrue(any("org-worktree" in h for h in hits))
+
+    def test_bold_domain_skill_ref_missing_flagged(self):
+        # the real dangling reference: two mandates named their authoritative tool in
+        # bold + "domain skill" and the linter never saw it
+        root = self._root_with()
+        line = "consult the **urar-review-compliance-expert** domain skill first"
+        hits = check_skills("d.md", line, root)
+        self.assertTrue(any("urar-review-compliance-expert" in h for h in hits))
+
+    def test_backtick_domain_skill_ref_checked(self):
+        root = self._root_with("urar-review-compliance-expert")
+        line = "consult the `urar-review-compliance-expert` skill first"
+        self.assertEqual(check_skills("d.md", line, root), [])
+
+    def test_existing_skill_clean(self):
+        root = self._root_with("blocker-triage")
+        self.assertEqual(
+            check_skills("d.md", "invoke the `blocker-triage` skill", root), [])
+
+    def test_bold_prose_word_not_flagged(self):
+        # un-hyphenated bold words before "skill" are prose emphasis, not a skill name
+        root = self._root_with()
+        self.assertEqual(check_skills("d.md", "**every** skill in the repo", root), [])
 
 
 if __name__ == "__main__":
