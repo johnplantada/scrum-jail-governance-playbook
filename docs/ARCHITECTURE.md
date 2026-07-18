@@ -23,7 +23,7 @@ software organizations. Each repo stands alone, but they only make full sense as
 
 ```mermaid
 flowchart LR
-    GP["📓 scrum-jail-governance-playbook<br/><b>Methodology</b><br/>authorization gate · 13 patterns · orggen generator"]
+    GP["📓 scrum-jail-governance-playbook<br/><b>Methodology</b><br/>authorization gate · 17 patterns · orggen generator"]
     BIZ["🏛️ scrum-jail-business<br/><b>The autonomous org — runtime</b><br/>Python scripts over gh · runner.py + wake-rules.yaml · Claude agents"]
     PROD["🌐 scrum-jail<br/><b>The product — scrumjail.org</b><br/>React SPA · Go Lambda · AWS · Terraform"]
 
@@ -74,7 +74,7 @@ scrum-jail-governance-playbook/
 ├── RUNBOOK.md           afternoon setup, incl. ships-vs-builds + the gate-verification tests
 ├── emoji-gate.md        the authorization gate (historical filename; the mechanism is
 │                        merges + manual deploy dispatches, not chat emoji)
-├── patterns.md          13 misbehavior patterns + counter-patterns
+├── patterns.md          17 misbehavior patterns + counter-patterns
 ├── blocker-ledger.md    the anti-"blocked loop" primitives
 ├── safe.md              scaled-agile without the theater
 ├── envelopes.yaml       authority-envelope field reference + presets
