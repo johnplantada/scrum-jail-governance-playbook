@@ -268,7 +268,7 @@ structural, not clever.
 
 ```mermaid
 flowchart TD
-    GH["GitHub events since the cursor<br/>issues · comments · workflow runs"] --> R["runner.py tick<br/>dedup → route via wake-rules.yaml<br/>first match wins; unrouted events wake nobody"]
+    GH["GitHub events since the cursor<br/>issues · comments · workflow runs"] --> R["runner.py tick<br/>dedup → route via wake-rules.yaml<br/>first match wins; an unlabeled issue falls through to the warden;<br/>other unrouted events wake nobody"]
     R --> B["one batched wake per department per tick<br/>five comments ≠ five wakes"]
     B --> G{"agent-run.sh gates"}
     G -->|".halt present"| S1["skip — org halted"]

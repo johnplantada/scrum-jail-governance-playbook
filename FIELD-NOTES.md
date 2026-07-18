@@ -47,8 +47,10 @@ departments via `agent-run.sh` → advance the cursor.
   pause, not an outage. The next tick drains a longer backlog, **oldest event first**
   (routing sorts by event timestamp), so catch-up order is event order.
 - **Routing is a committed, PR-reviewed file.** `wake-rules.yaml` replaced the wake
-  logic scattered across the watcher fleet — first matching rule wins, and an event
-  matching nothing wakes nobody (logged as unrouted).
+  logic scattered across the watcher fleet — first matching rule wins. An issue matching
+  no `dept:*` rule falls through to the warden for triage (patterns.md Pattern 16 — a
+  web-form filing that skips the department dropdown must not be invisible); any other
+  event matching nothing wakes nobody (logged as unrouted).
 - **A failed poll is a no-op tick, never a crash** — `gh api` errors return empty and
   the cursor doesn't advance past what was seen. **Shadow mode** (`RUNNER_MODE=shadow`,
   the default) polls and logs what *would* wake without firing anything — how the loop

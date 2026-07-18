@@ -95,11 +95,19 @@ def fill(text, **kv):
 
 
 def departments(spec):
-    """→ ordered list of (name, role, reports_to, model, max_subagents, budget, note)."""
+    """→ ordered list of (name, role, reports_to, model, max_subagents, budget, note).
+
+    The warden is guaranteed exactly once, last — an organ, not a chosen department
+    (--departments picks the org's *business* shape, never whether it can ask the
+    Chairman for anything). Guaranteed HERE so every consumer of the roster — chart
+    blocks, mandates, wake rules, max-agents arithmetic — sees the same list; the old
+    `depts + [WARDEN]` at one call site passed a 3-tuple into the 7-field dept_block
+    (a crash on every stamp) and would have double-stamped her off the default roster."""
     names = ([s.strip() for s in spec.split(",") if s.strip()]
              if spec else list(DEFAULT_DEPARTMENTS))
     if "ceo" not in names:
         names.insert(0, "ceo")
+    names = [n for n in names if n != WARDEN[0]] + [WARDEN[0]]
     out = []
     for name in names:
         role, reports_to, model, max_sub, budget, note = ARCHETYPES.get(
@@ -147,9 +155,12 @@ def dept_block(name, role, reports_to, model, max_sub, budget, note):
 
 def wake_rules(depts):
     """The runner's routing table, generated from the roster. First matching rule wins.
-    dept:* labels route issues, comments, and PRs to their owner; unlabeled PRs default
-    by repo (org → ceo: a Chairman merge un-parks org-shape work; product → the supply
-    department: the pipeline owner); product workflow runs wake the supply department."""
+    dept:* labels route issues, comments, and PRs to their owner; an issue with NO dept:*
+    label falls through to the warden, who triages it and adds the routing label (the
+    reference org's lesson: a web-form issue carrying only a kind label woke nobody and
+    sat invisible — patterns.md Pattern 16); unlabeled PRs default by repo (org → ceo: a
+    Chairman merge un-parks org-shape work; product → the supply department: the pipeline
+    owner); product workflow runs wake the supply department."""
     names = [d[0] for d in depts]
     supply = next((n for n, r, *_ in depts if r == "supply"), "ceo")
     head = (
@@ -168,7 +179,9 @@ def wake_rules(depts):
         "#   pr_state: open | merged | closed — for kind: pr (merged vs closed-without-merge)\n"
         "#\n"
         '# wake: a department name, or "from-label" to route to the item\'s dept:* label.\n'
-        "# First matching rule wins; an event matching nothing wakes nobody (and shadow mode logs it).\n"
+        "# First matching rule wins. An issue with no dept:* label falls through to the warden\n"
+        "# (the catch-all below — she triages it and adds the routing label); other kinds that\n"
+        "# match nothing wake nobody (logged; shadow mode logs the would-be wakes).\n"
         "\n"
         "rules:\n"
         "  # Work injection + ticket traffic: whoever the dept:* label names owns the wake.\n"
@@ -176,6 +189,18 @@ def wake_rules(depts):
     issue_rules = "".join(
         f'  - match: {{kind: issue, label: "dept:{n}"}}\n    wake: from-label\n'
         for n in names)
+    # Catch-all for unroutable work: an issue matching no dept:* rule above would
+    # otherwise wake nobody and sit invisible — the reference org's Chairman filed a
+    # follow-up through the web form with only a kind label, and the ask went
+    # unactioned for hours until a peer traced the gap by hand. The warden is an organ
+    # every org has, and this triage is her charter ("an unroutable issue whose owner
+    # is clear → add the label"); her label then wakes the owning department.
+    catchall_rule = (
+        "  # Catch-all: an unlabeled issue routes to the warden for triage — she adds the\n"
+        "  # dept:* label and that label wakes the owner. Without this, a web-form filing\n"
+        "  # that skipped the department dropdown is invisible to the whole org.\n"
+        "  - match: {kind: issue}\n"
+        "    wake: warden\n")
     comment_rule = ("  - match: {kind: comment}\n"
                     "    wake: from-label          # a comment on a routed issue re-wakes its owner\n")
     pr_head = (
@@ -205,7 +230,8 @@ def wake_rules(depts):
         f"    wake: {supply}\n"
         "  - match: {kind: run, repo: product, workflow: demo-evidence.yml, conclusion: failure}\n"
         f"    wake: {supply}\n")
-    return head + issue_rules + comment_rule + pr_head + pr_rules + pr_defaults + run_rules
+    return (head + issue_rules + catchall_rule + comment_rule + pr_head + pr_rules
+            + pr_defaults + run_rules)
 
 
 def dept_options(depts, for_objective=False):
@@ -271,9 +297,9 @@ def cmd_init(args):
     # 2. org-chart.yaml — from the _init template; the departments: block is generated from the
     #    SAME dept list that stamps the agent mandates (below), so the chart and agents/ can never
     #    disagree about who exists.
-    # The warden is appended unconditionally — --departments picks the org's *business*
-    # shape, never whether it can ask the Chairman for anything.
-    dept_blocks = "\n".join(dept_block(*d) for d in depts + [WARDEN])
+    # The warden rides in depts itself — departments() guarantees her exactly once,
+    # last, so the chart, mandates, wake rules, and max-agents all see the same roster.
+    dept_blocks = "\n".join(dept_block(*d) for d in depts)
     chart = fill(read(os.path.join(INIT, "org-chart.yaml")),
                  PRODUCT=product, CHAIRMAN_GITHUB=chairman, DEPARTMENTS=dept_blocks,
                  GLOBAL_MAX_AGENTS=max_agents,
@@ -329,7 +355,7 @@ def cmd_init(args):
 
     print(f"✓ stamped {org} → {target}")
     print(f"  product: {product}   chairman: {chairman}   departments: {', '.join(d[0] for d in depts)}"
-          f"   + {WARDEN[0]} (organ — your action queue; see step 5)")
+          f"   ({WARDEN[0]} is an organ — your action queue; see step 5)")
     print(f"  org repo: {org_gh_repo}   product repo: {product_gh_repo}")
     print(f"  global_max_agents: {max_agents} (every brain + its fan-out — raising it is a charter act)")
     print("\nNext steps (RUNBOOK.md — vendored in playbook/ — walks through each one):")

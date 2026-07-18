@@ -424,6 +424,39 @@ building *under* the thing it protects.
 
 ---
 
+## Pattern 16: Invisible Intake (the unrouted ticket)
+
+**What it looks like:** Work arrives and nothing happens. The Chairman files a follow-up —
+"address my review comments before we merge" — and no agent comments, no wake fires, the
+issue just sits. Hours later a *different* department notices by accident, traces the gap
+by hand, and posts the diagnosis: the ticket existed all along, but it carried only a kind
+label (`feature`), no `dept:*` label, so the router had nowhere to send it. To the human it
+reads as disobedience — "the agents aren't following orders" — when in fact no agent ever
+saw the order.
+
+**Why it happens:** Routing is label-driven — the `dept:*` label *is* the wake signal — and
+every intake path that doesn't force a department can mint a ticket the router cannot see.
+The scripted path (`pm-gh.sh`) refuses to create an unroutable item, but the web form's
+department dropdown maps to a label *at triage*, a manual step that is easy to skip; and
+the runner treated "matched no rule" as "wake nobody," leaving one `unrouted` log line
+nobody reads. The failure is silent by construction: the loud path — an agent complaining —
+requires an agent to have woken, which is precisely what didn't happen. This is Pattern
+14's inverse: there the org couldn't tell the human it was waiting; here the human couldn't
+tell the org to start.
+
+**Counter-pattern:** **No issue may route to nobody.** The routing table ends with a
+catch-all — an issue matching no `dept:*` rule wakes the **warden**, whose charter already
+names this exact triage ("an unroutable issue whose owner is clear from content → add the
+label"); the label she adds then wakes the owning department, and an unclear owner becomes
+one question to the Chairman on the queue epic. Orggen generates the catch-all into every
+stamped org's `wake-rules.yaml`, and the warden is an organ every org has (Pattern 14), so
+the fallback always exists. Note the shape of the fix — one rule in the router, not a new
+watcher, so the counter-ratchet holds. Non-issue kinds keep their existing defaults: PRs
+already route by repo, and workflow-run rules stay selective on purpose (a matched-nothing
+run is usually a run you chose not to care about).
+
+---
+
 ## The Pattern Behind the Patterns
 
 These split into **two roots**, and you need both fixes:

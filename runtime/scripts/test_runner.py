@@ -13,6 +13,7 @@ from runner import (attribute_issue_bumps, banner_dept, batch_wakes, body_banner
 
 RULES = [
     {"match": {"kind": "issue", "label": "dept:it"}, "wake": "from-label"},
+    {"match": {"kind": "issue"}, "wake": "warden"},   # catch-all: unrouted issue → warden
     {"match": {"kind": "comment"}, "wake": "from-label"},
     {"match": {"kind": "pr", "label": "dept:it"}, "wake": "from-label"},
     {"match": {"kind": "pr", "repo": "org"}, "wake": "ceo"},
@@ -104,8 +105,18 @@ class TestRouting(unittest.TestCase):
         self.assertEqual(wakes, [("it", issue_ev(labels=["dept:it"]))])
         self.assertEqual(unrouted, [])
 
-    def test_unmatched_event_is_unrouted(self):
+    def test_unlabeled_issue_falls_through_to_warden(self):
+        # org#28: an issue with no dept:* label used to wake nobody and sit invisible.
+        # The catch-all now routes it to the warden so she triages and adds the label.
         wakes, unrouted = route([issue_ev(labels=["question"])], RULES)
+        self.assertEqual([w[0] for w in wakes], ["warden"])
+        self.assertEqual(unrouted, [])
+
+    def test_unmatched_run_is_unrouted(self):
+        # Non-issue kinds still fall through to nobody — only issues carry a catch-all.
+        ev = {"id": "r9", "kind": "run", "repo": "org", "workflow": "ci.yml",
+              "conclusion": "success", "at": "t", "labels": []}
+        wakes, unrouted = route([ev], RULES)
         self.assertEqual(wakes, [])
         self.assertEqual(len(unrouted), 1)
 
