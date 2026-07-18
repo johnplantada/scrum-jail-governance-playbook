@@ -29,22 +29,24 @@ your afternoon.
 | `org-chart.yaml` | Define your agents, their roles, and their authority envelopes |
 | `envelopes.yaml` | Reference for every envelope field — what it means, how to tune it |
 | `emoji-gate.md` | The authorization gate walkthrough — decisions.yaml/CODEOWNERS for money/org-shape, the `workflow_dispatch`-only deploy gate, why each step exists, and the pre-deploy code-review/demo chain |
-| `patterns.md` | **13** agent misbehavior patterns + the specific governance fix for each |
+| `patterns.md` | **17** agent misbehavior patterns + the specific governance fix for each |
 | `blocker-ledger.md` | The blocker ledger + capability boundary + wake backpressure — stops the "blocked loop" |
 | `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output; the work-item tree with a closing rule per level; the `[CODEREVIEW]` + `[DEMO]` gates before a 🚀 |
-| `FIELD-NOTES.md` | **Field-tested mechanisms** from the live org — the event loop, spend guards, the `.halt` switch, single-flight locks, worker tool-scoping, model-tier pinning, typed handoffs, the work-item tree's closure gate, the deterministic warden + engine-first wakes, wake yield + the wake filter — plus the graveyard of what the 2026-07-05 demolition retired, and what replaced each piece |
+| `FIELD-NOTES.md` | **Field-tested mechanisms** from the live org — the event loop, spend guards, the `.halt` switch, single-flight locks, worker tool-scoping, model-tier pinning, typed handoffs, the work-item tree's closure gate, the deterministic warden + engine-first wakes, wake yield + the wake filter, the zero-spend CI gate — plus the graveyard of what the 2026-07-05 demolition retired, and what replaced each piece |
 | `RUNBOOK.md` | Step-by-step: set up your org in an afternoon |
 | `bin/orggen` | Generator that stamps a complete org — governance from `_init/`, runtime from `runtime/` — with every department surface (chart, mandates, wake rules, issue-form dropdowns, agent ceiling) generated from one roster |
 | `runtime/` | The full runtime, stamped verbatim: `scripts/` (runner + wake router, `pm-gh.sh`, the work-item closure gate, `agent-run.sh`, the deterministic warden, the subagent/objective PreToolUse gates, spend metering, unit tests), `.claude/` (guardrail settings + the governance skills), org CI, the operator Makefile |
 | `_init/agents/` | The shared `_policy.md`, the generic department template, and ready role mandates: `ceo`, `warden` (hygiene organ), `compliance` (assurance second line) |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How it all fits together, with Mermaid diagrams — the gate, the patterns, `orggen`, and where this repo sits in the wider Scrum Jail ecosystem |
 
-The first 8 patterns are about agents with **too much authority**. Patterns 9–13 (idle
+The first 8 patterns are about agents with **too much authority**. Patterns 9–16 (idle
 restatement, process theater, the self-wake storm, the tree that only grows, prose-patching
-the checker) and the `blocker-ledger.md` / `safe.md` primitives are about the other half: an
-orchestration loop with no idea of "blocked," "done," or "do nothing" — and gates that
-collect compliance instead of bug reports when they misfire. Both halves are battle-tested
-on the live org — see the writeups.
+the checker, silent blocking, flavor-text authority, invisible intake) and the
+`blocker-ledger.md` / `safe.md` primitives are about the other half: an orchestration loop
+with no idea of "blocked," "done," or "do nothing" — and gates that collect compliance
+instead of bug reports when they misfire. Pattern 17 is the newest tuition: the org's own
+metered plumbing amplifying agent chatter into a burned Actions quota. All of it is
+battle-tested on the live orgs — see the writeups.
 
 ---
 

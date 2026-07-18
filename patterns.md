@@ -1,11 +1,14 @@
 # Agent Misbehavior Patterns — and How to Govern Them
 
-Thirteen patterns that burn operators. Each one has a specific governance fix.
+Seventeen patterns that burn operators. Each one has a specific governance fix.
 These aren't hypothetical — they're the failure modes that show up when agents
 have more authority than their operators intended (Patterns 1–8), when the
 orchestration loop has no idea of "blocked," "done," or "do nothing" (Patterns
 9–12), or when the gates themselves misfire and collect compliance instead of
-bug reports (Pattern 13). See "The Pattern Behind the Patterns" at the end.
+bug reports (Pattern 13), when a state the org cannot represent — blocked on the
+human, a reserved power, an unrouted ticket — is silently mishandled (Patterns
+14–16), or when the org's own metered plumbing amplifies agent chatter into spend
+(Pattern 17). See "The Pattern Behind the Patterns" at the end.
 
 The failures are timeless; the counter-patterns are stated against the current
 GitHub-native runtime (work = Issues on one Project via `scripts/pm-gh.sh`; authority =
@@ -457,6 +460,42 @@ run is usually a run you chose not to care about).
 
 ---
 
+## Pattern 17: Metered Amplification (the CI-quota burn)
+
+**What it looks like:** Every CI check across every repo goes red at once with "The job
+was not started because recent account payments have failed or your spending limit needs
+to be increased." Runs die in ~2 seconds with zero steps executed. Nothing agent-side
+changed — and because required status checks live in CI, every PR in every org sharing
+the account is suddenly unmergeable except by the admin override emoji-gate.md warns
+erodes the gate.
+
+**Why it happens:** Hosted CI is metered, and the meter is unforgiving: GitHub bills each
+job's runtime **rounded up to the whole minute**, and a Free/Pro account has 2,000/3,000
+included minutes a month — pooled across every private repo the account owns. The live
+org wired its handoff validator to trigger on **every issue comment**. Agents comment at
+machine frequency — during the warden's self-echo storm (Pattern 11), 283 wakes in one
+day — so a five-second validation run billed a full minute, hundreds of times a day, and
+the monthly quota died in about three days. With no payment method on file, GitHub then
+blocked Actions **account-wide** until the monthly reset — the sibling org's CI went dark
+through no act of its own. The governance layer had placed its merge gates inside a
+metered service, so quota exhaustion *was* a governance outage.
+
+**Counter-pattern:** Metered compute must never trigger at agent frequency. No
+`issue_comment`/`issues` triggers on hosted workflows, ever — validation that must see
+every comment belongs in the runner or warden on the operator's machine, where compute is
+free. Hosted workflows are for **rare, deliberate** runs — the `workflow_dispatch`-only
+deploy gate is fine, because the quota dies by frequency, not intent — and re-enabling
+any workflow needs a budget line first: (jobs per run) × (runs per month) × the
+one-minute minimum, against the monthly pool; consolidate multi-job workflows while
+you're at it, since three jobs bill three minimums per run. Run the CI suite itself at
+push time on the operator's machine (FIELD-NOTES §13). Know the coupling required status
+checks buy: a merge gate that lives in metered CI inherits the meter's failure mode. And
+block-at-quota is the $0 backstop — an account with no stored payment method cannot be
+surprise-billed, only paused — so treat 75% of quota mid-month as an incident, not a
+curiosity.
+
+---
+
 ## The Pattern Behind the Patterns
 
 These split into **two roots**, and you need both fixes:
@@ -475,6 +514,14 @@ Pattern 13 is the mirror held up to both: the gates themselves are code, and age
 *comply* with a buggy gate rather than report it — so misfires surface as strange output
 norms, not bug reports. Audit the workarounds your agents invent; each one points at a gate
 to fix.
+
+Patterns 14–16 are the second root refined: "blocked on the human," "this power is
+reserved," and "this ticket has an owner" each turned out to need a first-class
+representation too — a queue the operator actually reads, a constitution line, a router
+catch-all — because a state the machinery cannot represent is a state the org silently
+mishandles. Pattern 17 is the mirror held up to the *infrastructure*: no agent decided
+anything — the meter was in the plumbing the governance layer itself ran on. Budget the
+machinery like you budget the agents.
 
 Don't try to patch either with more complex prompts. Use the governance primitives — envelopes,
 gates, cadences, the blocker ledger, event-driven wakes, the spend breaker, and an output

@@ -64,6 +64,19 @@ blockers:
   in the reference runtime fails the build on an open entry without one), because
   "assigned to the operator with no instructions" is how an unlock silently ages. If the
   steps are long, the `action:` points at a runbook doc.
+- **A PR's companion runtime action is a ledger entry, not PR prose.** If a change
+  only works once the operator flips runtime config (an `.env` value, a Settings
+  toggle), that flip goes into `blockers.yaml` **when the PR opens**. The live org
+  named a load-bearing `WAKE_FILTER_MODE=live` flip in a PR body; nothing tracked it,
+  and the self-echo storm it would have stopped burned for another day before an
+  agent ledgered it by hand.
+- **Merged ≠ landed.** A ledger PR whose branch trails `main` can squash-merge with
+  the conflict resolved to main's side: the merge commit lands an **empty diff**, the
+  entry silently vanishes, and the PR still shows "Merged." (The live org lost that
+  same wake-filter entry exactly this way.) After merging any ledger PR, confirm the
+  merge commit actually touched the file — `git show <sha> -- blockers.yaml` must be
+  non-empty — and never hand-resolve a `blockers.yaml` conflict in the web editor;
+  rebase the branch and merge clean.
 - The helper (`scripts/blockers.py open`) prints the open queue **EV-sorted** (each line
   tagged kind, value, effort, age), prefixed by the WIP banner when it applies — for the
   prompt and a `make blockers` view. The whole point: the operator scans **one short,
