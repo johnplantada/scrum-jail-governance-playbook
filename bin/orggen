@@ -95,11 +95,19 @@ def fill(text, **kv):
 
 
 def departments(spec):
-    """→ ordered list of (name, role, reports_to, model, max_subagents, budget, note)."""
+    """→ ordered list of (name, role, reports_to, model, max_subagents, budget, note).
+
+    The warden is guaranteed exactly once, last — an organ, not a chosen department
+    (--departments picks the org's *business* shape, never whether it can ask the
+    Chairman for anything). Guaranteed HERE so every consumer of the roster — chart
+    blocks, mandates, wake rules, max-agents arithmetic — sees the same list; the old
+    `depts + [WARDEN]` at one call site passed a 3-tuple into the 7-field dept_block
+    (a crash on every stamp) and would have double-stamped her off the default roster."""
     names = ([s.strip() for s in spec.split(",") if s.strip()]
              if spec else list(DEFAULT_DEPARTMENTS))
     if "ceo" not in names:
         names.insert(0, "ceo")
+    names = [n for n in names if n != WARDEN[0]] + [WARDEN[0]]
     out = []
     for name in names:
         role, reports_to, model, max_sub, budget, note = ARCHETYPES.get(
@@ -271,9 +279,9 @@ def cmd_init(args):
     # 2. org-chart.yaml — from the _init template; the departments: block is generated from the
     #    SAME dept list that stamps the agent mandates (below), so the chart and agents/ can never
     #    disagree about who exists.
-    # The warden is appended unconditionally — --departments picks the org's *business*
-    # shape, never whether it can ask the Chairman for anything.
-    dept_blocks = "\n".join(dept_block(*d) for d in depts + [WARDEN])
+    # The warden rides in depts itself — departments() guarantees her exactly once,
+    # last, so the chart, mandates, wake rules, and max-agents all see the same roster.
+    dept_blocks = "\n".join(dept_block(*d) for d in depts)
     chart = fill(read(os.path.join(INIT, "org-chart.yaml")),
                  PRODUCT=product, CHAIRMAN_GITHUB=chairman, DEPARTMENTS=dept_blocks,
                  GLOBAL_MAX_AGENTS=max_agents,
@@ -329,7 +337,7 @@ def cmd_init(args):
 
     print(f"✓ stamped {org} → {target}")
     print(f"  product: {product}   chairman: {chairman}   departments: {', '.join(d[0] for d in depts)}"
-          f"   + {WARDEN[0]} (organ — your action queue; see step 5)")
+          f"   ({WARDEN[0]} is an organ — your action queue; see step 5)")
     print(f"  org repo: {org_gh_repo}   product repo: {product_gh_repo}")
     print(f"  global_max_agents: {max_agents} (every brain + its fan-out — raising it is a charter act)")
     print("\nNext steps (RUNBOOK.md — vendored in playbook/ — walks through each one):")
