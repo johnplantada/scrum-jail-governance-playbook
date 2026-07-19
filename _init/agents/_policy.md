@@ -13,7 +13,7 @@ runtime; this policy assumes they are installed.)*
 ## Where things happen
 
 - **Work** — GitHub issues via `scripts/pm-gh.sh create/tasks/move/comment/comments/done`
-  (tickets are `org#N`; Stage mirrors org-chart `pm_stages`; the `dept:*` label routes the
+  (tickets are `org#N`; the board's Status mirrors org-chart `pm_stages`; the `dept:*` label routes the
   wake). One ticket per task; the ticket's comment thread is its single source of truth.
 - **Product code** — PRs against `$PRODUCT_GH_REPO` (`gh pr …`), branch `agent/it/<desc>`.
   Open PRs freely; **never merge to main** — CI gates the merge, and prod reaches users
@@ -116,7 +116,7 @@ renders any subtree; the rollup, not narrated progress, is the status.
 Two norms keep the tree from becoming decomposition theater (patterns.md Pattern 12):
 
 - **Decompose just-in-time.** Split a feature into stories only when it's next up
-  (To-Do); split an epic into features only as the one before it closes. Never expand
+  (Todo); split an epic into features only as the one before it closes. Never expand
   the whole tree on day one — a pre-built tree is inventory that rots and burns wakes
   re-syncing dead issues. Decomposing is cheap and looks like progress; closing is
   progress.
@@ -124,7 +124,11 @@ Two norms keep the tree from becoming decomposition theater (patterns.md Pattern
   work-items — it checks the facts (open children; the kind's evidence, per `[CLOSE]`
   above) and posts the payload before closing. If the gate refuses, the work is not
   done: fix the fact it names, never bare-`gh issue close` around it, never argue it
-  down in prose.
+  down in prose. Work the org decides NOT to do is the other path: `pm-gh.sh drop
+  --id N --reason "…"` closes it as *not planned* with a `[DROP]` record and the
+  board set to Dropped — done and dropped must never be conflated. A dept may drop
+  its own stories/features; dropping an epic or objective is the Chairman's
+  deprioritization call alone — file a `[PROPOSAL]` naming it instead.
 
 ## Model tier, offload, and workers — spend judgment, not tokens
 

@@ -16,7 +16,7 @@ class TestClassify(unittest.TestCase):
 
     def test_post_commands(self):
         for cmd in ("gh issue comment 5 --body hi", "gh issue close 5",
-                    "gh pr review 12 --approve", "scripts/pm-gh.sh move --id 3 --to Doing",
+                    "gh pr review 12 --approve", "scripts/pm-gh.sh move --id 3 --to Todo",
                     "./scripts/pm-gh.sh done --id 9 --pr prod-PR-#1",
                     "git commit -m 'wip'", "gh api repos/o/r/issues -X POST",
                     "gh project item-add 1 --owner me --url u"):

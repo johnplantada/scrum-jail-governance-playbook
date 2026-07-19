@@ -171,8 +171,8 @@ independently. Neither checks whether the work is already in progress or complet
 
 **Counter-pattern:** Use the ticket system (`scripts/pm-gh.sh` over Issues + the org
 Project) as the single source of truth for task state. Before starting work, an agent
-checks `pm-gh.sh tasks --project IT` and reads the ticket's Stage (the canonical list
-is `org-chart.yaml pm_stages`). If it's Doing or Done, the agent replies on the ticket
+checks `pm-gh.sh tasks --project IT` and reads the ticket's Status (the canonical list
+is `org-chart.yaml pm_stages`). If it's In Progress or Done, the agent replies on the ticket
 (`pm-gh.sh comment --id N --body "..."`) rather than re-executing. Only one
 department's label should own a task at a time — and the runtime backstops the race:
 `agent-run.sh` single-flights each agent behind a lock, added precisely because two

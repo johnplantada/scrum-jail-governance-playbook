@@ -22,15 +22,20 @@ run() { if [ "${DRY_RUN:-0}" = "1" ]; then echo "DRY: $*"; else "$@"; fi; }
 
 command -v gh >/dev/null || { echo "gh CLI required" >&2; exit 1; }
 
-# --- the stage canon, straight from org-chart.yaml (never restate it) -------------------
-# Flow stages (ordered pipeline) + holding columns (parked states). Both are options of the
-# one Stage field; holding stages are NOT part of the ordered flow (org-chart pm_holding_stages).
-stages="$(sed -n 's/^[[:space:]]*pm_stages:[[:space:]]*\[\(.*\)\]/\1/p' org-chart.yaml | tr -d ' ')"
+# --- the status canon, straight from org-chart.yaml (never restate it) ------------------
+# Flow statuses (ordered pipeline) + holding columns (parked) + terminal-alternates
+# (Dropped). All are options of the board's ONE built-in Status field. Names may be
+# multi-word ("In Progress"), so trim around commas — never strip spaces wholesale.
+trim_list() { sed -n "s/^[[:space:]]*$1:[[:space:]]*\[\(.*\)\]/\1/p" org-chart.yaml \
+              | sed 's/[[:space:]]*,[[:space:]]*/,/g; s/^[[:space:]]*//; s/[[:space:]]*$//'; }
+stages="$(trim_list pm_stages)"
 [ -n "$stages" ] || { echo "could not read pm_stages from org-chart.yaml" >&2; exit 1; }
-holding="$(sed -n 's/^[[:space:]]*pm_holding_stages:[[:space:]]*\[\(.*\)\]/\1/p' org-chart.yaml | tr -d ' ')"
-stage_options="$stages${holding:+,$holding}"
-echo "stages (org-chart pm_stages): $stages"
+holding="$(trim_list pm_holding_stages)"
+terminal="$(trim_list pm_terminal_stages)"
+status_options="$stages${holding:+,$holding}${terminal:+,$terminal}"
+echo "statuses (org-chart pm_stages): $stages"
 [ -n "$holding" ] && echo "holding columns (org-chart pm_holding_stages): $holding"
+[ -n "$terminal" ] && echo "terminal-alternates (org-chart pm_terminal_stages): $terminal"
 
 # --- labels: dept routing (the wake signal) + the template types -------------------------
 # The department roster comes from org-chart.yaml (the single source of truth) — adding a
@@ -81,21 +86,42 @@ else
   echo "  project #$pn exists"
 fi
 
-# Stage single-select mirroring pm_stages. gh cannot edit a field's options in place, so an
-# existing Stage field is left alone (delete it in the UI to re-mint after a canon change).
+# The board's BUILT-IN Status single-select mirrors the canon. Every project is born with
+# one (Todo/In Progress/Done) and it cannot be deleted — which is exactly why the org uses
+# it instead of a parallel custom field: it's what every GitHub view groups and counts by,
+# and a second field is a standing drift invitation. gh cannot edit options, so reconcile
+# goes through the GraphQL API and REPLACES the option list wholesale when any canon name
+# is missing (same-named options keep their items; options renamed away lose theirs — a
+# canon change is a rare, deliberate act). Two UI-only switches accompany this (Project →
+# ⋯ → Workflows): keep "Item added → Todo" ON; turn "Item closed → Done" OFF — that
+# workflow can't tell Done from Dropped, and the pm-gh.sh done/drop gates set the
+# terminal state themselves.
 if [ "$pn" != "<new>" ]; then
-  have_stage="$(gh project field-list "$pn" --owner "$OWNER" --format json \
-                --jq '.fields[] | select(.name == "Stage") | .name' 2>/dev/null || true)"
-  if [ -z "$have_stage" ]; then
-    run gh project field-create "$pn" --owner "$OWNER" --name "Stage" \
-        --data-type SINGLE_SELECT --single-select-options "$stage_options"
+  fid="$(gh project field-list "$pn" --owner "$OWNER" --format json \
+         --jq '.fields[] | select(.name == "Status") | .id' 2>/dev/null || true)"
+  have_opts="$(gh project field-list "$pn" --owner "$OWNER" --format json \
+               --jq '[.fields[] | select(.name == "Status") | .options[].name] | join(",")' 2>/dev/null || true)"
+  missing="$(IFS=,; for o in $status_options; do case ",$have_opts," in *",$o,"*) ;; *) printf '%s,' "$o" ;; esac; done)"
+  if [ -z "$fid" ]; then
+    echo "  ⚠ no built-in Status field found (unexpected on a ProjectV2) — skipping option reconcile" >&2
+  elif [ -z "$missing" ]; then
+    echo "  Status options already cover the canon ($status_options)"
   else
-    echo "  Stage field exists (options are not reconciled — check against: $stage_options)"
-    echo "  ↳ gh cannot add options in place; add any new holding columns ($holding) in the Project UI, or delete the Stage field there to re-mint."
+    echo "  Status options missing: ${missing%,} — replacing option list with the canon"
+    mutation="$(printf '%s' "$status_options" | python3 -c '
+import json, sys
+names = [s.strip() for s in sys.stdin.read().split(",") if s.strip()]
+opts = ", ".join("{name: %s, color: GRAY, description: \"\"}" % json.dumps(n) for n in names)
+print("mutation($f: ID!) { updateProjectV2Field(input: {fieldId: $f, singleSelectOptions: [%s]})"
+      " { projectV2Field { ... on ProjectV2SingleSelectField { id } } } }" % opts)')"
+    run gh api graphql -f query="$mutation" -F f="$fid" --jq '.data | keys[0]'
   fi
+  legacy="$(gh project field-list "$pn" --owner "$OWNER" --format json \
+            --jq '.fields[] | select(.name == "Stage") | .name' 2>/dev/null || true)"
+  [ -n "$legacy" ] && echo "  ↳ a legacy Stage field exists — the org now runs on Status; delete Stage in the Project UI once nothing references it."
   run gh project link "$pn" --owner "$OWNER" --repo "$ORG_REPO"
   run gh project link "$pn" --owner "$OWNER" --repo "$PRODUCT_REPO"
 fi
 
-echo "✓ Phase 2 PM scaffolding ready: labels + project (Stage = org-chart pm_stages + pm_holding_stages)"
+echo "✓ Phase 2 PM scaffolding ready: labels + project (Status = org-chart pm_stages + pm_holding_stages + pm_terminal_stages)"
 echo "  Next: file the first [OBJECTIVE] issue — agents work the board via scripts/pm-gh.sh"

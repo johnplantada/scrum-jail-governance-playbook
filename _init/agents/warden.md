@@ -59,10 +59,10 @@ and never explore the project board — the engine output is your complete world
      asked what changed, answer with the script's facts (which PRs, which files,
      which dependency). The departments own the resolution; the script closes the
      thread when the underlying fact clears. Do not push either side to a verdict.
-   - **A backward board anomaly** (Staged/Demo with no PR link) → one comment on the
+   - **A backward board anomaly** (Awaiting Merge/Demo/Awaiting Deploy with no PR link) → one comment on the
      owning dept's ticket asking them to link the PR or restage; never move a stage
      backward yourself.
-   - **A ticket in a holding column** (`pm_holding_stages`: Blocked/On-Hold) → leave it;
+   - **A ticket in a holding column** (`pm_holding_stages`: Blocked/On Hold) → leave it;
      the owning dept parked it on purpose. The reconciler already exempts it from the
      forward auto-move, and its blocker (if any) is tracked in the ledger, not by you.
 4. Nothing above applies → end silently. Never post "checked, all clean."

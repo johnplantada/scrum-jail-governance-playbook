@@ -25,10 +25,14 @@ without a marker are never touched, only reported as unmanaged.
 
 The BOARD RECONCILER makes the project board reorganize itself from code truth: every
 open org issue is joined to the PRs that reference it (`org#N` in PR title/body, both
-repos), and the Stage single-select is moved FORWARD-only where the code has outrun
-the board — an issue with an open non-draft PR belongs in Doing; one whose PR merged
-belongs in Staged. Backward inconsistencies (Staged/Demo with no PR anywhere) are
-reported, never auto-moved — a human or the owning dept decides those.
+repos), and the board's Status single-select is moved FORWARD-only where the code has
+outrun the board — an issue with an open non-draft PR belongs in Awaiting Merge (the
+Chairman's merge queue); one whose PR merged belongs in Demo. Backward inconsistencies
+(Awaiting Merge/Demo/Awaiting Deploy with no PR anywhere) are reported, never
+auto-moved — a human or the owning dept decides those. Two hygiene reconciles ride
+along: an open epic whose child work has started is lifted off Todo (epics are what the
+Chairman scans, and a frozen Todo epic reads as untouched), and a CLOSED issue stuck at
+a live column is settled to its terminal truth (NOT_PLANNED → Dropped, else Done).
 
 The CONFLICT CONVENER turns in-flight friction into a discussion instead of a
 surprise: deterministic detections — a product PR gone DIRTY (merge-conflicts with
@@ -87,8 +91,25 @@ MAX_CREATE = 15   # runaway brake: no single sync files more than this many chil
 MAX_MOVES = 10    # …or board moves
 MAX_SYNC = 3      # …or newly-convened [SYNC] discussions (each wakes two departments)
 KINDS = ("epic", "feature", "story")
-STAGES = ["To-Do", "Doing", "Staged", "Demo", "Done"]   # org-chart pm_stages order
-HOLDING_STAGES = ("Blocked", "On-Hold")   # org-chart pm_holding_stages — parked, never auto-advanced
+
+
+def _chart_list(key, default):
+    """A `global.<key>: [a, b, …]` flow list straight off org-chart.yaml — the canon
+    lives THERE (the chart is explicit that no tool may restate it); the default only
+    covers a missing/unreadable chart so this engine can never crash on its config."""
+    try:
+        with open(os.path.join(REPO_DIR, "org-chart.yaml"), encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return list(default)
+    m = re.search(rf"^\s*{re.escape(key)}:\s*\[([^\]]+)\]", text, re.MULTILINE)
+    return [s.strip().strip("'\"") for s in m.group(1).split(",")] if m else list(default)
+
+
+STAGES = _chart_list("pm_stages",
+                     ["Todo", "In Progress", "Awaiting Merge", "Demo", "Awaiting Deploy", "Done"])
+HOLDING_STAGES = tuple(_chart_list("pm_holding_stages", ["Blocked", "On Hold"]))
+TERMINAL_STAGES = tuple(_chart_list("pm_terminal_stages", ["Dropped"]))
 # Generated files whose overlap between PRs is churn, not a real collision.
 LOCKFILES = ("package-lock.json", "yarn.lock", "go.sum", "go.mod")
 
@@ -224,15 +245,19 @@ def linked_refs(text):
 def expected_stage(current, has_merged_pr, has_open_pr):
     """The FORWARD-only board move code truth demands, or None. Never proposes a
     backward move — regressions are findings for humans/depts, not auto-moves. A parked
-    item (org-chart pm_holding_stages: Blocked/On-Hold) is left alone — someone put it
-    there on purpose, and having a PR must not auto-yank it back into the flow."""
-    if current in HOLDING_STAGES:
+    item (org-chart pm_holding_stages: Blocked/On Hold) is left alone — someone put it
+    there on purpose, and having a PR must not auto-yank it back into the flow; a
+    Dropped item is dead, not behind. An open non-draft PR titled (org#N) IS the
+    awaiting-a-merge fact; a merged one IS the awaiting-demo/acceptance fact (safe.md's
+    column definitions) — Awaiting Deploy and Done are gate outcomes (demo acceptance,
+    pm-gh.sh done), never derivable from PR state alone."""
+    if current in HOLDING_STAGES or current in TERMINAL_STAGES:
         return None
-    cur = current if current in STAGES else "To-Do"
-    if has_merged_pr and STAGES.index(cur) < STAGES.index("Staged"):
-        return "Staged"
-    if has_open_pr and STAGES.index(cur) < STAGES.index("Doing"):
-        return "Doing"
+    cur = current if current in STAGES else STAGES[0]
+    if has_merged_pr and STAGES.index(cur) < STAGES.index("Demo"):
+        return "Demo"
+    if has_open_pr and STAGES.index(cur) < STAGES.index("Awaiting Merge"):
+        return "Awaiting Merge"
     return None
 
 
@@ -245,7 +270,7 @@ def plan_moves(open_issues, stages, links):
     Precision asymmetry, learned from the first live audit: MOVES (mutations) trust
     only TITLE links — "(org#N)" in a PR title is the implements-this convention,
     while a body mention can be incidental (a report PR listing an issue moved it to
-    Doing). ANOMALIES (report-only) are suppressed by ANY reference, weak included —
+    In Progress). ANOMALIES (report-only) are suppressed by ANY reference, weak included —
     better to miss a nag than to nag a linked item. Epics and objectives are skipped
     entirely: they track by child rollup, not by PR."""
     moves, anomalies = [], []
@@ -262,12 +287,51 @@ def plan_moves(open_issues, stages, links):
             why = (f"PR {', '.join(l['merged'][:3])} merged" if l.get("merged")
                    else f"open PR {', '.join(l['open'][:3])}")
             moves.append((n, cur or "(off board)", to, why))
-        elif cur in ("Staged", "Demo") and not any(
+        elif cur in ("Awaiting Merge", "Demo", "Awaiting Deploy") and not any(
                 l.get(k) for k in ("merged", "open", "merged_weak", "open_weak")):
             anomalies.append(f"org#{n} sits in {cur} with no PR referencing it anywhere "
-                             f"— stage claims more than the code shows: "
+                             f"— the status claims more than the code shows: "
                              f"{_trim(i.get('title'), 60)}")
     return moves, anomalies
+
+
+def plan_epic_rollup(open_epics, stages, children):
+    """Epics track by child rollup, so plan_moves skips them — which left every epic
+    frozen at Todo while its children moved, reading as untouched work on exactly the
+    rows the Chairman scans. One forward-only lift: an open epic still at Todo (or off
+    the board) whose child work has visibly started — a child already closed, or past
+    Todo on the board — belongs in In Progress. Nothing deeper is derived (Done is the
+    rollup close's job), and a parked epic stays parked. `children`: epic# → child dicts
+    (number/state)."""
+    moves = []
+    first, active = STAGES[0], STAGES[1]
+    for e in open_epics or []:
+        n = e.get("number")
+        cur = stages.get(n)
+        if cur is not None and cur != first:
+            continue
+        kids = children.get(n) or []
+        if any((k.get("state") or "").lower() == "closed"
+               or (stages.get(k.get("number")) or first) != first for k in kids):
+            moves.append((n, cur or "(off board)", active, "child work has started"))
+    return moves
+
+
+def plan_closed_reconcile(closed_issues, stages):
+    """A CLOSED issue frozen at a live column lies to every board reader (the stale
+    To-Dos that prompted the status overhaul were exactly this). Settle each to its
+    terminal truth: closed as NOT_PLANNED → Dropped, otherwise Done. Only items already
+    ON the board move — a closed issue nobody tracked doesn't earn a card posthumously."""
+    moves = []
+    terminal = {STAGES[-1], *TERMINAL_STAGES}
+    for i in closed_issues or []:
+        n, cur = i.get("number"), stages.get(i.get("number"))
+        if n is None or cur is None or cur in terminal:
+            continue
+        to = ("Dropped" if str(i.get("stateReason") or "").upper() == "NOT_PLANNED"
+              else STAGES[-1])
+        moves.append((n, cur, to, "issue is closed"))
+    return moves
 
 
 def detect_conflicts(open_product_prs):
@@ -342,7 +406,7 @@ def render_report(plan, findings, now_str, queue_issue, moves=None, sync_plan=No
         lines.append("Unmanaged children (no `warden-source` marker — adopt or close by "
                      "hand): " + ", ".join(f"#{n}" for n in plan["unmanaged"]))
     if moves:
-        lines += ["", "Board reconcile (code truth → stage):"]
+        lines += ["", "Board reconcile (code truth → Status):"]
         lines += [f"- org#{n}: {frm} → {to} ({why})" for n, frm, to, why in moves]
     if sync_plan and (sync_plan.get("kept") or sync_plan.get("create")
                       or sync_plan.get("close")):
@@ -459,10 +523,10 @@ def fetch_open_issues():
 
 
 def fetch_board_stages():
-    """{issue_number: Stage} from the org Project (gh flattens the Stage single-select
-    to `.stage` on each item). {} when the project is unreachable — reconcile then
-    proposes nothing (fail-soft toward inaction). The board number comes from the
-    org-chart pin; the by-title lookup is only the un-pinned fallback."""
+    """{issue_number: Status} from the org Project (gh flattens the built-in Status
+    single-select to `.status` on each item). {} when the project is unreachable —
+    reconcile then proposes nothing (fail-soft toward inaction). The board number comes
+    from the org-chart pin; the by-title lookup is only the un-pinned fallback."""
     pn = _chart_pin("pm_project_number") or gh_json(
         ["project", "list", "--owner", ORG_REPO.split("/")[0], "--format", "json",
          "--jq", '[.projects[] | select(.title == "'
@@ -472,8 +536,15 @@ def fetch_board_stages():
         return {}
     items = gh_json(["project", "item-list", str(pn), "--owner", ORG_REPO.split("/")[0],
                      "--limit", "500", "--format", "json",
-                     "--jq", "[.items[] | {n: .content.number, stage: .stage}]"], [])
+                     "--jq", "[.items[] | {n: .content.number, stage: .status}]"], [])
     return {i["n"]: i.get("stage") for i in items or [] if i.get("n")}
+
+
+def fetch_closed_issues(limit=30):
+    """Recently closed issues with their close reason — the closed-board reconcile's
+    input. Bounded: the sweep converges over a few runs, it doesn't need all history."""
+    return gh_json(["issue", "list", "--repo", ORG_REPO, "--state", "closed",
+                    "--limit", str(limit), "--json", "number,stateReason"], []) or []
 
 
 def build_links(open_org_issues, prs_by_repo, merged_by_repo):
@@ -526,9 +597,13 @@ def hygiene_findings(open_issues, product_prs):
             findings.append(f"{PRODUCT_REPO.split('/')[-1]} PR #{pr['number']} has no org#N "
                             f"work-item link: {_trim(pr.get('title'), 60)}")
     # Recently closed typed items must carry their [CLOSE] evidence (bounded: 8 lookups).
+    # NOT_PLANNED closes are exempt — a drop's record is its [DROP] comment, and no
+    # [CLOSE] evidence is owed for work the org decided not to do.
     closed = gh_json(["issue", "list", "--repo", ORG_REPO, "--state", "closed", "--limit", "8",
-                      "--json", "number,title,labels"], []) or []
+                      "--json", "number,title,labels,stateReason"], []) or []
     for i in closed:
+        if str(i.get("stateReason") or "").upper() == "NOT_PLANNED":
+            continue
         labels = [l.get("name", "") for l in i.get("labels") or []]
         if not any(k in labels for k in KINDS):
             continue
@@ -638,7 +713,14 @@ def gather_all(queue):
                        if str(i.get("title", "")).startswith("[PROPOSAL]")]),
         fetch_children(queue))
     links = build_links(open_issues, prs, merged)
-    moves, anomalies = plan_moves(open_issues, fetch_board_stages(), links)
+    stages = fetch_board_stages()
+    moves, anomalies = plan_moves(open_issues, stages, links)
+    epics = [i for i in open_issues
+             if "epic" in [l.get("name", "") for l in i.get("labels") or []]
+             and "objective" not in [l.get("name", "") for l in i.get("labels") or []]]
+    moves += plan_epic_rollup(epics, stages,
+                              {e["number"]: fetch_children(e["number"]) for e in epics})
+    moves += plan_closed_reconcile(fetch_closed_issues(), stages)
     sync_plan = plan_sync(desired_sync_threads(detect_conflicts(prs["product"])),
                           sync_issue_shapes(open_issues))
     findings = hygiene_findings(open_issues, prs["product"]) + anomalies

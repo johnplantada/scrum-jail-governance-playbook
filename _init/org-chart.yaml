@@ -41,14 +41,20 @@ global:
   # in another human-only unlock — scripts/blockers.py prepends the WIP warning to the
   # queue injected into every wake prompt. Prompt-enforced. 0/absent disables the warning.
   unlock_wip_limit: {{UNLOCK_WIP_LIMIT}}
-  # Canonical pm workflow stages, in order (DESIGN.md §2). The ONLY place the stage list
-  # is defined — github-pm-setup.sh builds the Project's Stage field from it, and docs and
-  # mandates must reference it rather than restate it.
-  pm_stages: [To-Do, Doing, Staged, Demo, Done]
+  # Canonical pm workflow statuses, in order (DESIGN.md §2). The ONLY place the list is
+  # defined — github-pm-setup.sh provisions the board's built-in Status field from it, and
+  # docs and mandates must reference it rather than restate it. Each column answers "who
+  # is this waiting on": Awaiting Merge and Awaiting Deploy are the Chairman's two queues,
+  # so his whole to-do is Awaiting Merge + Awaiting Deploy + Blocked.
+  pm_stages: [Todo, In Progress, Awaiting Merge, Demo, Awaiting Deploy, Done]
   # Holding columns — orthogonal PARKED states, NOT points in the pm_stages flow (safe.md).
-  # Same board Stage field, valid move target, kept out of the ordered list, and exempt
+  # Same board Status field, valid move target, kept out of the ordered list, and exempt
   # from any forward auto-reconcile (a parked item with a PR stays parked).
-  pm_holding_stages: [Blocked, On-Hold]
+  pm_holding_stages: [Blocked, On Hold]
+  # Terminal-alternate — "won't do", closed as not-planned via pm-gh.sh drop. Not a flow
+  # position (kept out of any .index() math), not parked (nothing resumes). Dropping an
+  # epic or objective is the Chairman's call alone; agents file a [PROPOSAL] instead.
+  pm_terminal_stages: [Dropped]
   # ── COMMISSIONING PINS — both REQUIRED; the org is not finished until they are set ──
   # These cannot be stamped: neither the board nor the queue epic exists until you have
   # created the org repo. Leaving them null is not a soft default — warden.py exits before

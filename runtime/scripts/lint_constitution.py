@@ -74,28 +74,54 @@ def canonical_stages(chart_text):
 
 
 def holding_stages(chart_text):
-    """Extract global.pm_holding_stages — valid Stage board columns that are NOT part
-    of the ordered flow (Blocked/On-Hold). Recognized so prose may name them without
+    """Extract global.pm_holding_stages — valid Status board columns that are NOT part
+    of the ordered flow (Blocked/On Hold). Recognized so prose may name them without
     the ordered-flow check treating them as non-canonical."""
     return _flow_list(chart_text, "pm_holding_stages")
 
 
-ARROW_CHAIN = re.compile(r"[\w`*\"-]+(?:\s*→\s*[\w`*\"-]+)+")
+def terminal_stages(chart_text):
+    """Extract global.pm_terminal_stages — the won't-do outcomes (Dropped). Like holding
+    columns: valid names with no flow position."""
+    return _flow_list(chart_text, "pm_terminal_stages")
 
 
-def check_stages(path, text, stages, holding=()):
-    """Arrow chains naming ≥2 canonical flow stages must use only VALID stage names, in
-    canonical flow order. Holding columns (pm_holding_stages: Blocked/On-Hold) are valid
-    names but carry no flow position, so they're allowed in a chain yet skipped by the
-    order check. A line claiming to list 'workflow stages' must name them all (or point at
-    pm_stages) — checked against the line plus its continuation line, since prose wraps."""
+# A chain element is at most TWO words — the widest canonical name ("In Progress",
+# "Awaiting Merge") — so an element can't swallow the surrounding prose wholesale.
+ARROW_CHAIN = re.compile(
+    r"[\w`*\"-]+(?:[ \t][\w`*\"-]+)?(?:\s*→\s*[\w`*\"-]+(?:[ \t][\w`*\"-]+)?)+")
+
+
+def _canon_token(tok, valid_lower):
+    """Normalize one chain element. Two-word elements mean the regex can absorb one word
+    of surrounding prose ("moves Todo → …" → element "moves Todo"; "→ Done` on" →
+    "Done on"); when the element isn't a valid name but a word-boundary suffix or prefix
+    of it is, judge that — the prose word belongs to the sentence, not the chain."""
+    t = tok.strip("`*\"' ")
+    if t.lower() in valid_lower:
+        return t
+    words = [w.strip("`*\"'") for w in t.split()]
+    if len(words) > 1:
+        for cand in (" ".join(words[-2:]), words[-1], " ".join(words[:2]), words[0]):
+            if cand.lower() in valid_lower:
+                return cand
+    return t
+
+
+def check_stages(path, text, stages, holding=(), terminal=()):
+    """Arrow chains naming ≥2 canonical flow stages must use only VALID status names, in
+    canonical flow order. Holding columns (pm_holding_stages: Blocked/On Hold) and
+    terminal-alternates (pm_terminal_stages: Dropped) are valid names but carry no flow
+    position, so they're allowed in a chain yet skipped by the order check. A line
+    claiming to list 'workflow stages' must name them all (or point at pm_stages) —
+    checked against the line plus its continuation line, since prose wraps."""
     findings = []
     canon_lower = [s.lower() for s in stages]
-    valid_lower = canon_lower + [h.lower() for h in holding]
+    valid_lower = canon_lower + [h.lower() for h in holding] + [t.lower() for t in terminal]
     lines = text.splitlines()
     for lineno, line in enumerate(lines, 1):
         for chain in ARROW_CHAIN.findall(line):
-            tokens = [t.strip("`*\"' ") for t in chain.split("→")]
+            tokens = [_canon_token(t, valid_lower) for t in chain.split("→")]
             hits = [t for t in tokens if t.lower() in canon_lower]
             if len(hits) < 2:
                 continue  # not a stage chain (e.g. poll → route → wake)
@@ -163,6 +189,7 @@ def run(root=ROOT):
         chart = fh.read()
     stages = canonical_stages(chart)
     holding = holding_stages(chart)
+    terminal = terminal_stages(chart)
     if not stages:
         return ["org-chart.yaml: global.pm_stages missing — the stage canon must live there"]
     findings = []
@@ -171,7 +198,7 @@ def run(root=ROOT):
             text = fh.read()
         rel = os.path.relpath(f, root)
         findings += check_cadence(rel, text)
-        findings += check_stages(rel, text, stages, holding)
+        findings += check_stages(rel, text, stages, holding, terminal)
         findings += check_skills(rel, text, root)
     return findings
 
