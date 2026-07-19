@@ -90,11 +90,11 @@ class TestDesiredQueue(unittest.TestCase):
             {"id": "plain", "state": "open", "action": "Set two repo secrets",
              "value": "infra"},
         ]}, {}, [])
-        self.assertTrue(d["blocker:gumroad"]["title"].startswith("🔴 "))
+        self.assertTrue(d["blocker:gumroad"]["title"].startswith("[MARKET-CONTACT] "))
         self.assertIn("MARKET-CONTACT", d["blocker:gumroad"]["body"])
         self.assertIn("does NOT go quiet", d["blocker:gumroad"]["body"])
         # an ordinary infra blocker is untouched
-        self.assertFalse(d["blocker:plain"]["title"].startswith("🔴"))
+        self.assertFalse(d["blocker:plain"]["title"].startswith("[MARKET-CONTACT]"))
         self.assertNotIn("MARKET-CONTACT", d["blocker:plain"]["body"])
 
 

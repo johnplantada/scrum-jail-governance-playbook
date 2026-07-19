@@ -25,8 +25,8 @@ scripts/org-worktree.sh done "$wt"                 # always clean up, even if th
 
 - **Branch names:** short and purposeful (e.g. `safe-mandates`, `pi-12-brief`).
 - **One concern per PR** — a reviewable unit, not a grab-bag of unrelated edits.
-- **Constitution edits (`DESIGN.md`) merge only after the Board's 🏛️** on the matching
-  PROPOSAL — the worktree PR is the vehicle, not the approval.
+- **Constitution edits (`DESIGN.md`) merge only after the Board's charter approval** on the
+  matching PROPOSAL — the worktree PR is the vehicle, not the approval.
 - **Product code is a different repo** (`$PRODUCT_REPO`) with its own branch/PR flow —
   never landed through the org worktree.
 - CI runs the constitution linter on your PR; if it flags a hardcoded cadence number, a

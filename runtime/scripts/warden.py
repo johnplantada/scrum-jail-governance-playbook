@@ -86,7 +86,7 @@ except ImportError:  # pragma: no cover — environment-dependent by nature
 
 MARKER = "warden-source:"
 REPORT_MARKER = "<!-- warden-report -->"
-BANNER = "**🔒 Warden —**"
+BANNER = "**Warden —**"
 MAX_CREATE = 15   # runaway brake: no single sync files more than this many children
 MAX_MOVES = 10    # …or board moves
 MAX_SYNC = 3      # …or newly-convened [SYNC] discussions (each wakes two departments)
@@ -168,9 +168,9 @@ def desired_queue(blockers_data, prs_by_repo, proposals):
         blocks = ", ".join(str(x) for x in b.get("blocks") or [])
         mc = bool(b.get("gates_market_contact"))
         desired[key] = {
-            "title": _trim(f"{'🔴 ' if mc else ''}Chairman: {action or bid}"),
+            "title": _trim(f"{'[MARKET-CONTACT] ' if mc else ''}Chairman: {action or bid}"),
             "body": (f"{action}\n\n"
-                     + ("🔴 MARKET-CONTACT — the product is live but a checkout and/or an "
+                     + ("MARKET-CONTACT — the product is live but a checkout and/or an "
                         "audience is gated on you. This does NOT go quiet (DESIGN.md "
                         "invariant 2); it resurfaces every wake until cleared.\n\n" if mc else "")
                      + (f"({tags})\n" if tags else "")

@@ -58,7 +58,7 @@ SUBAGENT_TOOLS = {"Agent", "Task"}
 # Declarative worker subagents for parallel decomposition. The roster + tool/model scoping live as
 # plain data in worker_policy.WORKER_SPECS (stdlib-only, so CI can assert the governance invariants
 # without the SDK). The load-bearing rule: NO worker gets Bash, so none can git-push, comment via
-# gh, run offload.sh, spend (💰), or deploy (🚀) at depth — those stay on the parent cycle, which
+# gh, run offload.sh, spend, or deploy at depth — those stay on the parent cycle, which
 # holds all authority and synthesizes/commits the output. test_agent_workers.py asserts no-Bash in
 # CI so a future edit can't silently hand a worker shell power.
 #   researcher  read-only, Haiku  — parallel research/exploration (returns findings)

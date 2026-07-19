@@ -39,14 +39,14 @@ class TestMarkers(unittest.TestCase):
         # The business#129 false positive: a hard line-wrap landed a bare marker at
         # the start of a mid-paragraph line. A marker only leads a HANDOFF when it
         # leads a paragraph — mid-paragraph line starts are prose.
-        body = ("**📈 Business —**\n\n"
+        body = ("**Business —**\n\n"
                 "The reviewer gate means every product PR needs\n"
                 "[CODEREVIEW] to pass before its demo is relayed.")
         self.assertEqual(markers(body), [])
 
     def test_banner_led_handoff_detected(self):
         # The compliant form: identity banner, blank line, marker leads its paragraph.
-        body = "**🛠️ IT —**\n\n[DEMO] evidence below\n```yaml\npr: o/r#1\n```"
+        body = "**IT —**\n\n[DEMO] evidence below\n```yaml\npr: o/r#1\n```"
         self.assertEqual(markers(body), ["DEMO"])
 
     def test_marker_after_blank_line_counts(self):
@@ -56,7 +56,7 @@ class TestMarkers(unittest.TestCase):
     def test_crlf_bodies_handled(self):
         # GitHub comment bodies arrive with \r\n: a \r-only "blank" line still blanks,
         # and a wrap-landed marker mid-paragraph is still prose.
-        body = "**📈 Business —**\r\n\r\n[DEMO] evidence\r\n[CODEREVIEW] wrap-landed"
+        body = "**Business —**\r\n\r\n[DEMO] evidence\r\n[CODEREVIEW] wrap-landed"
         self.assertEqual(markers(body), ["DEMO"])
 
 

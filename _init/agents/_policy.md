@@ -36,8 +36,8 @@ runtime; this policy assumes they are installed.)*
 - **Org-repo changes** — the dir you wake in is shared, read-only runtime state: never
   `git commit`/`checkout`/`branch` there. **Invoke the `org-worktree` skill** (isolated
   worktree + PR). All agents share one GitHub identity, so banner your comments —
-  `**🛠️ IT —**`, `**📈 Business —**`, `**🎯 CEO —**` (pick a distinct banner per
-  department) — to stay legible.
+  `**IT —**`, `**Business —**`, `**CEO —**` (one banner per
+  department, always your department's name) — to stay legible.
 
 ## Blocked work — record it once, then go quiet
 
@@ -46,7 +46,7 @@ publishing from personal accounts): **invoke the `blocker-triage` skill** — on
 `blockers.yaml` entry with honest `value:` and `effort_minutes:`, then end the cycle. Never
 flip an entry to `cleared`; never re-announce a ledgered blocker — the one entry that stays
 loud, `gates_market_contact` (the org's only checkout or only audience), is reprinted by
-the tooling, not by you. **Respect the unlock WIP limit:** when the injected queue opens with the ⚠ warning (`global.unlock_wip_limit`
+the tooling, not by you. **Respect the unlock WIP limit:** when the injected queue opens with the WIP-limit warning (`global.unlock_wip_limit`
 exceeded), do not start new work whose critical path ends in another human-only unlock —
 work what is already unblocked or end the cycle.
 

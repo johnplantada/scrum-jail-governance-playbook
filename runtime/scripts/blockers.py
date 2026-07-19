@@ -91,8 +91,9 @@ def open_entries(data):
 
 def format_line(b, today, show_state=False):
     """One compact queue line: id, (kind, value, effort, age), summary → action.
-    Market-contact entries lead their tag list with 🔴 so they stand out in the queue."""
-    tags = ["🔴 market-contact"] if is_market_contact(b) else []
+    Market-contact entries lead their tag list with MARKET-CONTACT so they stand out
+    in the queue."""
+    tags = ["MARKET-CONTACT"] if is_market_contact(b) else []
     tags.append(b.get("kind", ""))
     value = str(b.get("value") or "").strip()
     if value:
@@ -117,7 +118,7 @@ def wip_warning(n_open, limit):
     """The queue-overflow banner, or None while under the limit (or with no limit set)."""
     if not limit or n_open <= limit:
         return None
-    return (f"⚠ UNLOCK WIP LIMIT EXCEEDED — {n_open} open human-only blockers "
+    return (f"WARNING: UNLOCK WIP LIMIT EXCEEDED — {n_open} open human-only blockers "
             f"(global.unlock_wip_limit is {limit}). Do NOT start new work whose critical "
             f"path ends in another human-only unlock; swarm what is already unblocked "
             f"(DESIGN.md, invariant 2).")
@@ -141,7 +142,7 @@ def market_contact_alert(entries, today):
         summary = " ".join((b.get("summary") or "").split())
         return f"  • [{b.get('id', '?')}{agestr}] {summary}"
 
-    return ("🔴 MARKET-CONTACT BLOCKED — the product is live but a checkout and/or an "
+    return ("MARKET-CONTACT BLOCKED — the product is live but a checkout and/or an "
             "audience is gated on the Chairman. This class does NOT go quiet; until it "
             "clears, the org ships into a void:\n" + "\n".join(one(b) for b in flagged))
 

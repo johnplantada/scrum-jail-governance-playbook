@@ -73,7 +73,7 @@ RETRY_MIN = int(os.environ.get("WAKE_RETRY_MIN", "15"))  # failed-wake requeue r
 
 # Same author signal the runner routes on (runner.banner_dept) — duplicated rather than
 # imported so this module never depends on runner (runner imports US inside cmd_tick).
-_BANNER_RE = re.compile(r"\*\*\S*\s*(\w+)\s*—", re.UNICODE)
+_BANNER_RE = re.compile(r"\*\*\s*(\w+)\s*—", re.UNICODE)
 _HOLD_WORD = re.compile(r"(^|[^a-z0-9])(deploy|revenue)([^a-z0-9]|$)")
 
 

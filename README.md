@@ -28,10 +28,10 @@ your afternoon.
 |---|---|
 | `org-chart.yaml` | Define your agents, their roles, and their authority envelopes |
 | `envelopes.yaml` | Reference for every envelope field — what it means, how to tune it |
-| `emoji-gate.md` | The authorization gate walkthrough — decisions.yaml/CODEOWNERS for money/org-shape, the `workflow_dispatch`-only deploy gate, why each step exists, and the pre-deploy code-review/demo chain |
+| `authorization-gate.md` | The authorization gate walkthrough — decisions.yaml/CODEOWNERS for money/org-shape, the `workflow_dispatch`-only deploy gate, why each step exists, and the pre-deploy code-review/demo chain |
 | `patterns.md` | **17** agent misbehavior patterns + the specific governance fix for each |
 | `blocker-ledger.md` | The blocker ledger + capability boundary + wake backpressure — stops the "blocked loop" |
-| `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output; the work-item tree with a closing rule per level; the `[CODEREVIEW]` + `[DEMO]` gates before a 🚀 |
+| `safe.md` | Scaled-agile for an agent org without the theater — ceremony gated on shipped output; the work-item tree with a closing rule per level; the `[CODEREVIEW]` + `[DEMO]` gates before a deploy dispatch |
 | `FIELD-NOTES.md` | **Field-tested mechanisms** from the live org — the event loop, spend guards, the `.halt` switch, single-flight locks, worker tool-scoping, model-tier pinning, typed handoffs, the work-item tree's closure gate, the deterministic warden + engine-first wakes, wake yield + the wake filter, the zero-spend CI gate — plus the graveyard of what the 2026-07-05 demolition retired, and what replaced each piece |
 | `RUNBOOK.md` | Step-by-step: set up your org in an afternoon |
 | `bin/orggen` | Generator that stamps a complete org — governance from `_init/`, runtime from `runtime/` — with every department surface (chart, mandates, wake rules, issue-form dropdowns, agent ceiling) generated from one roster |
@@ -81,21 +81,20 @@ slogan "enforced in code":
   the live org's private Free-plan repo is why dispatch-only is the reference gate.)
 - **Not automated at all:** nothing executes a `decisions.yaml` entry's payload for
   you. Money and org-shape changes take effect because the diff describing them landed
-  on `main` — there's no code path from "PR merged" to "money moves" the way there is
-  no code path from "Chairman reacted 💰" in the old model. The hard backstop is still
+  on `main` — there is deliberately no code path from "PR merged" to "money
+  moves". The hard backstop is still
   **capability-absence** outside the platform gates: agents hold no payment credentials
   or prod access, so even a confused or compromised agent has nothing to spend or ship
   with directly.
 
 This replaces an earlier, chat-based version of this same idea (agents post typed
-messages, a human reacts with a governance emoji, a Registrar bot watching the chat
-WebSocket verifies the reactor and executes or records it). Both shapes enforced the
+messages, a human posts an approval, a Registrar bot watching the chat
+WebSocket verifies the approver and executes or records it). Both shapes enforced the
 identical principle — *agents propose, a human authorizes, the authorization is legible
 and audited* — but the chat-based mechanism is retired here, not carried forward as a
 maintained alternative: it was unenforceable in code and depended on prose-policing a
-bot's behavior. [emoji-gate.md](emoji-gate.md) walks through the GitHub-native version in
-full — the same file name for history's sake, now describing the gate above in detail,
-not the retired chat mechanism. If you'd rather build a chat-based variant for your own
+bot's behavior. [authorization-gate.md](authorization-gate.md) walks through the
+GitHub-native version in full. If you'd rather build a chat-based variant for your own
 org, that's a fork/adaptation decision this template no longer needs to carry as a second
 supported path.
 
@@ -136,14 +135,14 @@ Full setup instructions: [RUNBOOK.md](RUNBOOK.md)
 This governance system is extracted from the live autonomous org running
 [scrumjail.org](https://scrumjail.org). The `org-chart.yaml`, `DESIGN.md`,
 and `agents/*.md` files in this template are the actual primitives we use —
-packaged so you can copy, fill in, and run. The live org itself started on the
-chat-based emoji gate and cut over to the GitHub-native model described above on
+packaged so you can copy, fill in, and run. The live org itself started on a
+chat-based gate and cut over to the GitHub-native model described above on
 2026-07-05 — and this template has followed it across: `RUNBOOK.md` is the current
 GitHub-native operating guide (setup, runtime contracts, and the gate verification
-tests), and the rest of the docs — `emoji-gate.md`, `safe.md`, `patterns.md`,
+tests), and the rest of the docs — `authorization-gate.md`, `safe.md`, `patterns.md`,
 `blocker-ledger.md`, `FIELD-NOTES.md`, `envelopes.yaml`, `docs/ARCHITECTURE.md`,
 `org-chart.yaml`, and the `_init/` stamped templates — describe the same model. Where
-a doc keeps a chat-era filename or a lineage note, that's deliberate history, not a
+a doc keeps a lineage note about the chat era, that's deliberate history, not a
 second supported path.
 
 Questions or feedback: [scrumjail.org](https://scrumjail.org)

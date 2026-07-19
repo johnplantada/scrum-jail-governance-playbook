@@ -1,5 +1,5 @@
-# Agent → Chairman proposal: the discussion surface before a decision. A Chairman 👍 (or
-# comment) here is direction only — money/org-shape changes take effect solely via a
+# Agent → Chairman proposal: the discussion surface before a decision. An approving Chairman
+# comment here is direction only — money/org-shape changes take effect solely via a
 # decisions.yaml PR whose CODEOWNERS-routed merge is the authorization (DESIGN.md invariant 1).
 name: Proposal
 description: "Agent → Chairman: a bet, spend, or org change that needs a human verdict"

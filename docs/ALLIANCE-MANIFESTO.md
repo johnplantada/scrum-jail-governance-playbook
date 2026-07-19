@@ -45,7 +45,7 @@ what AI can do now. Every purpose from 2023 carries forward, one level up:
 - **And now, an actual experiment.** How do you orchestrate multiple agents, get them
   to follow a strict process, and keep the whole thing auditable and controllable by
   one human? That question is not a joke, and the working answers are this repo: the
-  emoji gate, the authority envelopes, the blocker ledger, the output-gated ceremony.
+  authorization gate, the authority envelopes, the blocker ledger, the output-gated ceremony.
 
 Which lands on the punchline the whole thing was apparently building toward for three
 years. The 2023 site promised to improve "adherence to team agreements and processes."

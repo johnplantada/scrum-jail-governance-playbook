@@ -95,7 +95,7 @@ class TestMarketContact(unittest.TestCase):
 
     def test_format_line_marks_flagged(self):
         line = format_line(entry(id="mc", value="revenue", gates_market_contact=True), TODAY)
-        self.assertIn("🔴 market-contact", line)
+        self.assertIn("MARKET-CONTACT", line)
 
 
 class TestRunbookLint(unittest.TestCase):

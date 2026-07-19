@@ -3,7 +3,7 @@
 # and bound to the code actually being shipped? A demo's evidence is real only if the
 # product repo's demo-evidence workflow has a GREEN run on the PR's CURRENT head SHA —
 # the same pattern as last-ship.sh (predicate in code, not prose). IT runs this before
-# posting a [DEMO]; the CEO runs it before relaying a 🚀 (DESIGN §12); the run URL goes
+# posting a [DEMO]; the CEO runs it before relaying a deploy approval (DESIGN §12); the run URL goes
 # in the [DEMO] post so Business and the Chairman can open the artifacts.
 #
 # A stale run (evidence generated, then more commits pushed) does NOT verify — evidence

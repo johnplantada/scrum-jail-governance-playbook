@@ -45,7 +45,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           {
-            echo "⚠️ **Malformed typed handoff** — the payload does not match the schema:"
+            echo "**Malformed typed handoff** — the payload does not match the schema:"
             echo
             echo '```'
             cat problems.txt

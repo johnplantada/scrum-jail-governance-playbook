@@ -20,7 +20,7 @@ Modes (RUNNER_MODE in .env — the strangler switch):
   live              actually wake departments (agent-run.sh, WAKE_REASON=direct — the
                     agent's own lock, budget, and no-op gates still apply).
 
-Guards, both modes: the 🛑 kill switch (.halt) stops the tick; the GitHub rate-limit
+Guards, both modes: the kill switch (.halt) stops the tick; the GitHub rate-limit
 hold (GH_RATE_FLOOR, default 500; 0 disables) skips the whole tick — no poll, no wakes —
 while core or graphql remaining sits below the floor, leaving the cursor untouched so
 GitHub itself queues the backlog until the window resets; the spend cap
@@ -153,11 +153,11 @@ def depts_from_labels(labels):
             if str(lab).startswith("dept:")]
 
 
-BANNER_RE = re.compile(r"\*\*\S*\s*(\w+)\s*—", re.UNICODE)
+BANNER_RE = re.compile(r"\*\*\s*(\w+)\s*—", re.UNICODE)
 
 
 def banner_dept(text):
-    """The identity banner's department ('**🛠️ IT —** …' → 'it'). All agents share one
+    """The identity banner's department ('**IT —** …' → 'it'). All agents share one
     GitHub identity, so the mandated banner is the only author signal — it lets the
     runner skip echo-waking the department that wrote the comment. None when unsigned
     (a human comment, or an agent forgetting the banner — then everyone labeled wakes,

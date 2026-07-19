@@ -5,7 +5,7 @@
 # DIRECTORY — that's how we tell them apart. Deliberate human commits can override.
 top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 if [ -d "$top/.git" ] && [ -z "${ALLOW_RUNTIME_COMMIT:-}" ]; then
-  echo "✋ refusing to commit in the runtime checkout ($top)." >&2
+  echo "refusing to commit in the runtime checkout ($top)." >&2
   echo "   Org-repo changes go through an isolated worktree so agents don't collide:" >&2
   echo "     wt=\$(scripts/org-worktree.sh new <branch-suffix>)   # edit under \$wt" >&2
   echo "     ( cd \"\$wt\" && git add -A && git commit -m … && git push -u origin … && gh pr create )" >&2

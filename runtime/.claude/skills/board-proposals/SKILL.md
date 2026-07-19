@@ -1,6 +1,6 @@
 ---
 name: board-proposals
-description: Compose a Board-gated org-shape proposal — a [CHARTER] for a new department (🏛️) or a [PROMOTE] for a model-tier change (💎) — as a decisions.yaml PR whose payload is the exact org-chart.yaml change. Use when proposing a department or relaying/requesting a tier change; these are rare, deliberate acts.
+description: Compose a Board-gated org-shape proposal — a [CHARTER] for a new department or a [PROMOTE] for a model-tier change — as a decisions.yaml PR whose payload is the exact org-chart.yaml change. Use when proposing a department or relaying/requesting a tier change; these are rare, deliberate acts.
 ---
 
 # Board proposals — CHARTER and PROMOTE payloads
@@ -19,7 +19,7 @@ was approved, and `git log decisions.yaml` is the decision history. CI runs
 `scripts/decisions.py check`, so a malformed entry cannot merge. Never assume approval;
 an unmerged proposal is a no.
 
-## `[CHARTER]` — a new top-level department (🏛️)
+## `[CHARTER]` — a new top-level department
 
 Use when the work needs a capability no existing department covers. Sub-teams within an
 envelope need NO charter — the parent just announces them (DESIGN §5).
@@ -45,7 +45,7 @@ team = `haiku`. A chartered department also needs its mandate file
 a `dept:<name>` label to it, a `wake-rules.yaml` rule — include both in the same PR so
 the approval covers the whole shape.
 
-## `[PROMOTE]` — raise (or lower) a node's model tier (💎)
+## `[PROMOTE]` — raise (or lower) a node's model tier
 
 Use for a sustained tier change on a business case — a discrete hard question goes
 through `OFFLOAD_ESCALATE` instead (see `_policy.md`). To dial back down later, send the
