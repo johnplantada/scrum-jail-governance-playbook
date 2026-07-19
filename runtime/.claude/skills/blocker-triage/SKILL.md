@@ -13,7 +13,9 @@ Chairman's queue (DESIGN.md invariant 2) — never a status post. Follow these s
 It qualifies only if the unblock requires one of:
 - **external-input** — a credential, account registration, product/storefront URL, mailing
   address, or any real-world artifact an agent cannot create;
-- **governance** — a Chairman emoji approval (💰 fund · 🚀 ship · 🏛️ charter · 💎 promote).
+- **governance** — a Chairman authorization: a decisions.yaml merge (💰 fund ·
+  🏛️ charter · 💎 promote · ⚰️ sunset) or the 🚀 prod-deploy dispatch (the
+  Chairman's manual workflow_dispatch).
 
 A peer/tech dependency (waiting on IT's estimate, a failing test) is NOT a ledger entry —
 that goes in your `STATUS` `blocked:` line or a thread, as usual.

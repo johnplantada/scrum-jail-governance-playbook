@@ -123,7 +123,14 @@ blockers, and both are resolved, one by doing the step and one by *learning the 
 was impossible*. The money/org-shape half is **enforced**: branch protection on `main`
 went live 2026-07-06 — required CODEOWNERS review, required status checks, no force
 pushes, linear history (blocker `github-codeowners-branch-protection`, cleared) — so a
-`decisions.yaml` PR genuinely cannot merge without the Chairman's review. The deploy
+`decisions.yaml` PR genuinely cannot merge without the Chairman's review. Two later
+lessons temper the triumph: a *second* org stamped from this playbook skipped the
+protection step and ran for weeks with `main` wholly unprotected — nothing fails
+loudly when the step is skipped, so **verify it took** (RUNBOOK Step 3's API check);
+and required *status checks* couple this gate to the Actions meter — when the
+account's included minutes ran out (patterns.md Pattern 17), the required checks
+could never report and every PR froze behind the very admin override this section
+warns about. The deploy
 half shipped as a `production` environment first — and the ledgered Settings step turned
 out to be a no-op: required reviewers on a private Free-plan repo are accepted by the UI
 and silently unenforced (blocker `github-production-environment`, closed as

@@ -40,7 +40,7 @@ the whole org** — governance layer AND runtime. What's left for you is GitHub 
 
 | Component | What it is |
 |---|---|
-| GitHub itself | The org repo (push the stamped directory) + your product repo(s); Issues + one Project (its built-in `Status` single-select, provisioned by `scripts/github-pm-setup.sh`); Actions for CI and the deploy workflow — every prod-touching job triggered by **`workflow_dispatch` only** (the deploy gate); branch protection making CODEOWNERS review binding |
+| GitHub itself | The org repo (push the stamped directory) + your product repo(s); Issues + one Project (a `Stage` single-select, provisioned by `scripts/github-pm-setup.sh`); Actions **only for rare deliberate jobs** — every prod-touching job triggered by **`workflow_dispatch` only** (the deploy gate), nothing hosted triggering per issue-comment, the CI suite run at push time by a local `pre-push` hook (patterns.md Pattern 17; FIELD-NOTES §13); branch protection making CODEOWNERS review binding |
 | The product | Whatever the org runs. `scripts/templates/product-repo/` ships adaptable CI for it (code-review, demo-evidence, preview-deploy, the handoff validator, the metrics endpoint contract) |
 | Claude | The Claude Code SDK on your plan (`scripts/requirements.txt`); agents run headless through `agent-run.sh` |
 
@@ -154,6 +154,13 @@ to provision, for **both** your org repo and your product repo:
    pull request before merging" + "Require review from Code Owners". Without this,
    CODEOWNERS only *requests* your review — it doesn't *require* it, and a
    `decisions.yaml` PR could merge unreviewed.
+   **Then verify it took:** `gh api repos/<you>/<org-repo>/branches/main/protection` —
+   a 404 means the gate is convention-only, and nothing else will tell you (an org
+   stamped from this playbook ran for weeks unprotected because this step was skipped
+   and nothing noticed; private repos also need a paid plan for branch protection at
+   all). If you add required **status checks**, know the coupling: they run on metered
+   Actions, so quota exhaustion (patterns.md Pattern 17) freezes every merge behind a
+   check that can never report.
 4. **The deploy gate**, in your product repo — it's code, not Settings: every workflow
    that touches prod triggers on **`workflow_dispatch` only**. The common shape is one
    workflow with both triggers, where a push to `main` runs only the verify jobs:
@@ -236,7 +243,8 @@ Verify:
 - [ ] To decline: close the PR without merging. No reaction, no separate "no" — nothing
       happens
 - [ ] Confirm the PR is blocked from merging without your review (branch protection:
-      "Require review from Code Owners")
+      "Require review from Code Owners") — if it merges anyway, bootstrap step 3
+      didn't take; a 404 from the branch-protection API is the tell
 
 **Test 2 — Deploy gate (the dispatch-only trigger)**
 

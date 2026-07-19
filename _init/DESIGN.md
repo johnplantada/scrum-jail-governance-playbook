@@ -85,9 +85,11 @@ wakes) before going live.
 
 Cross-role handoffs carry a fenced yaml payload in the relevant issue/PR comment — typed,
 not prose-by-convention. Required keys per type live in `scripts/handoff_check.py`
-(documented in `agents/_policy.md` §handoffs; keep the two in sync — CI tests it). The
-handoff-validator workflow fails a malformed payload and replies with the missing keys;
-both ship in the stamped runtime.
+(documented in `agents/_policy.md` §handoffs; keep the two in sync — CI tests it). `handoff_check.py`
+fails a malformed payload and names the missing keys; it ships in the stamped runtime
+and runs on operator-local compute (the runner's wake path or the pre-push CI suite) —
+never as a per-comment hosted workflow, which bills at agent frequency (patterns.md
+Pattern 17).
 
 ## 5 · Counter-ratchet
 
