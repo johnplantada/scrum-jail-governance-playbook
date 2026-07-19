@@ -1,6 +1,6 @@
 ---
 name: blocker-triage
-description: Record a human-only blocker once in blockers.yaml and end the cycle silently. Use when work is blocked on something only the Chairman can do — cloud credentials, money, registering an account, a real URL or mailing address, or a 🚀/💰/🏛️/💎 authorization.
+description: Record a human-only blocker once in blockers.yaml and end the cycle silently. Use when work is blocked on something only the Chairman can do — cloud credentials, money, registering an account, a real URL or mailing address, or a deploy/fund/charter/promote authorization.
 ---
 
 # Blocker triage — record it once, then go quiet
@@ -13,8 +13,8 @@ Chairman's queue (DESIGN.md invariant 2) — never a status post. Follow these s
 It qualifies only if the unblock requires one of:
 - **external-input** — a credential, account registration, product/storefront URL, mailing
   address, or any real-world artifact an agent cannot create;
-- **governance** — a Chairman authorization: a decisions.yaml merge (💰 fund ·
-  🏛️ charter · 💎 promote · ⚰️ sunset) or the 🚀 prod-deploy dispatch (the
+- **governance** — a Chairman authorization: a decisions.yaml merge (fund ·
+  charter · promote · sunset) or the prod-deploy dispatch (the
   Chairman's manual workflow_dispatch).
 
 A peer/tech dependency (waiting on IT's estimate, a failing test) is NOT a ledger entry —
@@ -69,5 +69,5 @@ the new inbound that wakes you.
   you are now in a **deploy-hold**: follow the deploy-hold rules in `agents/_policy.md`
   (minimum motion, no speculative inventory, no ceremony).
 - If the queue you just joined is over `global.unlock_wip_limit` (org-chart.yaml — the
-  injected queue opens with a ⚠ warning when it is), the whole org is in queue-overflow:
+  injected queue opens with a WIP-limit warning when it is), the whole org is in queue-overflow:
   do not start further work that terminates in yet another human-only unlock.

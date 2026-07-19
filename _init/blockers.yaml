@@ -14,8 +14,8 @@
 #   - `scripts/blockers.py open` prints the open queue in EV order.
 #
 # kind:  external-input = a credential/URL/address/account only the human can supply
-#        governance     = a Chairman authorization — a decisions.yaml merge (💰 fund ·
-#                         🏛️ charter · 💎 promote · ⚰️ sunset) or a 🚀 prod-deploy dispatch
+#        governance     = a Chairman authorization — a decisions.yaml merge (fund ·
+#                         charter · promote · sunset) or a prod-deploy dispatch
 #                         (the Chairman's manual workflow_dispatch)
 # needs: chairman (always, for now)
 # state: open | cleared

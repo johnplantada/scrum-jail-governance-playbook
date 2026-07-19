@@ -5,7 +5,7 @@ WORKER_SPECS policy in worker_policy.py — the same data agent_cycle.py turns i
 
 The load-bearing invariant: NO worker may carry shell or implicit-everything authority. A worker's
 only channel back to the parent is its returned text; if one had Bash it could git-push, post to
-the bus, run offload.sh, spend (💰), or deploy (🚀) at depth — exactly what must never delegate.
+the bus, run offload.sh, spend, or deploy at depth — exactly what must never delegate.
 These checks fail CI if a future edit hands a worker Bash or drops its tool allowlist."""
 import sys
 

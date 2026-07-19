@@ -53,7 +53,7 @@ config owns.)*
 4. **Ceremony is output-gated.** Process never runs ahead of delivery: while
    `scripts/last-ship.sh` reports `shipped=no`, reviews close with one line, PI Planning is
    suppressed, and no new feature work opens over a deploy-blocked critical path.
-5. **The 🛑 kill switch stops every loop.** A `.halt` file in the repo root halts the runner
+5. **The kill switch stops every loop.** A `.halt` file in the repo root halts the runner
    and every agent cycle; only a human removes it.
 
 ## 2 · The work system

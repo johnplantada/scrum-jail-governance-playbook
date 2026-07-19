@@ -103,13 +103,13 @@ stack, replaced by the CI check.) Three rules keep it honest:
 - **Ship it dormant.** The gate is dormant until the review check is installed on the product
   repo — no check, no citation required — then binding. Until then, don't pretend to have it.
 
-This is the "author ≠ reviewer" separation the emoji gate already applies to spend and deploy,
-extended to code correctness — a CI check on the PR, not a department and not a parser.
+This is the "author ≠ reviewer" separation the authorization gate already applies to spend and
+deploy, extended to code correctness — a CI check on the PR, not a department and not a parser.
 
 ## The `[DEMO]` gate — the one gate worth adding
 
 A `[DEMO]` is a worked demonstration that a change meets agreed **acceptance criteria**. Make it
-the prerequisite for a deploy request: no product-surface PR reaches a 🚀 without a
+the prerequisite for a deploy request: no product-surface PR reaches a deploy dispatch without a
 demand-side-**accepted** `[DEMO]` (which cites its passing `[CODEREVIEW]`), and the approval
 relay cites the accepted demo's id. Two rules keep it honest:
 
@@ -174,13 +174,14 @@ Inspect & Adapt (score the increment, commit one process change).
 |---|---|
 | `last-ship.sh` output predicate | a separate `#demos` channel (reuse the board) |
 | `pi-tick` counter + `pi_planning_eligible` flag | a custom `[DEMO]` parser (it's just a tag) |
-| The `[DEMO]`-before-🚀 rule in the constitution + mandates | per-task Definitions-of-Done |
+| The `[DEMO]`-before-deploy rule in the constitution + mandates | per-task Definitions-of-Done |
 | ACs only for product-surface work | a sprint tool / burndown charts |
 | Output-gating on every ceremony | ceremony that runs on a clock |
 
 ## Adopt it deliberately
 
-The process layer is a constitution change — gate its adoption behind an operator 🏛️, and ship
+The process layer is a constitution change — gate its adoption behind an operator charter
+approval, and ship
 the capabilities (the counter, the demo column) **dormant**. The gate becomes binding the moment
 your first deploy goes green and the output predicate flips to `yes`. Until then, the most honest
 thing your org can do is stay quiet and point at the one blocker in [blocker-ledger.md](blocker-ledger.md).

@@ -62,5 +62,5 @@ jobs:
           URL: https://your-site-host.example/previews/pr-${{ github.event.number }}/
         run: |
           gh pr comment "${{ github.event.number }}" --repo "${{ github.repository }}" \
-            --body "🔍 Preview for this PR: $URL (head ${{ github.event.pull_request.head.sha }}) — cite this URL in the [DEMO]; Business verifies the acceptance criteria against it directly." \
+            --body "Preview for this PR: $URL (head ${{ github.event.pull_request.head.sha }}) — cite this URL in the [DEMO]; Business verifies the acceptance criteria against it directly." \
             --edit-last --create-if-none

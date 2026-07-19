@@ -5,8 +5,8 @@ specs here (scripts/test_agent_workers.py) without needing the SDK installed.
 
 Each worker is tool-scoped and tier-pinned for two reasons:
   • Governance — NO worker gets Bash, so none can git-push, post to the bus, run offload.sh,
-    spend (💰), or deploy (🚀) at depth. A worker's only channel back is its returned text; the
-    parent cycle holds all authority and synthesizes/commits the output. 💰/🚀 never delegate.
+    spend, or deploy at depth. A worker's only channel back is its returned text; the
+    parent cycle holds all authority and synthesizes/commits the output. Spend/deploy never delegate.
   • Cost — research/draft workers run on Haiku (cheap parallel decomposition, now visible per-model
     in the spend ledger); the code-authoring implementer runs on Sonnet but still has no shell, so
     the parent runs build/tests and does the commit/PR/merge.

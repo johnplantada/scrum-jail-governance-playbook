@@ -5,7 +5,7 @@ org-chart.yaml `global.model_ids` is the single source of truth; the FALLBACK ma
 only covers a chart that predates the key. Anything already shaped like a full model id
 passes through unchanged, so a caller can pin an exact id in an emergency without
 touching the chart. Tiers stay the org's vocabulary everywhere else (ledger, banners,
-brownouts, 💎) — resolution happens only at the CLI/SDK invocation boundary.
+brownouts, PROMOTE) — resolution happens only at the CLI/SDK invocation boundary.
 
 Usage: model_id.py <tier-or-id>    → prints the model id
 """

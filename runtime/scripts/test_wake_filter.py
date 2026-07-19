@@ -9,7 +9,7 @@ from wake_filter import (banner_dept, batch_verdict, cooldown_active, deadman_du
                          deploy_hold, event_verdict, last_cycle_ts, noop_streak)
 
 
-def comment(title="**🛠️ IT —** pushed the fix", issue_state="open", **kw):
+def comment(title="**IT —** pushed the fix", issue_state="open", **kw):
     base = {"id": "c1", "kind": "comment", "repo": "org", "at": "2026-07-11T10:00:00Z",
             "title": title, "url": "u", "labels": ["dept:business"],
             "issue_state": issue_state}
@@ -70,7 +70,7 @@ class TestVerdicts(unittest.TestCase):
         self.assertEqual(event_verdict(run_ev, cooldown=True, hold=True)[0], "fire")
         # No bump_dept = the bump could be a human's (edit, label, close) — a bannered
         # TITLE is not attribution; unattributed issue events pierce every rule.
-        ev = issue(title="**🛠️ IT —** whatever")
+        ev = issue(title="**IT —** whatever")
         self.assertEqual(event_verdict(ev, cooldown=True, hold=True), ("fire", "issue"))
 
     def test_human_comments_pierce_everything(self):
@@ -107,8 +107,8 @@ class TestVerdicts(unittest.TestCase):
         self.assertEqual(batch_verdict([], cooldown=False)[0], "defer")
 
     def test_banner_parsing(self):
-        self.assertEqual(banner_dept("**🛠️ IT —** pushed"), "it")
-        self.assertEqual(banner_dept("**📈 Business —** thoughts?"), "business")
+        self.assertEqual(banner_dept("**IT —** pushed"), "it")
+        self.assertEqual(banner_dept("**Business —** thoughts?"), "business")
         self.assertIsNone(banner_dept("no banner"))
 
     def test_marker_led_comment_uses_runner_stamped_banner(self):

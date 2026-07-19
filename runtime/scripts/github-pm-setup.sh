@@ -103,7 +103,7 @@ if [ "$pn" != "<new>" ]; then
                --jq '[.fields[] | select(.name == "Status") | .options[].name] | join(",")' 2>/dev/null || true)"
   missing="$(IFS=,; for o in $status_options; do case ",$have_opts," in *",$o,"*) ;; *) printf '%s,' "$o" ;; esac; done)"
   if [ -z "$fid" ]; then
-    echo "  ⚠ no built-in Status field found (unexpected on a ProjectV2) — skipping option reconcile" >&2
+    echo "  WARNING: no built-in Status field found (unexpected on a ProjectV2) — skipping option reconcile" >&2
   elif [ -z "$missing" ]; then
     echo "  Status options already cover the canon ($status_options)"
   else

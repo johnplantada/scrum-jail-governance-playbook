@@ -19,10 +19,10 @@ logs: ## Follow every org log in one colored feed (runner · agents · offload �
 	@./scripts/watch.sh
 
 ## ── Kill switch ──────────────────────────────────────────────────────────
-halt: ## 🛑 Engage the kill switch (pause the runner and all agents)
+halt: ## Engage the kill switch (pause the runner and all agents)
 	@./scripts/halt.sh
 
-resume: ## ▶️  Clear the kill switch
+resume: ## Clear the kill switch
 	@./scripts/resume.sh
 
 ## ── Org status ───────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ test: ## Python unit tests + constitution lint + blocker-runbook lint + decision
 # keep it honest: sync pulls the golden's root docs in + pins the source commit; check fails on
 # drift. Business-specific files (DEPLOY-RUNBOOK.md, templates/) are NOT synced.
 GOLDEN_REPO ?= $(HOME)/codebase/scrum-jail-governance-playbook
-PLAYBOOK_VENDORED := patterns.md safe.md blocker-ledger.md emoji-gate.md envelopes.yaml README.md RUNBOOK.md org-chart.yaml FIELD-NOTES.md
+PLAYBOOK_VENDORED := patterns.md safe.md blocker-ledger.md authorization-gate.md envelopes.yaml README.md RUNBOOK.md org-chart.yaml FIELD-NOTES.md
 
 sync-playbook: ## Pull the golden's governance docs into playbook/ + pin the source (GOLDEN_REPO=...)
 	@test -d "$(GOLDEN_REPO)" || { echo "GOLDEN_REPO not found: $(GOLDEN_REPO)"; exit 1; }

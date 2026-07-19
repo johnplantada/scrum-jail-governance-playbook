@@ -7,7 +7,7 @@
 # effect until it is on main.
 #
 # This is the ONLY authorization path for money and org-shape changes in this org —
-# there is no emoji fallback. CI validates this file with `scripts/decisions.py check`
+# there is no fallback path. CI validates this file with `scripts/decisions.py check`
 # (unique ids, required fields).
 #
 # Entry schema (all fields required unless noted):

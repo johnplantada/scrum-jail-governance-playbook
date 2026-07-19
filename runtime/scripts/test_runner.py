@@ -58,15 +58,15 @@ class TestNormalize(unittest.TestCase):
         self.assertIsNone(ev["banner"])
         ev = normalize_comment({"id": 4, "created_at": "t", "html_url": "u",
                                 "issue_url": "iu",
-                                "body": "<!-- warden-report -->\n**🔒 Warden —** report"},
+                                "body": "<!-- warden-report -->\n**Warden —** report"},
                                "org")
         self.assertEqual(ev["banner"], "warden")
 
     def test_body_banner_skips_markers_and_blank_lines_only(self):
-        self.assertEqual(body_banner("**🛠️ IT —** pushed"), "it")
-        self.assertEqual(body_banner("<!-- warden-report -->\n\n**🔒 Warden —** report"),
+        self.assertEqual(body_banner("**IT —** pushed"), "it")
+        self.assertEqual(body_banner("<!-- warden-report -->\n\n**Warden —** report"),
                          "warden")
-        self.assertIsNone(body_banner("plain human text\n**🛠️ IT —** quoted below"))
+        self.assertIsNone(body_banner("plain human text\n**IT —** quoted below"))
         self.assertIsNone(body_banner(""))
         self.assertIsNone(body_banner(None))
 
@@ -151,12 +151,12 @@ class TestRouting(unittest.TestCase):
 
     def test_banner_suppresses_self_echo(self):
         ev = issue_ev(kind="comment", labels=["dept:business", "dept:it"],
-                      title="**🛠️ IT —** pushed the fix")
+                      title="**IT —** pushed the fix")
         wakes, _ = route([ev], RULES)
         self.assertEqual([w[0] for w in wakes], ["business"])
 
     def test_self_comment_on_own_ticket_is_handled_not_unrouted(self):
-        ev = issue_ev(kind="comment", labels=["dept:it"], title="**🛠️ IT —** noting progress")
+        ev = issue_ev(kind="comment", labels=["dept:it"], title="**IT —** noting progress")
         wakes, unrouted = route([ev], RULES)
         self.assertEqual(wakes, [])
         self.assertEqual(unrouted, [])
@@ -178,7 +178,7 @@ class TestRouting(unittest.TestCase):
 
     def test_unsigned_comment_fails_safe_and_wakes_all(self):
         self.assertIsNone(banner_dept("no banner here"))
-        self.assertEqual(banner_dept("**📈 Business —** thoughts?"), "business")
+        self.assertEqual(banner_dept("**Business —** thoughts?"), "business")
         ev = issue_ev(kind="comment", labels=["dept:it"], title="human chairman comment")
         wakes, _ = route([ev], RULES)
         self.assertEqual([w[0] for w in wakes], ["it"])

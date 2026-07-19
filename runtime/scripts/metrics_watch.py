@@ -247,7 +247,7 @@ def cmd_announce(cfg):
     for key, old, new in changes:
         owner, kind = metric_policy(cfg, key)
         if owner and is_milestone(kind, old, new):
-            print(f"🎉 Demand milestone for {owner} — {fmt_change(key, old, new)}. "
+            print(f"Demand milestone for {owner} — {fmt_change(key, old, new)}. "
                   f"React to the market, not the process.")
     for key, _old, new in changes:
         cursor[key] = new

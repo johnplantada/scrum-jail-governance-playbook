@@ -10,8 +10,8 @@ name="${1:?usage: agent-run.sh <ceo|business|it|...>}"
 def="agents/${name}.md"
 [ -f "$def" ] || { echo "no agent definition: $def" >&2; exit 1; }
 
-# Respect the 🛑 kill switch.
-if [ -f .halt ]; then echo "🛑 halted — skipping $name wake"; exit 0; fi
+# Respect the kill switch.
+if [ -f .halt ]; then echo "halted — skipping $name wake"; exit 0; fi
 
 [ -f .env ] && { set -a; . ./.env; set +a; }
 
