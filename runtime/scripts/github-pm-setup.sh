@@ -123,5 +123,16 @@ print("mutation($f: ID!) { updateProjectV2Field(input: {fieldId: $f, singleSelec
   run gh project link "$pn" --owner "$OWNER" --repo "$PRODUCT_REPO"
 fi
 
+# pm-gh.sh caches the board coordinates (state/pm-board.tsv, FIELD-NOTES §14); this run
+# may have just changed them, so a provision always invalidates the cache.
+run rm -f state/pm-board.tsv
+
+# The board number is meant to be PINNED (org-chart global.pm_project_number — warden.py
+# refuses to run without it; un-pinned, pm-gh.sh pays a metered by-title lookup per call).
+pin="$(sed -n 's/^[[:space:]]*pm_project_number:[[:space:]]*\([0-9][0-9]*\).*/\1/p' org-chart.yaml | head -1)"
+if [ "$pn" != "<new>" ] && [ "${pin:-}" != "$pn" ]; then
+  echo "  WARNING: org-chart global.pm_project_number is ${pin:-unset} but the board is #$pn — pin it"
+fi
+
 echo "✓ Phase 2 PM scaffolding ready: labels + project (Status = org-chart pm_stages + pm_holding_stages + pm_terminal_stages)"
 echo "  Next: file the first [OBJECTIVE] issue — agents work the board via scripts/pm-gh.sh"

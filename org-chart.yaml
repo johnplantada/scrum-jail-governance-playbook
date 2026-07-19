@@ -78,7 +78,9 @@ global:
   # channel for "we are waiting on you." warden.py exits before doing any work without the
   # pin, and because nothing wakes a department that doesn't exist, the omission is silent.
   chairman_queue_issue: <N>   # the UNTYPED epic whose sub-issues = what only the human can do
-  pm_project_number: <N>      # the org Project's number (gh project <N>)
+  pm_project_number: <N>      # the org Project's number (gh project <N>) — pm-gh.sh reads it
+                              # too; un-pinned, every board call pays a by-title GraphQL lookup
+                              # (FIELD-NOTES §14)
 
   # Model tier → exact API model id. The ONE place tier→model resolution lives. Everything
   # else (spend ledger, wake banners, budget brownouts, PROMOTE) keeps speaking in
