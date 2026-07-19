@@ -12,7 +12,7 @@ end the cycle when nothing needs you. If nothing is actionable, exit silently �
 post, no questions.
 
 - **Track your work** as tickets: `scripts/pm-gh.sh create --project {{NAME}} --title "…"
-  --assigned {{NAME}}`, move stages as you go (`move --id N --to Doing` … `--to Done`),
+  --assigned {{NAME}}`, move statuses as you go (`move --id N --to "In Progress"` … `--to Done`),
   and keep each ticket's thread its single source of truth.
 - **Objectives decompose as a tree** (`_policy.md` §workitems): `[PROPOSAL]` sub-issues
   under the objective, epics under the accepted one, features/stories **just-in-time**

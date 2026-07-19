@@ -130,22 +130,31 @@ commits pushed) does not verify, and the run URL goes in the `[DEMO]` so the acc
 artifacts, not adjectives.
 
 **Let the tracker hold the queue.** Give the board a fixed, ordered set of columns so a
-change can't silently skip the gate. The live org runs **To-Do → Doing → Staged → Demo → Done**:
-`Staged` = PR open, awaiting merge; `Demo` = merged to main, awaiting the first prod deploy (or
-awaiting demand-side acceptance of the `[DEMO]`); `Done` = shipped (or, for non-product tasks,
-completed). Define the stage list in **one place** and have your docs and lint reference it —
-the column *is* the queue, so a merged-but-undeployed PR visibly waits in `Demo` instead of
-being quietly treated as shipped.
+change can't silently skip the gate — and name each column for **who it waits on**, so the
+human can read their own queue off the board. The live org runs
+**Todo → In Progress → Awaiting Merge → Demo → Awaiting Deploy → Done**:
+`Awaiting Merge` = PR open, in the Chairman's merge queue; `Demo` = merged to main, demo
+being produced or awaiting demand-side acceptance of the `[DEMO]`; `Awaiting Deploy` =
+demo accepted, waiting on the Chairman's manual `workflow_dispatch`; `Done` = shipped (or,
+for non-product tasks, completed). The two `Awaiting` columns plus `Blocked` ARE the
+Chairman's to-do list. Define the status list in **one place** and have your docs and lint
+reference it — the column *is* the queue, so accepted-but-undeployed work visibly waits in
+`Awaiting Deploy` instead of being quietly treated as shipped (while a deploy path stays
+dark, that column doubles as the visible deploy debt).
 
 **Parked states are not flow stages.** The live board also carries two **holding columns**
-— `Blocked` (waiting on a ledgered human-only blocker) and `On-Hold` (deliberately
+— `Blocked` (waiting on a ledgered human-only blocker) and `On Hold` (deliberately
 deprioritized) — kept in a *separate* `pm_holding_stages` list, not appended to the
-ordered flow. They're options of the same board Stage field and a valid move target, but
+ordered flow. They're options of the same board Status field and a valid move target, but
 three properties depend on keeping them out of the ordered list: the flow linter and any
-`.index()` math over the stage sequence stay honest; a stalled item shows as *parked*
-instead of feigning progress in `Doing`; and any forward auto-reconcile (a bot moving
-cards to match PR state) must **exempt** them — a parked item that happens to have a PR
-must not be yanked back into the flow while the thing that parked it still holds.
+`.index()` math over the status sequence stay honest; a stalled item shows as *parked*
+instead of feigning progress in `In Progress`; and any forward auto-reconcile (a bot
+moving cards to match PR state) must **exempt** them — a parked item that happens to have
+a PR must not be yanked back into the flow while the thing that parked it still holds.
+A third kind of non-stage, `Dropped` (`pm_terminal_stages`), records the won't-dos:
+closed as *not planned* with the reason on the record, so the board stops conflating
+"shipped" with "abandoned" — and dropping an epic or objective is the Chairman's
+deprioritization call alone.
 
 ## Program Increments — gate the planning, not just the cadence
 

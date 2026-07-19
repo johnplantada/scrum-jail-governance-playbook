@@ -372,7 +372,7 @@ def cmd_init(args):
     print("     b) org repo → Settings → Branches → protect main: require a PR + require")
     print("        Code Owner review (this makes the decisions.yaml merge gate binding).")
     print("  4. Run scripts/github-pm-setup.sh — dept:* labels (incl. dept:warden, org repo")
-    print("     only) + the org Project with the Stage field from org-chart.yaml pm_stages.")
+    print("     only) + the org Project's built-in Status options from org-chart.yaml pm_stages.")
     print("  5. COMMISSION THE CHAIRMAN QUEUE — org-chart.yaml ships two null pins and the")
     print("     org is not finished until both are set. Skipping this is the single most")
     print("     expensive omission in this playbook (patterns.md Pattern 14): warden.py exits")

@@ -195,10 +195,10 @@ reference_envelopes:
 #                     entry now, not an emoji) changes an AGENT's tier; editing this map
 #                     changes what a tier MEANS for the whole org. Pin ids so a
 #                     provider's silent default can't drift you onto a different model.
-# pm_stages         — the ordered kanban columns (To-Do, Doing, Staged, Demo, Done),
-#                     defined in ONE place. github-pm-setup.sh builds the Project's
-#                     Stage field from it; the Demo column is the [DEMO]-gate queue
-#                     (safe.md).
+# pm_stages         — the ordered kanban columns (Todo … Done; canon in org-chart.yaml),
+#                     defined in ONE place. github-pm-setup.sh provisions the Project's
+#                     built-in Status field from it; the Demo column is the [DEMO]-gate
+#                     queue (safe.md).
 # review_interval / — SAFe cadence (safe.md): an iteration = review_interval wakes;
 # pi_interval         a PI = pi_interval iterations.
 # unlock_wip_limit  — Chairman-queue discipline: past this many open human-only

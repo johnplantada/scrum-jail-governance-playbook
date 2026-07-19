@@ -19,9 +19,10 @@
 #                    dept:* wake label: agents share one identity and can't be assignees.)
 #   pm-gh.sh tree    --id N                      render the sub-issue tree under org#N
 #   pm-gh.sh tasks   --project IT [--all]
-#   pm-gh.sh move    --id N --to <Stage: org-chart pm_stages, or a pm_holding_stages
-#                    parking column — Blocked / On-Hold — for work stalled on a blocker
-#                    or deliberately deprioritized; move it back to its flow stage on resume>
+#   pm-gh.sh move    --id N --to <Status: org-chart pm_stages, or a pm_holding_stages
+#                    parking column — Blocked / "On Hold" — for work stalled on a blocker
+#                    or deliberately deprioritized; move it back to its flow status on
+#                    resume. Multi-word names need quotes: --to "In Progress">
 #   pm-gh.sh comment --id N --body "…"
 #   pm-gh.sh comments --id N
 #   pm-gh.sh done    --id N [--pr <owner/repo#N|url>] [--done-when "…"] [--demo <comment-url>]
@@ -29,6 +30,10 @@
 #                    no open children; story needs a merged PR or done-when; feature needs
 #                    its accepted [DEMO] or done-when — and the evidence is posted back as
 #                    a [CLOSE] comment before the issue closes)
+#   pm-gh.sh drop    --id N --reason "…"   won't-do: posts a [DROP] record, sets the board
+#                    to Dropped (org-chart pm_terminal_stages), closes as "not planned".
+#                    Refused with open children. Dropping an epic or objective is the
+#                    Chairman's call alone — during an agent wake, file a [PROPOSAL] instead.
 #
 # Needs: gh auth (with project scope for move/create), the Project + labels from
 # scripts/github-pm-setup.sh. Fails loud and early — a silent PM write that went
@@ -45,13 +50,13 @@ PROJECT_TITLE="${PM_PROJECT_TITLE:-Org Project}"
 
 command -v gh >/dev/null || { echo "pm-gh: gh CLI required" >&2; exit 1; }
 
-usage() { sed -n '4,24p' "$0" >&2; exit 2; }
+usage() { sed -n '4,36p' "$0" >&2; exit 2; }
 [ $# -ge 1 ] || usage
 cmd="$1"; shift
 
 # --- flag parsing (same names as bin/pm) --------------------------------------------------
 project="" title="" assigned="" desc="" priority="" due="" id="" to="" body="" all=0
-type="" parent="" pr="" done_when="" demo="" assignee=""
+type="" parent="" pr="" done_when="" demo="" assignee="" reason=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --project)   project="$2"; shift 2 ;;
@@ -69,6 +74,7 @@ while [ $# -gt 0 ]; do
     --pr)        pr="$2"; shift 2 ;;
     --done-when) done_when="$2"; shift 2 ;;
     --demo)      demo="$2"; shift 2 ;;
+    --reason)    reason="$2"; shift 2 ;;
     --all)       all=1; shift ;;
     *) echo "pm-gh: unknown flag $1" >&2; usage ;;
   esac
@@ -86,7 +92,7 @@ project_number() {
     --jq ".projects[] | select(.title == \"$PROJECT_TITLE\") | .number" | head -1
 }
 
-set_stage() {  # $1 = issue number, $2 = stage name — Stage single-select on the Project
+set_status() {  # $1 = issue number, $2 = status name — the board's built-in Status single-select
   local pn pid item fid oid
   pn="$(project_number)"
   [ -n "$pn" ] || { echo "pm-gh: project '$PROJECT_TITLE' not found (run github-pm-setup.sh)" >&2; return 1; }
@@ -95,17 +101,17 @@ set_stage() {  # $1 = issue number, $2 = stage name — Stage single-select on t
           --jq ".items[] | select(.content.number == $1 and .content.repository == \"$REPO\") | .id" | head -1)"
   if [ -z "$item" ]; then
     # Chairman-filed issues (objective.yml et al.) never go through `create`, so they
-    # never land on the board — that silently defeated "move this to Doing" for exactly
-    # the items org#134 asked us to track. Add on first move instead of failing hard.
+    # never land on the board — that silently defeated "move this to In Progress" for
+    # exactly the items org#134 asked us to track. Add on first move instead of failing hard.
     item="$(gh project item-add "$pn" --owner "$OWNER" \
             --url "https://github.com/$REPO/issues/$1" --format json --jq .id)"
     [ -n "$item" ] || { echo "pm-gh: could not add issue #$1 to the project board" >&2; return 1; }
   fi
   fid="$(gh project field-list "$pn" --owner "$OWNER" --format json \
-         --jq '.fields[] | select(.name == "Stage") | .id')"
+         --jq '.fields[] | select(.name == "Status") | .id')"
   oid="$(gh project field-list "$pn" --owner "$OWNER" --format json \
-         --jq ".fields[] | select(.name == \"Stage\") | .options[] | select(.name == \"$2\") | .id")"
-  [ -n "$fid" ] && [ -n "$oid" ] || { echo "pm-gh: Stage option '$2' not found (canon: org-chart pm_stages)" >&2; return 1; }
+         --jq ".fields[] | select(.name == \"Status\") | .options[] | select(.name == \"$2\") | .id")"
+  [ -n "$fid" ] && [ -n "$oid" ] || { echo "pm-gh: Status option '$2' not found (canon: org-chart pm_stages + pm_holding_stages + pm_terminal_stages; run github-pm-setup.sh)" >&2; return 1; }
   gh project item-edit --id "$item" --project-id "$pid" --field-id "$fid" --single-select-option-id "$oid" >/dev/null
   echo "org#$1 → $2"
 }
@@ -150,7 +156,7 @@ case "$cmd" in
     url="$(gh issue create --repo "$REPO" --title "$title" --body "${full_body:-—}" "${labels[@]}")"
     n="${url##*/}"
     pn="$(project_number)"
-    [ -n "$pn" ] && gh project item-add "$pn" --owner "$OWNER" --url "$url" >/dev/null && set_stage "$n" "To-Do" >/dev/null
+    [ -n "$pn" ] && gh project item-add "$pn" --owner "$OWNER" --url "$url" >/dev/null && set_status "$n" "Todo" >/dev/null
     [ -n "$parent" ] && workitems link "$parent" "$n"
     echo "created org#$n  $url"
     ;;
@@ -167,7 +173,7 @@ case "$cmd" in
     ;;
   move)
     [ -n "$id" ] && [ -n "$to" ] || { echo "pm-gh: move needs --id and --to" >&2; exit 2; }
-    set_stage "$id" "$to"
+    set_status "$id" "$to"
     ;;
   comment)
     [ -n "$id" ] && [ -n "$body" ] || { echo "pm-gh: comment needs --id and --body" >&2; exit 2; }
@@ -200,8 +206,32 @@ case "$cmd" in
       gh issue comment "$id" --repo "$REPO" \
         --body "$(printf '[CLOSE] org#%s\n```yaml\n%s\n```\n' "$id" "$payload")" >/dev/null
     fi
-    set_stage "$id" "Done" || true   # board first; closing is the record either way
+    set_status "$id" "Done" || true   # board first; closing is the record either way
     gh issue close "$id" --repo "$REPO" && echo "closed org#$id"
+    ;;
+  drop)
+    [ -n "$id" ] || { echo "pm-gh: drop needs --id" >&2; exit 2; }
+    [ -n "$reason" ] || { echo "pm-gh: drop needs --reason — a won't-do without a recorded why is just a disappearance" >&2; exit 2; }
+    # Dropping is deprioritization authority, scaled like the tree itself: a dept may bury
+    # its own stories/features (with the reason on the record), but an epic or objective is
+    # the Chairman's scope — an agent wake (AGENT_NAME set; the Chairman's own sessions
+    # never are, same mechanism as objective_gate.py) gets refused toward a [PROPOSAL].
+    kind=""
+    for k in objective epic feature story; do
+      gh issue view "$id" --repo "$REPO" --json labels --jq '.labels[].name' | grep -qx "$k" && { kind="$k"; break; }
+    done
+    if [ -n "${AGENT_NAME:-}" ] && { [ "$kind" = "objective" ] || [ "$kind" = "epic" ]; }; then
+      echo "pm-gh: dropping an $kind is the Chairman's call alone — file a [PROPOSAL] naming org#$id and why" >&2; exit 1
+    fi
+    open_kids="$(gh api "repos/$REPO/issues/$id/sub_issues?per_page=100" \
+                 --jq '[.[] | select(.state == "open")] | length' 2>/dev/null || echo 0)"
+    if [ "${open_kids:-0}" != "0" ]; then
+      echo "pm-gh: org#$id still has $open_kids open child(ren) — drop or close them first (a dropped parent must not orphan live work)" >&2; exit 1
+    fi
+    gh issue comment "$id" --repo "$REPO" \
+      --body "$(printf '[DROP] org#%s\n```yaml\nitem: org#%s\nkind: %s\nreason: %s\n```\n' "$id" "$id" "${kind:-untyped}" "$reason")" >/dev/null
+    set_status "$id" "Dropped" || true   # board first; closing is the record either way
+    gh issue close "$id" --repo "$REPO" --reason "not planned" && echo "dropped org#$id (closed as not planned)"
     ;;
   *) usage ;;
 esac

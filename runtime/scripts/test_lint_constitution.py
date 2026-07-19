@@ -16,10 +16,17 @@ from lint_constitution import (
     check_skills,
     check_stages,
     holding_stages,
+    terminal_stages,
 )
 
+# Historical single-word canon — kept as fixtures so each drift class that actually
+# happened stays pinned as detectable, independent of what the live canon is today.
 STAGES = ["To-Do", "Doing", "Staged", "Demo", "Done"]
 HOLDING = ["Blocked", "On-Hold"]
+# The live canon shape: multi-word names, plus a terminal-alternate list.
+NEW_STAGES = ["Todo", "In Progress", "Awaiting Merge", "Demo", "Awaiting Deploy", "Done"]
+NEW_HOLDING = ["Blocked", "On Hold"]
+TERMINAL = ["Dropped"]
 
 
 class TestCadence(unittest.TestCase):
@@ -95,6 +102,41 @@ class TestStages(unittest.TestCase):
         line = "`To-Do → Doing → Frozen`"
         hits = check_stages("d.md", line, STAGES, HOLDING)
         self.assertTrue(any("non-canonical" in h for h in hits))
+
+
+class TestMultiWordStages(unittest.TestCase):
+    """The live canon has two-word names (In Progress, Awaiting Merge, On Hold) — the
+    chain parser must read them as ONE element, and must not let its two-word reach
+    swallow the prose around a chain."""
+
+    def test_full_chain_in_order_clean(self):
+        line = ("runs `Todo → In Progress → Awaiting Merge → Demo → "
+                "Awaiting Deploy → Done` on the board")
+        self.assertEqual(
+            check_stages("d.md", line, NEW_STAGES, NEW_HOLDING, TERMINAL), [])
+
+    def test_leading_prose_word_not_swallowed(self):
+        # the element regex may absorb one word of prose ("moves Todo"); the suffix
+        # rule hands it back to the sentence instead of flagging a phantom stage
+        line = "the agent moves Todo → In Progress as it picks the work up"
+        self.assertEqual(
+            check_stages("d.md", line, NEW_STAGES, NEW_HOLDING, TERMINAL), [])
+
+    def test_multiword_out_of_order_flagged(self):
+        line = "`In Progress → Todo` regressions are findings, not auto-moves"
+        hits = check_stages("d.md", line, NEW_STAGES, NEW_HOLDING, TERMINAL)
+        self.assertTrue(any("out of canonical order" in h for h in hits))
+
+    def test_terminal_stage_in_chain_recognized_not_flagged(self):
+        line = "buried: `In Progress → Dropped` (Chairman's call for epics/objectives)"
+        self.assertEqual(
+            check_stages("d.md", line, NEW_STAGES, NEW_HOLDING, TERMINAL), [])
+
+    def test_terminal_parse(self):
+        chart = ("global:\n  pm_stages: [Todo, In Progress, Done]\n"
+                 "  pm_terminal_stages: [Dropped]\n")
+        self.assertEqual(terminal_stages(chart), ["Dropped"])
+        self.assertEqual(canonical_stages(chart), ["Todo", "In Progress", "Done"])
 
 
 class TestSkillRefs(unittest.TestCase):

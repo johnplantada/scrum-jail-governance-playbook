@@ -5,7 +5,9 @@ Run: PYTHONPATH=scripts python3 scripts/test_warden.py  (CI does this)
 """
 import unittest
 
-from warden import (desired_queue, desired_sync_threads, detect_conflicts,
+from warden import (HOLDING_STAGES, STAGES, TERMINAL_STAGES, _chart_list,
+                    desired_queue, desired_sync_threads, detect_conflicts,
+                    plan_closed_reconcile, plan_epic_rollup,
                     expected_stage, kind_mismatch, linked_refs, parse_chart_pin,
                     parse_source, plan_moves, plan_sync, pr_ready, render_report)
 
@@ -151,38 +153,41 @@ class TestBoardReconcile(unittest.TestCase):
         self.assertEqual(linked_refs(None), set())
 
     def test_expected_stage_is_forward_only(self):
-        self.assertEqual(expected_stage("To-Do", False, True), "Doing")
-        self.assertEqual(expected_stage("To-Do", True, False), "Staged")
-        self.assertEqual(expected_stage("Doing", True, True), "Staged")
-        self.assertIsNone(expected_stage("Staged", True, False))    # never re-move
-        self.assertIsNone(expected_stage("Demo", True, True))       # never backward
+        self.assertEqual(expected_stage("Todo", False, True), "Awaiting Merge")
+        self.assertEqual(expected_stage("Todo", True, False), "Demo")
+        self.assertEqual(expected_stage("In Progress", True, True), "Demo")
+        self.assertEqual(expected_stage("Awaiting Merge", True, False), "Demo")
+        self.assertIsNone(expected_stage("Demo", True, True))       # never re-move
+        self.assertIsNone(expected_stage("Awaiting Deploy", True, True))  # gate outcome
         self.assertIsNone(expected_stage("Done", True, True))
-        self.assertIsNone(expected_stage("Doing", False, True))     # already there
-        self.assertEqual(expected_stage(None, False, True), "Doing")  # off-board
+        self.assertIsNone(expected_stage("Awaiting Merge", False, True))  # already there
+        self.assertEqual(expected_stage(None, False, True), "Awaiting Merge")  # off-board
 
     def test_holding_stages_are_never_auto_advanced(self):
         # A parked item (pm_holding_stages) stays put even with a PR — someone put it
-        # there on purpose; forward reconcile must not yank it back into the flow.
+        # there on purpose; forward reconcile must not yank it back into the flow. A
+        # Dropped item is dead, not behind.
         self.assertIsNone(expected_stage("Blocked", True, True))
         self.assertIsNone(expected_stage("Blocked", False, True))
-        self.assertIsNone(expected_stage("On-Hold", True, False))
-        self.assertIsNone(expected_stage("On-Hold", False, True))
+        self.assertIsNone(expected_stage("On Hold", True, False))
+        self.assertIsNone(expected_stage("On Hold", False, True))
+        self.assertIsNone(expected_stage("Dropped", True, True))
 
     def test_plan_moves_and_anomalies(self):
         issues = [{"number": 1, "title": "story a"}, {"number": 2, "title": "ghost"},
                   {"number": 3, "title": "fine"}]
-        stages = {1: "To-Do", 2: "Staged", 3: "Doing"}
+        stages = {1: "Todo", 2: "Awaiting Merge", 3: "Awaiting Merge"}
         links = {1: {"open": ["product#9"], "merged": []},
                  3: {"open": ["product#7"], "merged": []}}
         moves, anomalies = plan_moves(issues, stages, links)
-        self.assertEqual(moves, [(1, "To-Do", "Doing", "open PR product#9")])
+        self.assertEqual(moves, [(1, "Todo", "Awaiting Merge", "open PR product#9")])
         self.assertEqual(len(anomalies), 1)
         self.assertIn("org#2", anomalies[0])
 
     def test_weak_links_suppress_anomalies_but_never_move(self):
         issues = [{"number": 4, "title": "mentioned only"},
-                  {"number": 5, "title": "staged, weakly linked"}]
-        stages = {4: "To-Do", 5: "Staged"}
+                  {"number": 5, "title": "awaiting merge, weakly linked"}]
+        stages = {4: "Todo", 5: "Awaiting Merge"}
         links = {4: {"open": [], "merged": [], "open_weak": ["org#99"]},
                  5: {"open": [], "merged": [], "merged_weak": ["product#88"]}}
         moves, anomalies = plan_moves(issues, stages, links)
@@ -202,10 +207,52 @@ class TestBoardReconcile(unittest.TestCase):
         issues = [{"number": 6, "title": "[EPIC] big", "labels": [{"name": "epic"}]},
                   {"number": 7, "title": "[OBJECTIVE] bigger",
                    "labels": [{"name": "objective"}, {"name": "dept:ceo"}]}]
-        stages = {6: "Doing", 7: "Staged"}
+        stages = {6: "In Progress", 7: "Awaiting Merge"}
         links = {6: {"open": [], "merged": ["product#1"]}}
         moves, anomalies = plan_moves(issues, stages, links)
         self.assertEqual((moves, anomalies), ([], []))
+
+    def test_epic_rollup_lifts_started_epics_off_todo(self):
+        epics = [{"number": 6, "title": "[EPIC] moving"},
+                 {"number": 7, "title": "[EPIC] untouched"},
+                 {"number": 9, "title": "[EPIC] parked"}]
+        stages = {6: "Todo", 7: "Todo", 9: "On Hold", 61: "In Progress", 71: "Todo"}
+        children = {6: [{"number": 61, "state": "open"}],
+                    7: [{"number": 71, "state": "open"}],
+                    9: [{"number": 91, "state": "closed"}]}
+        moves = plan_epic_rollup(epics, stages, children)
+        # 6 has a child past Todo → lifted; 7's child hasn't started; 9 is parked.
+        self.assertEqual(moves, [(6, "Todo", "In Progress", "child work has started")])
+        # A closed child also counts as started, and an off-board epic gets a card.
+        moves = plan_epic_rollup([{"number": 10, "title": "[EPIC] off-board"}],
+                                 {101: "Todo"}, {10: [{"number": 101, "state": "closed"}]})
+        self.assertEqual(moves, [(10, "(off board)", "In Progress",
+                                  "child work has started")])
+
+    def test_closed_reconcile_settles_terminal_truth(self):
+        closed = [{"number": 2, "stateReason": "COMPLETED"},
+                  {"number": 3, "stateReason": "NOT_PLANNED"},
+                  {"number": 4, "stateReason": "COMPLETED"},   # already Done
+                  {"number": 5, "stateReason": "COMPLETED"}]   # never on the board
+        stages = {2: "Todo", 3: "In Progress", 4: "Done"}
+        moves = plan_closed_reconcile(closed, stages)
+        self.assertEqual(moves, [(2, "Todo", "Done", "issue is closed"),
+                                 (3, "In Progress", "Dropped", "issue is closed")])
+
+    def test_chart_list_reads_the_canon(self):
+        # The stage lists come from org-chart.yaml, not a hardcoded copy. In a stamped
+        # org the chart sits at REPO_DIR/org-chart.yaml and the constants must mirror
+        # it exactly; in the unstamped golden runtime there is no chart, so the
+        # defaults hold — same file, both homes (runtime/ is byte-synced).
+        chart = _chart_list("pm_stages", [])
+        if chart:
+            self.assertEqual(STAGES, chart)
+            self.assertEqual(list(HOLDING_STAGES), _chart_list("pm_holding_stages", []))
+            self.assertEqual(list(TERMINAL_STAGES), _chart_list("pm_terminal_stages", []))
+        else:
+            self.assertEqual(STAGES[0], "Todo")
+            self.assertIn("Awaiting Merge", STAGES)
+        self.assertEqual(_chart_list("no_such_key", ["fallback"]), ["fallback"])
 
 
 class TestConflicts(unittest.TestCase):
@@ -239,10 +286,10 @@ class TestConflicts(unittest.TestCase):
     def test_report_sections_for_moves_and_conflicts(self):
         base = dict(create=[], close=[], unmanaged=[], kept=[])
         r = render_report(base, [], "t", 138,
-                          moves=[(1, "To-Do", "Doing", "open PR product#9")],
+                          moves=[(1, "Todo", "Awaiting Merge", "open PR product#9")],
                           sync_plan=dict(create=[("k", {})], close=[(55, "k2")],
                                          unmanaged=[], kept=["k3"]))
-        self.assertIn("org#1: To-Do → Doing", r)
+        self.assertIn("org#1: Todo → Awaiting Merge", r)
         self.assertIn("2 active [SYNC] discussion(s)", r)
         self.assertIn("1 resolved", r)
 

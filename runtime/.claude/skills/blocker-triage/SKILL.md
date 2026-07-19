@@ -58,10 +58,10 @@ the new inbound that wakes you.
 ## 4. Park the ticket, then end the cycle silently
 
 - If a board ticket was in flight, **`scripts/pm-gh.sh move --id N --to Blocked`** so the
-  board shows it parked (not feigning progress in Doing). This is the ledger entry's board
-  reflection — the ledger stays the record; the column just makes the stall visible. Move it
-  back to its flow stage the cycle the Chairman clears the blocker. (No board ticket yet? Skip
-  this — the ledger alone is enough.)
+  board shows it parked (not feigning progress in In Progress). This is the ledger entry's
+  board reflection — the ledger stays the record; the column just makes the stall visible.
+  Move it back to its flow status the cycle the Chairman clears the blocker. (No board
+  ticket yet? Skip this — the ledger alone is enough.)
 - Do **not** post a `STATUS` about being blocked.
 - Do **not** re-list ledgered blockers in any future `STATUS` — at most a one-line
   `blocked: see ledger (N open)` pointer.

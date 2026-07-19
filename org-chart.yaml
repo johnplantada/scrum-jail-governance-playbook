@@ -52,17 +52,25 @@ global:
   # human-only unlock. Prompt-enforced. 0/absent disables the warning.
   unlock_wip_limit: 5
 
-  # Canonical pm/kanban workflow stages, in order — the ONLY place the list is defined.
-  # ENFORCED BY USE: github-pm-setup.sh builds the Project's Stage field from it, and
-  # pm-gh.sh moves cards against it. The Demo column is the [DEMO]-gate queue (safe.md).
-  pm_stages: [To-Do, Doing, Staged, Demo, Done]
+  # Canonical pm/kanban workflow statuses, in order — the ONLY place the list is defined.
+  # ENFORCED BY USE: github-pm-setup.sh provisions the board's built-in Status field from
+  # it, and pm-gh.sh moves cards against it. Each column answers "who is this waiting
+  # on" — Awaiting Merge and Awaiting Deploy are the Chairman's two queues (his whole
+  # to-do is Awaiting Merge + Awaiting Deploy + Blocked); the Demo column is the
+  # [DEMO]-gate queue (safe.md).
+  pm_stages: [Todo, In Progress, Awaiting Merge, Demo, Awaiting Deploy, Done]
 
   # Holding columns — orthogonal PARKED states, NOT points in the pm_stages flow
-  # (safe.md "Parked states are not flow stages"). Options of the SAME board Stage
+  # (safe.md "Parked states are not flow stages"). Options of the SAME board Status
   # field and a valid move target, but kept out of the ordered list so flow lint and
   # index math stay honest — and EXEMPT from any forward auto-reconcile (a parked item
   # with a PR must not be yanked back into the flow while the blocker holds).
-  pm_holding_stages: [Blocked, On-Hold]
+  pm_holding_stages: [Blocked, On Hold]
+
+  # Terminal-alternate — "won't do", closed as not-planned via pm-gh.sh drop (a [DROP]
+  # record with the reason, never a bare close). Not a flow position, not parked.
+  # Dropping an epic or objective is the Chairman's call alone.
+  pm_terminal_stages: [Dropped]
 
   # REQUIRED pins (FIELD-NOTES.md §11) — the ONE place scripts resolve these coordinates
   # from, so recreating the board or the queue epic is a one-line re-pin. These were once

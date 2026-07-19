@@ -49,7 +49,7 @@ the contract if you ever replace a piece with your own:
 
 | Component | Its contract (what the docs assume it does) |
 |---|---|
-| `pm-gh.sh` | The ticket CLI — `create`/`tasks`/`move`/`comment`/`comments`/`done`, plus the work-item tree verbs: `create --type epic\|feature\|story --parent N` (kind label + prefix, routing inherited, native sub-issue link) and `tree --id N` — mapped onto Issues + the Project's `Stage` field; ticket ids are `org#N` (the issue number) |
+| `pm-gh.sh` | The ticket CLI — `create`/`tasks`/`move`/`comment`/`comments`/`done`/`drop`, plus the work-item tree verbs: `create --type epic\|feature\|story --parent N` (kind label + prefix, routing inherited, native sub-issue link) and `tree --id N` — mapped onto Issues + the Project's built-in `Status` field; ticket ids are `org#N` (the issue number) |
 | `workitems.py` | The tree's closure gate (safe.md): `can-close` re-derives the facts live — no open children; story evidence = merged repo-qualified PR or done-when; feature evidence = accepted `[DEMO]` or done-when — and `pm-gh.sh done` refuses to close a work-item the gate rejects, posting the typed `[CLOSE]` payload when it passes |
 | `runner.py` + `wake-rules.yaml` | The poller: each tick, diffs GitHub (issues + PRs, comments on both repos, workflow runs on the product repo) against a saved cursor, normalizes to events, and routes each through the rules table to wake the owning department |
 | `agent-run.sh` | Runs one headless Claude cycle per wake — loads the department's mandate + `agents/_policy.md` + the open `blockers.yaml` queue, single-flight-locks so two wakes of the same agent never race, respects the `.halt` kill switch |
@@ -143,8 +143,11 @@ to provision, for **both** your org repo and your product repo:
 
 1. **Labels + the Project board.** `scripts/github-pm-setup.sh` does this idempotently —
    it creates the `dept:*` wake labels plus `objective`/`proposal`, and the one shared
-   Project with a `Stage` single-select whose options mirror `org-chart.yaml`'s
-   `pm_stages` (the only place that list is defined). Safe to re-run.
+   Project whose built-in `Status` single-select options mirror `org-chart.yaml`'s
+   `pm_stages` + `pm_holding_stages` + `pm_terminal_stages` (the only place that list is
+   defined). Safe to re-run. Two UI-only switches finish it (Project → ⋯ → Workflows):
+   keep "Item added → Todo" ON, turn "Item closed → Done" OFF (it can't tell Done from
+   Dropped — the `done`/`drop` gates set the terminal state).
 2. **`.github/CODEOWNERS`** naming yourself (the Chairman) as owner of `decisions.yaml` —
    this is what routes a money/org-shape PR to you for review.
 3. **Branch protection on `main`**: Settings → Branches → add a rule → enable "Require a
@@ -219,7 +222,7 @@ scripts/pm-gh.sh create --project ceo --title "CEO online" --desc "smoke test"
 ```
 
 You should see a new issue land in your org repo, labeled `dept:ceo`, sitting in the
-Project board's `To-Do` column.
+Project board's `Todo` column.
 
 ---
 
@@ -303,7 +306,7 @@ the `dept:*` label that routes it and the acceptance line its closure will bind 
 **What to watch for in the first week:**
 - Agents opening `[PROPOSAL]` issues or `decisions.yaml` PRs (good — they're asking, not
   acting)
-- Tickets moving `To-Do → Doing → Staged → Demo → Done` on the Project board
+- Tickets moving `Todo → In Progress → Awaiting Merge → Demo → Awaiting Deploy → Done` on the Project board
 - The tree closing **upward** — stories citing merged PRs, features citing accepted
   `[DEMO]`s (`pm-gh.sh tree --id N` shows the rollup; a tree that only grows is
   patterns.md Pattern 12)
@@ -405,7 +408,8 @@ operator surface):
 | Create a ticket | `pm-gh.sh create --project <dept> --title "…"` |
 | Create a work-item tree child (kind label + prefix, routing inherited, sub-issue link) | `pm-gh.sh create --type epic\|feature\|story --parent N` |
 | Render an objective's tree (the rollup) | `pm-gh.sh tree --id N` |
-| Move a ticket | `pm-gh.sh move --id N --to <Stage>` |
+| Move a ticket | `pm-gh.sh move --id N --to <Status>` (quote multi-word names: `--to "In Progress"`) |
+| Drop a ticket (won't-do) | `pm-gh.sh drop --id N --reason "…"` (epics/objectives: Chairman only) |
 | List tickets | `pm-gh.sh tasks --project <dept>` |
 | Comment on a ticket | `pm-gh.sh comment --id N --body "…"` |
 | Read a ticket's thread | `pm-gh.sh comments --id N` |
