@@ -85,20 +85,68 @@ dept_label() {  # project name → the dept:* wake label
 }
 
 project_number() {
-  # Pinned board (org-chart global.pm_project_number, exported by callers as
-  # $PM_PROJECT_NUMBER) skips a by-title lookup per invocation; lookup is the fallback.
+  # Resolution order: $PM_PROJECT_NUMBER (the warden exports it to its children), the
+  # org-chart global.pm_project_number pin (the REQUIRED pin of FIELD-NOTES §11 — the ONE
+  # place board coordinates live), then a by-title lookup as the un-pinned fallback.
+  # The pin costs nothing; the lookup bills the GraphQL pool on every single call.
   if [ -n "${PM_PROJECT_NUMBER:-}" ]; then printf '%s' "$PM_PROJECT_NUMBER"; return; fi
+  local pin
+  pin="$(sed -n 's/^[[:space:]]*pm_project_number:[[:space:]]*\([0-9][0-9]*\).*/\1/p' org-chart.yaml 2>/dev/null | head -1)"
+  if [ -n "$pin" ]; then printf '%s' "$pin"; return; fi
   gh project list --owner "$OWNER" --format json \
     --jq ".projects[] | select(.title == \"$PROJECT_TITLE\") | .number" | head -1
 }
 
-set_status() {  # $1 = issue number, $2 = status name — the board's built-in Status single-select
-  local pn pid item fid oid
+# --- board-coordinate cache (FIELD-NOTES §14) ---------------------------------------------
+# The project id, Status field id, and option ids only change when github-pm-setup.sh
+# reprovisions, but set_status used to re-discover all of them on every call — ~9 GraphQL
+# requests per board move, exactly one of which (the write) did any work. Projects v2 is
+# GraphQL-only, and GraphQL is metered as a separate hourly pool from REST: the org once
+# burned the whole pool on this while REST sat idle, and the runner's GH_RATE_FLOOR then
+# parked every wake until the window reset. So: the coordinates live in a TSV cache under
+# state/ (runtime-only, gitignored), written on first use, deleted by setup, refreshed at
+# most once per call when a write looks stale.
+BOARD_CACHE="state/pm-board.tsv"
+
+board_get() { awk -F'\t' -v k="$1" '$1 == k { print $2; exit }' "$BOARD_CACHE" 2>/dev/null || true; }
+board_opt() { awk -F'\t' -v n="$1" '$1 == "option" && $2 == n { print $3; exit }' "$BOARD_CACHE" 2>/dev/null || true; }
+
+board_refresh() {  # 2 GraphQL requests, amortized over every later call
+  local pn pid
   pn="$(project_number)"
-  [ -n "$pn" ] || { echo "pm-gh: project '$PROJECT_TITLE' not found (run github-pm-setup.sh)" >&2; return 1; }
+  [ -n "$pn" ] || { echo "pm-gh: project '$PROJECT_TITLE' not found (run github-pm-setup.sh, then pin org-chart global.pm_project_number)" >&2; return 1; }
   pid="$(gh project view "$pn" --owner "$OWNER" --format json --jq .id)"
-  item="$(gh project item-list "$pn" --owner "$OWNER" --limit 500 --format json \
-          --jq ".items[] | select(.content.number == $1 and .content.repository == \"$REPO\") | .id" | head -1)"
+  [ -n "$pid" ] || { echo "pm-gh: could not resolve project #$pn (owner $OWNER)" >&2; return 1; }
+  mkdir -p "$(dirname "$BOARD_CACHE")"
+  {
+    printf 'number\t%s\n' "$pn"
+    printf 'project_id\t%s\n' "$pid"
+    gh project field-list "$pn" --owner "$OWNER" --format json --jq '
+      (.fields[] | select(.name == "Status"))
+      | "status_field\t\(.id)", (.options[] | "option\t\(.name)\t\(.id)")'
+  } > "$BOARD_CACHE.tmp" && mv "$BOARD_CACHE.tmp" "$BOARD_CACHE"
+}
+
+board_item_id() {  # $1 = issue number → its item id on the org board ('' when absent).
+  # One targeted request, constant cost — never page the whole board to find one issue.
+  gh api graphql \
+    -f query='query($owner: String!, $name: String!, $issue: Int!) {
+        repository(owner: $owner, name: $name) { issue(number: $issue) {
+          projectItems(first: 10) { nodes { id project { id } } } } } }' \
+    -f owner="${REPO%%/*}" -f name="${REPO#*/}" -F issue="$1" \
+    --jq ".data.repository.issue.projectItems.nodes[] | select(.project.id == \"$(board_get project_id)\") | .id" \
+    2>/dev/null | head -1 || true
+}
+
+set_status() {  # $1 = issue number, $2 = Status name, $3 = known project-item id (optional —
+                # create passes the id item-add just returned, so its status set is 1 request)
+  local pn pid item fid oid
+  oid="$(board_opt "$2")"
+  if [ -z "$oid" ]; then board_refresh || return 1; oid="$(board_opt "$2")"; fi
+  [ -n "$oid" ] || { echo "pm-gh: Status option '$2' not found (canon: org-chart pm_stages + pm_holding_stages + pm_terminal_stages; run github-pm-setup.sh)" >&2; return 1; }
+  pn="$(board_get number)"; pid="$(board_get project_id)"; fid="$(board_get status_field)"
+  item="${3:-}"
+  [ -n "$item" ] || item="$(board_item_id "$1")"
   if [ -z "$item" ]; then
     # Chairman-filed issues (objective.yml et al.) never go through `create`, so they
     # never land on the board — that silently defeated "move this to In Progress" for
@@ -107,12 +155,15 @@ set_status() {  # $1 = issue number, $2 = status name — the board's built-in S
             --url "https://github.com/$REPO/issues/$1" --format json --jq .id)"
     [ -n "$item" ] || { echo "pm-gh: could not add issue #$1 to the project board" >&2; return 1; }
   fi
-  fid="$(gh project field-list "$pn" --owner "$OWNER" --format json \
-         --jq '.fields[] | select(.name == "Status") | .id')"
-  oid="$(gh project field-list "$pn" --owner "$OWNER" --format json \
-         --jq ".fields[] | select(.name == \"Status\") | .options[] | select(.name == \"$2\") | .id")"
-  [ -n "$fid" ] && [ -n "$oid" ] || { echo "pm-gh: Status option '$2' not found (canon: org-chart pm_stages + pm_holding_stages + pm_terminal_stages; run github-pm-setup.sh)" >&2; return 1; }
-  gh project item-edit --id "$item" --project-id "$pid" --field-id "$fid" --single-select-option-id "$oid" >/dev/null
+  if ! gh project item-edit --id "$item" --project-id "$pid" --field-id "$fid" \
+        --single-select-option-id "$oid" >/dev/null 2>&1; then
+    # Stale coordinates (the board was reprovisioned since the cache was written):
+    # refresh once and retry LOUD — a second failure is real and must surface.
+    board_refresh || return 1
+    pn="$(board_get number)"; pid="$(board_get project_id)"; fid="$(board_get status_field)"; oid="$(board_opt "$2")"
+    [ -n "$fid" ] && [ -n "$oid" ] || { echo "pm-gh: Status option '$2' missing after refresh (canon: org-chart pm_stages + pm_holding_stages + pm_terminal_stages; run github-pm-setup.sh)" >&2; return 1; }
+    gh project item-edit --id "$item" --project-id "$pid" --field-id "$fid" --single-select-option-id "$oid" >/dev/null
+  fi
   echo "org#$1 → $2"
 }
 
@@ -141,7 +192,7 @@ case "$cmd" in
     [ -n "$project" ] && labels+=(--label "$(dept_label "$project")")
     [ -n "$assigned" ] && [ "$assigned" != "$project" ] && labels+=(--label "$(dept_label "$assigned")")
     if [ -z "$project" ]; then  # --parent only: children inherit the parent's routing
-      for l in $(gh issue view "$parent" --repo "$REPO" --json labels --jq '.labels[].name | select(startswith("dept:"))'); do
+      for l in $(gh api "repos/$REPO/issues/$parent" --jq '.labels[].name | select(startswith("dept:"))'); do
         labels+=(--label "$l")
       done
       [ ${#labels[@]} -gt 0 ] || { echo "pm-gh: parent org#$parent carries no dept:* label to inherit — pass --project" >&2; exit 1; }
@@ -155,8 +206,12 @@ case "$cmd" in
     [ -n "$assignee" ] && labels+=(--assignee "$assignee")
     url="$(gh issue create --repo "$REPO" --title "$title" --body "${full_body:-—}" "${labels[@]}")"
     n="${url##*/}"
-    pn="$(project_number)"
-    [ -n "$pn" ] && gh project item-add "$pn" --owner "$OWNER" --url "$url" >/dev/null && set_status "$n" "Todo" >/dev/null
+    pn="$(project_number || true)"
+    if [ -n "$pn" ]; then
+      # Keep the item id item-add returns — set_status then skips its board lookup.
+      item="$(gh project item-add "$pn" --owner "$OWNER" --url "$url" --format json --jq .id 2>/dev/null || true)"
+      set_status "$n" "Todo" ${item:+"$item"} >/dev/null
+    fi
     [ -n "$parent" ] && workitems link "$parent" "$n"
     echo "created org#$n  $url"
     ;;
@@ -167,9 +222,11 @@ case "$cmd" in
   tasks)
     [ -n "$project" ] || { echo "pm-gh: tasks needs --project" >&2; exit 2; }
     state="open"; [ "$all" = 1 ] && state="all"
-    gh issue list --repo "$REPO" --label "$(dept_label "$project")" --state "$state" \
-      --json number,title,state --template \
-      '{{range .}}org#{{.number}}  [{{.state}}]  {{.title}}{{"\n"}}{{end}}'
+    # REST, not `gh issue list` (which is GraphQL under the hood): list reads belong on
+    # the separately-metered REST pool the runner already ETags. Same output shape.
+    gh api -X GET "repos/$REPO/issues" --paginate \
+      -f labels="$(dept_label "$project")" -f state="$state" -F per_page=100 \
+      --jq '.[] | select(.pull_request | not) | "org#\(.number)  [\(.state | ascii_upcase)]  \(.title)"'
     ;;
   move)
     [ -n "$id" ] && [ -n "$to" ] || { echo "pm-gh: move needs --id and --to" >&2; exit 2; }
@@ -217,8 +274,9 @@ case "$cmd" in
     # the Chairman's scope — an agent wake (AGENT_NAME set; the Chairman's own sessions
     # never are, same mechanism as objective_gate.py) gets refused toward a [PROPOSAL].
     kind=""
+    issue_labels="$(gh api "repos/$REPO/issues/$id" --jq '.labels[].name' 2>/dev/null || true)"  # once, via REST — not one GraphQL lookup per kind
     for k in objective epic feature story; do
-      gh issue view "$id" --repo "$REPO" --json labels --jq '.labels[].name' | grep -qx "$k" && { kind="$k"; break; }
+      printf '%s\n' "$issue_labels" | grep -qx "$k" && { kind="$k"; break; }
     done
     if [ -n "${AGENT_NAME:-}" ] && { [ "$kind" = "objective" ] || [ "$kind" = "epic" ]; }; then
       echo "pm-gh: dropping an $kind is the Chairman's call alone — file a [PROPOSAL] naming org#$id and why" >&2; exit 1

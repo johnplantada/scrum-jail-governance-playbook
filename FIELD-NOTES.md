@@ -512,6 +512,44 @@ compute is free — on the operator's machine, at push time.
 **The counter-ratchet line:** this replaces the hosted CI workflow (disabled, not
 deleted) — one gate moved, none added.
 
+## 14. The GraphQL budget — board coordinates are cached, list reads ride REST
+
+**The failure:** the org ground to an hour-long halt with 96% of its REST quota
+unused. GitHub meters REST, GraphQL, and search as SEPARATE hourly pools, and every
+Projects-v2 command (`gh project …`) is GraphQL-only — as are `gh issue list` /
+`gh pr list` under the hood. The old `pm-gh.sh set_status` re-discovered the board on
+every call: a by-title project lookup, the project id, a 500-item scan to find one
+issue's item id, and the Status field fetched twice — ~9 GraphQL requests per board
+move, exactly one of which (the write itself) did any work, with the scan growing as
+the board grew. A busy stretch of creates and moves drained the whole 5,000-point
+GraphQL hour while the runner's ETag'd REST polls (§1) cost nothing, and the
+`GH_RATE_FLOOR` hold then — correctly — parked every wake until the window reset.
+
+**How it works:** three rules, all in `scripts/pm-gh.sh`:
+
+- **Pin, don't look up.** The board number resolves from `$PM_PROJECT_NUMBER`, then the
+  org-chart `global.pm_project_number` pin (§11's REQUIRED pin — the warden already
+  refused to run without it; now pm-gh.sh reads it too). The by-title lookup survives
+  only as the un-pinned fallback.
+- **Cache the immutable coordinates.** Project id, Status field id, and option ids
+  change only when `github-pm-setup.sh` reprovisions — so they live in
+  `state/pm-board.tsv` (runtime state, gitignored), written on first use, deleted by
+  setup, refreshed at most once per call when a write looks stale. Finding one issue's
+  board item is a single targeted GraphQL query (issue → `projectItems`), never a page
+  through the whole board; `create` hands the item id it already got back from
+  `item-add` straight to `set_status`, so its status set is one request.
+- **List reads ride REST.** `tasks`, label reads, and parent-label inheritance go
+  through `gh api repos/…` — the separately-metered REST pool that was sitting idle
+  while GraphQL starved. (The warden's full-board `item-list` stays GraphQL: it
+  genuinely reconciles every item, on a bounded cron cadence, not per agent action.)
+
+A warm board move now costs 2 GraphQL requests (item lookup + write) and a create's
+status set costs 1; the steady state touches GraphQL nowhere else. The rate floor
+still guards the edge — it just shouldn't trip in normal operation anymore.
+
+**The counter-ratchet line:** no new gate — this is a cost fix inside an existing
+mechanism, plus one cache file that setup already knows how to invalidate.
+
 ---
 
 # Part II — Retired with the chat stack (2026-07-05)

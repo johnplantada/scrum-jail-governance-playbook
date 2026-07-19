@@ -62,7 +62,9 @@ global:
   # five silent hours (patterns.md Pattern 14). Set them in RUNBOOK commissioning, then
   # re-pin here if either is ever recreated.
   chairman_queue_issue: null   # ← the UNTYPED epic whose sub-issues = what only the human can do
-  pm_project_number: null      # ← the org Project's number (gh project <N>)
+  pm_project_number: null      # ← the org Project's number (gh project <N>) — pm-gh.sh reads it
+                               #   too; un-pinned, every board call pays a by-title GraphQL
+                               #   lookup (FIELD-NOTES §14)
   # Pinned API model id per brain tier — the ONE place tier→model resolution lives.
   # Everything else — ledger, wake banners, budget brownouts, PROMOTE — keeps speaking
   # in tiers; a PROMOTE changes an AGENT's tier, editing THIS map upgrades what a tier means
