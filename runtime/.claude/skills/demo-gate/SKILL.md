@@ -7,9 +7,9 @@ description: Produce or accept a [DEMO] — the pre-deploy gate. Use when IT has
 
 The one real gate the SAFe layer adds (`safe.md`): **no product-surface PR reaches a deploy
 `workflow_dispatch` request without a Business-accepted `[DEMO]`.** The typed payload schema
-is `scripts/handoff_check.py` (documented in `agents/_policy.md` §handoffs), enforced by the
-handoff-validator workflow on every marker-bearing comment. Substance is on you; the
-validator only checks shape.
+is `scripts/handoff_check.py` (documented in `agents/_policy.md` §handoffs), enforced on
+every marker-bearing comment from the runner's wake path, never a per-comment hosted
+workflow (patterns.md Pattern 17). Substance is on you; the validator only checks shape.
 
 ## First: is a demo even required?
 
