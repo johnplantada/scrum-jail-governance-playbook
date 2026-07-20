@@ -292,11 +292,15 @@ def cmd_init(args):
     for doc in VENDORED_DOCS:
         src = os.path.join(REPO, doc)
         if os.path.exists(src):
-            write(os.path.join(target, doc), read(src))
+            write(os.path.join(target, "playbook", doc), read(src))
+    write(os.path.join(target, "playbook", "SOURCE.md"),
+          "# Vendored snapshot\n\nplaybook/ mirrors the governance golden. Do not hand-edit the\n"
+          "vendored docs — change them in the golden and re-run `make sync-playbook`.\n\n"
+          f"Source: scrum-jail-governance-playbook @ {golden_sha()}\n"
+          f"Vendored files: {' '.join(VENDORED_DOCS)}\n")
 
-    # 2. org-chart.yaml — from the _init template; the departments: block is generated from the
-    #    SAME dept list that stamps the agent mandates (below), so the chart and agents/ can never
-    #    disagree about who exists.
+    # 3. org-chart.yaml — the departments: block, the roster-derived agent ceiling, and the
+    #    cadences, from the SAME dept list that stamps the mandates below.
     # The warden rides in depts itself — departments() guarantees her exactly once,
     # last, so the chart, mandates, wake rules, and max-agents all see the same roster.
     dept_blocks = "\n".join(dept_block(*d) for d in depts)
@@ -395,7 +399,7 @@ def cmd_init(args):
     print("     agents/warden.md is not — it ships complete. Re-read any mandate you edit")
     print("     against invariant 1: a mandate that tells an agent to 'turn the north star")
     print("     into objectives' silently repeals your work intake (Pattern 15).")
-    print("  8. Read blocker-ledger.md + safe.md before week 2.")
+    print("  8. Read playbook/blocker-ledger.md + playbook/safe.md before week 2.")
 
 
 def org_readme(org, product, depts):
