@@ -54,8 +54,8 @@ report must not bump the issue and wake anyone.
   scripts/warden.py sync [--dry-run]  # converge the queue + update the report comment
 
 Fail-soft everywhere: no gh / offline / missing files degrade to empty sections, never
-a crash — this runs unattended (launchd/cron via warden-sync.sh). Pure helpers up top
-(unit-tested in test_warden.py); I/O at the bottom.
+a crash — this runs unattended (launchd/cron: `python3 scripts/warden.py sync`, ~4h).
+Pure helpers up top (unit-tested in test_warden.py); I/O at the bottom.
 """
 import argparse
 import datetime

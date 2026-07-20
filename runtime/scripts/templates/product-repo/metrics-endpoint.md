@@ -1,6 +1,6 @@
 # TEMPLATE — the product's metrics endpoint (for $PRODUCT_REPO's Go Lambda)
 
-The org's demand-telemetry watcher (`scripts/metrics_watch.py`, DESIGN §16) polls the
+The org's demand-telemetry watcher (`scripts/metrics_watch.py`) polls the
 product for its own counters. The contract is deliberately minimal: **one GET endpoint,
 flat JSON, numeric values** — the org side maps fields to metrics in `metrics.yaml`
 (`http_json` source, dotted `path` per metric), so adding a counter here needs only a
