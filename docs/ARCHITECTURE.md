@@ -37,7 +37,7 @@ flowchart LR
 
 | Repo | Role | What lives here |
 |---|---|---|
-| **scrum-jail-governance-playbook** *(you are here)* | **Methodology** | The governance model, the 13 misbehavior patterns + fixes, and `orggen` — packaged so anyone can copy it. |
+| **scrum-jail-governance-playbook** *(you are here)* | **Methodology** | The governance model, the 17 misbehavior patterns + fixes, the runtime, and `orggen` — packaged so anyone can copy it. |
 | [scrum-jail-business](https://github.com/johnplantada/scrum-jail-business) | **Runtime** | The live multi-agent org that runs scrumjail.org. It *vendors* this repo's docs and is the org these primitives were extracted from. |
 | [scrum-jail](https://github.com/johnplantada/scrum-jail) | **Product** | The actual website the org builds and ships. |
 
@@ -53,9 +53,10 @@ dogfoods every day.
 
 ## What this repo is — and is not
 
-This is a **GitHub template repo**: documentation + YAML config + one Python generator. It
-contains **no runtime**. The runtime is deliberately thin — a handful of scripts wrapping the
-`gh` CLI, plus GitHub platform primitives that are *configuration, not code*:
+This is a **golden-example repo**: documentation + YAML config + one Python generator +
+the runtime it stamps (`runtime/`, copied verbatim into every new org). The runtime is
+deliberately thin — a set of scripts wrapping the `gh` CLI, plus GitHub platform
+primitives that are *configuration, not code*:
 
 - **Scripts** (the moving parts): `runner.py` + `wake-rules.yaml` (poll GitHub, route events to
   department wakes), `agent-run.sh` + `agent_cycle.py` (one headless Claude cycle per wake),
@@ -76,8 +77,10 @@ scrum-jail-governance-playbook/
 ├── patterns.md          17 misbehavior patterns + counter-patterns
 ├── blocker-ledger.md    the anti-"blocked loop" primitives
 ├── safe.md              scaled-agile without the theater
+├── FIELD-NOTES.md       field-tested mechanisms from the live org + the demolition graveyard
 ├── envelopes.yaml       authority-envelope field reference + presets
 ├── org-chart.yaml       a concrete example org (the runtime's parameter file)
+├── docs/                this doc + the alliance manifesto
 ├── bin/orggen           the generator — stamps a complete org from _init/ + runtime/
 ├── _init/               the governance templates orggen fills in
 │   ├── DESIGN.md         the constitution (PRODUCT/GOAL placeholders)
@@ -204,31 +207,38 @@ are platform/file mechanisms:
 
 ---
 
-## The two failure roots — and the 13 patterns
+## The two failure roots — and the 17 patterns
 
 The patterns documented here are battle scars. They cluster into two roots: agents given **too
 much authority**, and an orchestration loop with **no concept of "blocked," "done," or "do
-nothing."** (Pattern 13 mirrors both: a buggy gate collects compliance instead of bug reports.)
+nothing."** (Pattern 13 mirrors both: a buggy gate collects compliance instead of bug reports.
+Pattern 17 is the platform-side scar: hosted CI's per-minute meter amplifying agent-frequency
+triggers into an account-wide governance outage.)
 
 ```mermaid
 mindmap
-  root((13 patterns, two roots))
+  root((17 patterns, two roots))
     Too much authority, patterns 1 to 8
       Rogue spender
       Broken deploy
       Runaway recursion
       Blocked-action retry loop
-      Channel flood
+      Comment flood
       Domain expansion
       Double execution
       Approval-gate evasion
-    No concept of blocked, done, or nothing, patterns 9 to 12
+    No concept of blocked, done, or nothing, patterns 9 to 12 and 14 to 16
       Idle restatement
       Process theater
       Self-wake storm
       The tree that only grows
+      Silent blocking
+      Flavor-text authority
+      Invisible intake
     The gates are code too, pattern 13
       Prose-patching the checker
+    The platform is metered, pattern 17
+      Metered amplification
 ```
 
 The first root is cured by the authorization gate and tight envelopes (above). The second root
@@ -327,7 +337,7 @@ flowchart LR
     Args["orggen init &lt;target&gt;<br/>product · goal · chairman GitHub username · product repo · departments"] --> Tup["departments(): one tuple per department<br/>name, role, reports_to"]
     Tup --> Chart["org-chart.yaml<br/>departments: block"]
     Tup --> Agents["agents/&lt;name&gt;.md<br/>one mandate per tuple"]
-    Args --> Docs["copy VERBATIM_DOCS (7):<br/>patterns · safe · authorization-gate · envelopes · blocker-ledger · FIELD-NOTES · RUNBOOK"]
+    Args --> Docs["vendor VENDORED_DOCS (9) into playbook/:<br/>patterns · safe · authorization-gate · envelopes · blocker-ledger · FIELD-NOTES · RUNBOOK · README · org-chart"]
     Args --> Fill["fill DESIGN.md + .env.example<br/>copy blockers.yaml · stamp a README"]
     Chart --> Inv(["Invariant: one tuple list →<br/>chart and agents/ never disagree"])
     Agents --> Inv
@@ -343,12 +353,17 @@ bin/orggen init ../my-org --product "myproduct.com" --goal "$10k/month" \
   --departments ceo,business,it
 ```
 
-`ceo` is special-cased (reports to the board, `max_subagents: 0`); every other name reports to
-the CEO with an envelope of `4 / 500k`. The seven governance docs are copied **verbatim** (they
-are meant to travel unchanged); `DESIGN.md`, `.env.example` (the org/product repo slugs the
+`ceo` is special-cased (reports to the board, `max_subagents: 0`), and the **warden is an
+organ, not a choice** — appended to every roster exactly once (reports to the board, `haiku`,
+`0 / 100k`), because `--departments` picks the org's business shape, never whether it can ask
+the Chairman for anything. `compliance` also reports to the board (the assurance second line);
+every other name reports to the CEO with an envelope of `4 / 500k`. The nine governance docs
+are vendored into `playbook/` pinned to this golden's commit (the stamped `check-playbook` and
+CI drift job keep them honest); `DESIGN.md`, `.env.example` (the org/product repo slugs the
 runner and `pm-gh.sh` read), and the org chart are filled from your flags. The generator stamps
-the governance + behavioral layer only — it prints, as its first next step, how to bring the
-thin runtime in, per the contracts in [`RUNBOOK.md`](../RUNBOOK.md).
+**both layers** — governance from `_init/`, the full runtime from `runtime/` verbatim — and its
+printed next steps walk the commissioning contracts in [`RUNBOOK.md`](../RUNBOOK.md), starting
+with installing the runtime's dependencies and running its suite.
 
 ---
 

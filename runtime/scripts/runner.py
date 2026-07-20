@@ -99,11 +99,36 @@ def normalize_issue(item, repo_key):
     return ev
 
 
+def handoff_problems(body):
+    """Shape-check a comment body's typed handoffs (scripts/handoff_check.py is the
+    authoritative schema). This is the wake-path home of the validation Pattern 17
+    evicted from hosted CI: it must see every comment, so it runs here, where compute
+    is free. Pure and lazy — no API calls, yaml loads only when a paragraph-leading
+    marker is actually present. Never raises: an unparseable payload is a problem
+    string, not a crashed tick."""
+    import handoff_check
+    types = handoff_check.markers(body)
+    if not types:
+        return []
+    import yaml
+    payloads = []
+    for raw in handoff_check.fenced_blocks(body):
+        try:
+            data = yaml.safe_load(raw)
+        except yaml.YAMLError as exc:
+            return [f"unparseable yaml payload: {exc}"]
+        if isinstance(data, dict):
+            payloads.append(data)
+    return handoff_check.validate(types, payloads)
+
+
 def normalize_comment(item, repo_key):
     """One issue comment (REST shape) → a routable event. The comment API carries no
     labels; route() resolves from-label via the issue URL the caller maps in. `banner`
     is the author signal read from the FULL body (the title's first line can be a
-    machine marker like '<!-- warden-report -->', hiding the banner beneath it)."""
+    machine marker like '<!-- warden-report -->', hiding the banner beneath it).
+    `handoff_problems` is computed here because the full body doesn't travel on the
+    event — only this 120-char title does."""
     return {
         "id": f"{repo_key}-comment-{item.get('id')}",
         "kind": "comment",
@@ -113,6 +138,7 @@ def normalize_comment(item, repo_key):
         "url": item.get("html_url") or "",
         "issue_url": item.get("issue_url") or "",
         "banner": body_banner(item.get("body")),
+        "handoff_problems": handoff_problems(item.get("body")),
         "labels": [],
     }
 
@@ -521,6 +547,31 @@ def fire_wake(dept, evs, carried=None):
         return 127
 
 
+def post_handoff_reply(ev, problems):
+    """Reply to a malformed typed-handoff comment naming the missing keys — the
+    wake-path successor to the retired hosted issue_comment validator (patterns.md
+    Pattern 17: metered compute must never trigger at agent frequency). The reply is a
+    plain comment: next tick it routes like any other comment event, so the offending
+    department wakes to fix it. The reply says REPOST, not edit — an edited comment
+    keeps its id, which the dedup ring has already seen. Never raises: a failed reply
+    is a logged miss, not a crashed tick."""
+    num = issue_number_from_url(ev.get("issue_url") or "")
+    repo = os.environ.get("ORG_GH_REPO" if ev.get("repo") == "org" else "PRODUCT_GH_REPO", "")
+    if not (num and repo):
+        return False
+    body = ("**Malformed typed handoff** — the payload does not match the schema:\n\n"
+            "```\n" + "\n".join(problems) + "\n```\n\n"
+            "Schema: scripts/handoff_check.py REQUIRED (documented in agents/_policy.md "
+            "§handoffs). Fix the fenced yaml payload and repost the comment.")
+    try:
+        out = subprocess.run(["gh", "api", f"repos/{repo}/issues/{num}/comments",
+                              "-f", f"body={body}"],
+                             capture_output=True, timeout=60)
+        return out.returncode == 0
+    except (subprocess.SubprocessError, OSError):
+        return False
+
+
 def dead_letter(dept, entries, rc, now_iso):
     """Append exhausted events to state/dead-letter.jsonl — the terminal record for an
     event the org could not deliver. Loud on any write failure: a dead-letter that
@@ -583,6 +634,19 @@ def cmd_tick(preview=False):
     events = dedup(events, cursor.get("seen"))
     events, issue_cache = resolve_comment_labels(
         events, cursor.get("issues"), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+    # Typed-handoff shape check, post-dedup so each comment is judged exactly once
+    # (FIELD-NOTES §8: the wake path is validation's operator-local home). The reply
+    # is itself a comment event — next tick it wakes the offender to fix and repost.
+    for ev in events:
+        problems = ev.get("handoff_problems") or []
+        if not problems:
+            continue
+        if preview or mode != "live":
+            print(f"SHADOW runner: malformed handoff {ev['url']} — {problems[0]}")
+        else:
+            ok = post_handoff_reply(ev, problems)
+            print(f"runner: malformed handoff {ev['url']} — {len(problems)} problem(s)"
+                  f"{'' if ok else ' (reply FAILED — see runner log)'}")
     wakes, unrouted = route(events, load_rules())
     for ev in unrouted:
         print(f"runner: unrouted {ev['kind']} {ev['url']}")

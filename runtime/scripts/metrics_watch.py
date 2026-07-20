@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""metrics_watch.py — the org's sensors pointed at the MARKET (docs/METRICS.md).
+"""metrics_watch.py — the org's sensors pointed at the MARKET.
 
 The constitution's core loop is hypothesis → action → MEASURE → learn, and until this
 watcher the measure leg didn't exist: nothing a stranger did could ever wake an agent.
-This is the same deterministic-watcher pattern as deploy-watch.sh, aimed at demand:
+The same deterministic-watcher pattern as the warden's engine, aimed at demand:
 
   collect   poll every configured source (metrics.yaml) — the product's counters
             endpoint today — and append observations to the store
@@ -21,9 +21,9 @@ Sources (metrics.yaml at the repo root — committed, it's config not state):
   http_json  GET a JSON endpoint (URL supports ${ENV} expansion), extract dotted
              paths into named metrics. The product website emits its counters this
              way (template: scripts/templates/product-repo/metrics-endpoint.md).
-  manual     no polling — a human appends observations with
-             `scripts/metrics.py add` (mug/Spring sales, anything dashboard-only).
-             The announcer treats them identically, so manual entries wake agents too.
+  manual     no polling — a human appends observation lines to state/metrics.jsonl by
+             hand (mug/Spring sales, anything dashboard-only). The announcer treats
+             them identically, so manual entries wake agents too.
 
 Everything is fail-soft per source: one dead API never loses the other signals, and a
 broken sweep never breaks an agent cycle (this runs from cron/launchd, not from wakes).
@@ -190,7 +190,7 @@ def collect_source(src, env):
             if v is not None:
                 fresh[f"{name}.{m['name']}"] = v
     elif kind == "manual":
-        pass  # humans append via `scripts/metrics.py add`; nothing to poll
+        pass  # humans append to state/metrics.jsonl by hand; nothing to poll
     else:
         raise RuntimeError(f"unknown source type {kind!r}")
     return fresh

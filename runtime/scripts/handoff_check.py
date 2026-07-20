@@ -2,12 +2,13 @@
 """handoff_check.py — validate typed handoff payloads
 ([AGREEMENT] / [DEMO] / [CODEREVIEW] / [CLOSE]).
 
-DESIGN.md §4's "planned Actions validator", now real — the successor to the chat-era
-Go validator (services/common/protocol/handoff.go, demolished 2026-07-05). Counter-
-ratchet: this replaces that validator and the Warden's malformed-payload citation,
-nothing else. The handoff-validator workflow runs this against every issue/PR comment
-that leads a line with a handoff marker; a malformed payload fails the check run and
-gets a reply naming the missing keys, so schema drift is caught at post time.
+The successor to the chat-era Go validator (services/common/protocol/handoff.go,
+demolished 2026-07-05). Counter-ratchet: this replaces that validator and the Warden's
+malformed-payload citation, nothing else. The runner's wake path runs this against
+every polled issue/PR comment (runner.py handoff_problems — the operator-local home
+Pattern 17 demands; the per-comment hosted workflow it briefly lived in burned the
+Actions quota and is retired); a malformed payload gets a reply naming the missing
+keys, so schema drift is caught at post time.
 
 REQUIRED below is the authoritative schema. agents/_policy.md §handoffs documents it
 for the mandates, and test_handoff_check.py asserts the two never drift apart.
