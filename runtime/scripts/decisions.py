@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""decisions.py — read and validate the decisions ledger (GITHUB-NATIVE-PLAN.md Phase 4).
+"""decisions.py — read and validate the decisions ledger (DESIGN.md invariant 1).
 
   scripts/decisions.py check   # exit 1 with problems if the ledger is malformed (CI runs this)
   scripts/decisions.py list    # print the ledger newest-first

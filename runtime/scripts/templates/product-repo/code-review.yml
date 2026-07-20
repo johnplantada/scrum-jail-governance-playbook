@@ -2,7 +2,7 @@
 #
 # Machine floor for product-PR code review. The deterministic part that must be green on
 # the PR head SHA before a PR is merge-worthy; model judgement (a `claude-code-action`
-# review — GITHUB-NATIVE-PLAN.md) sits ON TOP of this when the org re-adds it.
+# review — the GitHub-native migration) sits ON TOP of this when the org re-adds it.
 #
 # The steps below are the review floor the org's own history says matters most: a secret /
 # open-IAM scan (the prod-PR-#77 "open S3 bucket" class of bug), static analysis, and type

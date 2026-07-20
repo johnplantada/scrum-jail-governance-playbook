@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help test halt resume blockers warden tick preview logs sync-playbook check-playbook
+.PHONY: help test halt resume blockers warden tick preview logs sync-playbook check-playbook install-hooks
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -31,6 +31,10 @@ blockers: ## Show the open human-task ledger (what only the Chairman can clear)
 
 warden: ## Read-only warden report: Chairman-queue drift + hygiene findings
 	@set -a; [ -f .env ] && . ./.env; set +a; PYTHONPATH=scripts python3 scripts/warden.py audit
+
+install-hooks: ## Wire scripts/hooks/ as this repo's git hooks (pre-commit + pre-push CI gate — covers all worktrees)
+	@git config core.hooksPath scripts/hooks
+	@echo "✓ core.hooksPath = scripts/hooks (pre-push runs the CI suite locally; see docs/actions-budget.md)"
 
 ## ── Tests (same suite CI runs) ────────────────────────────────────────────
 test: ## Python unit tests + constitution lint + blocker-runbook lint + decisions-ledger check

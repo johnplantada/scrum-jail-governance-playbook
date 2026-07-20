@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # runner-watch.sh — wrapper for the runner tick: the org's ONE scheduled process
-# (GITHUB-NATIVE-PLAN.md; it retired the old watcher fleet). Install it yourself as a
+# (the GitHub-native migration — that plan doc is retired; DESIGN.md is the standing spec — it retired the old watcher fleet). Install it yourself as a
 # launchd job or cron entry running every ~5 minutes.
 #
 # It also SELF-DEPLOYS: before each tick it fast-forwards this runtime checkout to

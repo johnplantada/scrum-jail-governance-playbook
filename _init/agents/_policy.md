@@ -12,7 +12,7 @@ runtime; this policy assumes they are installed.)*
 
 ## Where things happen
 
-- **Work** — GitHub issues via `scripts/pm-gh.sh create/tasks/move/comment/comments/done`
+- **Work** — GitHub issues via `scripts/pm-gh.sh create/tasks/move/comment/comments/done/drop`
   (tickets are `org#N`; the board's Status mirrors org-chart `pm_stages`; the `dept:*` label routes the
   wake). One ticket per task; the ticket's comment thread is its single source of truth.
 - **Product code** — PRs against `$PRODUCT_GH_REPO` (`gh pr …`), branch `agent/it/<desc>`.
@@ -101,7 +101,8 @@ title prefix:
 
 **The root is not yours.** `[OBJECTIVE]` is the Chairman's work intake — it has no
 agent-creatable parent because no agent opens one, ever (DESIGN.md invariant 1). `pm-gh.sh`
-mints only `--type epic|feature|story`. A mission pillar with no ticket is a `[PROPOSAL]`
+mints only `--type epic|feature|story`, and `scripts/objective_gate.py` refuses the
+bare-`gh issue create --label objective` path during a wake. A mission pillar with no ticket is a `[PROPOSAL]`
 naming the objective you would file; the Chairman's filing is the answer. Opening it
 yourself reads as diligent coverage and is actually a transfer of his power to you.
 

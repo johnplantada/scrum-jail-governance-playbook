@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# github-pm-setup.sh — idempotent Phase 2 provisioning (GITHUB-NATIVE-PLAN.md): the dept/type
-# labels and the single org Project whose Stage field mirrors org-chart.yaml pm_stages — the
-# one place the stage list is defined (same canon the linter enforces on prose).
+# github-pm-setup.sh — idempotent provisioning (DESIGN.md §2, the work system): the dept/type
+# labels and the single org Project whose built-in Status field mirrors the org-chart.yaml
+# status canon (pm_stages + holding + terminal) — the one place the list is defined (same
+# canon the linter enforces on prose).
 #
 # Run from the org laptop (needs gh auth with project scope: `gh auth refresh -s project`).
 # Safe to re-run: labels are create-or-update, the project and field are found before created.

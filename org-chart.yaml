@@ -164,7 +164,7 @@ departments:
   # ── WHERE THE REVIEWER DEPARTMENT WENT ────────────────────────
   # Earlier revisions carried a dormant `reviewer` department for the [CODEREVIEW] gate.
   # There deliberately isn't one anymore: code review is a claude-code-action CI check on
-  # product PRs (GITHUB-NATIVE-PLAN.md), not a chartered agent — author ≠ reviewer holds
+  # product PRs (DESIGN.md §5), not a chartered agent — author ≠ reviewer holds
   # without a standing department burning budget. Charter one via a decisions.yaml
   # [CHARTER] entry only if a CI check genuinely can't do the job.
   #

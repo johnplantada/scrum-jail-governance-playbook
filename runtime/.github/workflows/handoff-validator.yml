@@ -1,3 +1,17 @@
+# ⚠ SHIPPED DISABLED — DO NOT `gh workflow enable` THIS WITHOUT A BUDGET LINE. ⚠
+#
+# This is the highest-frequency trigger the org can mount: `issue_comment` fires at AGENT
+# chatter frequency (hundreds/day in a storm), and Actions bills a 1-minute MINIMUM per
+# job per run. That combination is what exhausted the reference org's monthly quota in
+# ~3 days and froze CI account-wide (patterns.md Pattern 17; docs/actions-budget.md
+# rule 2, which forbids `issue_comment` / `issues` triggers outright).
+#
+# DESIGN.md §4 is the governing rule: `handoff_check.py` runs on operator-local compute —
+# the runner's wake path or the pre-push suite — NEVER as a per-comment hosted workflow.
+# The file is kept (not deleted) because the *validation duty* is real and this is its
+# reference implementation for an org that funds Actions and has done the arithmetic in
+# rule 3. Stamped orgs should leave it disabled: `gh workflow disable handoff-validator`.
+#
 # Typed-handoff validator (DESIGN.md §4) — the Actions successor to the chat-era Go
 # validator + the Warden's malformed-payload citation (both demolished 2026-07-05;
 # counter-ratchet satisfied: this replaces those, nothing else).

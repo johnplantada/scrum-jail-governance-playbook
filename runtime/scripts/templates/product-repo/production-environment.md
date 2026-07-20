@@ -1,4 +1,4 @@
-# TEMPLATE — the deploy gate: `workflow_dispatch`-only workflows (GITHUB-NATIVE-PLAN.md)
+# TEMPLATE — the deploy gate: `workflow_dispatch`-only workflows (DESIGN.md invariant 1)
 
 > Filename kept for link stability. This template originally described a `production`
 > environment with the Chairman as required reviewer — that gate was **superseded 2026-07**

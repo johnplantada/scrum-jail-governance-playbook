@@ -40,7 +40,7 @@ the whole org** — governance layer AND runtime. What's left for you is GitHub 
 
 | Component | What it is |
 |---|---|
-| GitHub itself | The org repo (push the stamped directory) + your product repo(s); Issues + one Project (a `Stage` single-select, provisioned by `scripts/github-pm-setup.sh`); Actions **only for rare deliberate jobs** — every prod-touching job triggered by **`workflow_dispatch` only** (the deploy gate), nothing hosted triggering per issue-comment, the CI suite run at push time by a local `pre-push` hook (patterns.md Pattern 17; FIELD-NOTES §13); branch protection making CODEOWNERS review binding |
+| GitHub itself | The org repo (push the stamped directory) + your product repo(s); Issues + one Project (the built-in `Status` single-select, reconciled against the org-chart status canon by `scripts/github-pm-setup.sh`); Actions **only for rare deliberate jobs** — every prod-touching job triggered by **`workflow_dispatch` only** (the deploy gate), nothing hosted triggering per issue-comment, the CI suite run at push time by a local `pre-push` hook (patterns.md Pattern 17; FIELD-NOTES §13); branch protection making CODEOWNERS review binding |
 | The product | Whatever the org runs. `scripts/templates/product-repo/` ships adaptable CI for it (code-review, demo-evidence, preview-deploy, the handoff validator, the metrics endpoint contract) |
 | Claude | The Claude Code SDK on your plan (`scripts/requirements.txt`); agents run headless through `agent-run.sh` |
 

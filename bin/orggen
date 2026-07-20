@@ -284,15 +284,30 @@ def cmd_init(args):
         d = os.path.join(target, sh)
         for f in os.listdir(d):
             p = os.path.join(d, f)
-            if os.path.isfile(p) and (f.endswith(".sh") or f == "pre-commit"):
+            if os.path.isfile(p) and (f.endswith(".sh") or f in ("pre-commit", "pre-push")):
                 os.chmod(p, 0o755)
 
     # 2. The vendored playbook/ — this golden's docs, pinned so the stamped Makefile's
     #    check-playbook can detect hand-edits (edits belong here, then `make sync-playbook`).
+    #    These land in playbook/, NOT the org root: the stamped Makefile's PLAYBOOK_VENDORED
+    #    loop diffs playbook/<doc>, and ci.yml reads the pin out of playbook/SOURCE.md. Writing
+    #    them to the root instead left every stamped org failing check-playbook (DRIFT on all
+    #    nine) and its playbook-drift CI job on the very first push, until someone ran
+    #    `make sync-playbook` by hand — which then left the root copies behind as stale
+    #    duplicates of the playbook/ set.
+    pin = golden_sha()
     for doc in VENDORED_DOCS:
         src = os.path.join(REPO, doc)
         if os.path.exists(src):
-            write(os.path.join(target, doc), read(src))
+            write(os.path.join(target, "playbook", doc), read(src))
+    # SOURCE.md is the pin. `make check-playbook` clones the golden at this commit and diffs
+    # against it; without the file the CI job fails before it can even resolve a commit.
+    write(os.path.join(target, "playbook", "SOURCE.md"),
+          "# Vendored snapshot\n\n"
+          "playbook/ mirrors the governance golden. Do not hand-edit the\n"
+          "vendored docs — change them in the golden and re-run `make sync-playbook`.\n\n"
+          f"Source: scrum-jail-governance-playbook @ {pin}\n"
+          f"Vendored files: {' '.join(VENDORED_DOCS)}\n")
 
     # 2. org-chart.yaml — from the _init template; the departments: block is generated from the
     #    SAME dept list that stamps the agent mandates (below), so the chart and agents/ can never
@@ -362,7 +377,8 @@ def cmd_init(args):
     print("  1. Local runtime: python3 -m venv .venv && .venv/bin/pip install -r")
     print("     scripts/requirements.txt; run `make test` — the stamped org's suite must be")
     print("     green before anything else. Install the guard hook:")
-    print("     cp scripts/hooks/pre-commit .git/hooks/ (after git init).")
+    print("     `make install-hooks` (after git init) — sets core.hooksPath, so the")
+    print("     pre-commit guard AND the pre-push CI gate cover every worktree.")
     print("  2. GitHub: create the org repo and push this directory; `gh auth login`,")
     print("     then `gh auth refresh -s project`. `cp .env.example .env` and fill it in.")
     print("  3. Chairman Settings — the two human-only steps no agent can perform:")
@@ -395,7 +411,10 @@ def cmd_init(args):
     print("     agents/warden.md is not — it ships complete. Re-read any mandate you edit")
     print("     against invariant 1: a mandate that tells an agent to 'turn the north star")
     print("     into objectives' silently repeals your work intake (Pattern 15).")
-    print("  8. Read blocker-ledger.md + safe.md before week 2.")
+    print("  8. Read playbook/blocker-ledger.md + playbook/safe.md before week 2.")
+    print("  9. Fill in the filesystem scope (FIELD-NOTES §15): name the absolute paths of")
+    print("     the org repo and product repo(s) in your docs. No agent reads or writes")
+    print("     outside them — unwritten, that rule is a habit, not an invariant.")
 
 
 def org_readme(org, product, depts):

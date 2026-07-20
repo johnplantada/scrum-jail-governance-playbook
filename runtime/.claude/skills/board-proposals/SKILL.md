@@ -8,7 +8,7 @@ description: Compose a Board-gated org-shape proposal — a [CHARTER] for a new 
 Both are **proposals**: nothing exists or changes until the Chairman authorizes. Never
 assume approval.
 
-## The path — a decisions.yaml PR (GITHUB-NATIVE-PLAN.md)
+## The path — a decisions.yaml PR (DESIGN.md invariant 1)
 
 Board decisions (spend / charter / promote / sunset) are reviewed merges: append ONE
 entry to `decisions.yaml` (schema in the file header — id, type, dept, what, why,

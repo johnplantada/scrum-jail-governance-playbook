@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""runner.py — the one poller (GITHUB-NATIVE-PLAN.md Phase 3).
+"""runner.py — the one poller (DESIGN.md §3, the nervous system).
 
 Each tick: read the cursor → ask GitHub what changed since (issues + PRs + comments on
 both repos, workflow runs on the product repo; PRs ride the issues poll, split out as

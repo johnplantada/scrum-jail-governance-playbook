@@ -152,7 +152,7 @@ Two properties that make backpressure safe to lean on:
   **Honesty note:** the live runner does not have this yet. A failed *poll* is safe (the
   cursor never advances past what was fetched), but once a tick dispatches, the cursor
   advances even if the dispatched cycle crashes — delivery is currently **at-most-once**.
-  The cursor hold-back is explicitly on the build list (GITHUB-NATIVE-PLAN.md, item 2
+  The cursor hold-back is explicitly on the build list (the retired GITHUB-NATIVE-PLAN.md migration doc, item 2
   follow-up). Until it lands, a crashed wake needs a re-poke — any new comment on the issue
   re-wakes its owner.
 
