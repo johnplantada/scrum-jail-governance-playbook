@@ -5,10 +5,11 @@ description: Produce or accept a [DEMO] — the pre-deploy gate. Use when IT has
 
 # The [DEMO] gate
 
-The one real gate the SAFe layer adds (`safe.md`): **no product-surface PR reaches a deploy
+The one real gate the SAFe layer adds (`playbook/safe.md`): **no product-surface PR reaches a deploy
 `workflow_dispatch` request without a Business-accepted `[DEMO]`.** The typed payload schema
-is `scripts/handoff_check.py` (documented in `agents/_policy.md` §handoffs), enforced by the
-handoff-validator workflow on every marker-bearing comment. Substance is on you; the
+is `scripts/handoff_check.py` (documented in `agents/_policy.md` §handoffs), enforced from
+operator-local compute — never a per-comment hosted workflow (DESIGN.md §4). Treat the
+schema as binding even where no automated check fires. Substance is on you; the
 validator only checks shape.
 
 ## First: is a demo even required?
