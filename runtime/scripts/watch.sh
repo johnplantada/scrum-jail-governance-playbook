@@ -9,8 +9,8 @@
 #                 picked up live as new agent-*.log files appear
 #   • OFFLOAD   — every delegation to a cheaper/local model (offload.log)
 #   • SUBAGENT  — every Task/Agent fan-out — which agent spawned what (subagents.log)
-#   • <OPS>     — every other root *.log (cost-sync, metrics-watch, backup-state, rotate-logs,
-#                 and any future ops/infra stream) so no stream is silently dropped
+#   • <OPS>     — every other root *.log (any ops/infra stream a cron job or script
+#                 grows later) so no stream is silently dropped
 #
 # The old chat + registrar feed retired with the chat stack (GITHUB-NATIVE-PLAN.md). The org's
 # conversation now lives in GitHub Issues/PRs — watch those on the Project board or with `gh`
@@ -98,8 +98,8 @@ start_log_tailers() {
     name="${f#agent-}"; name="${name%.log}"
     start_tailer "$f" "$(printf '%s' "$name" | tr '[:lower:]' '[:upper:]')" "$(color_for "$name")" "$from"
   done
-  # Catch-all: every remaining root-level *.log (cost-sync, metrics-watch, backup-state,
-  # rotate-logs, …) so the feed never silently drops a stream. Already-tailed logs are skipped.
+  # Catch-all: every remaining root-level *.log (any ops/infra stream) so the feed
+  # never silently drops a stream. Already-tailed logs are skipped.
   for f in *.log; do
     [ -f "$f" ] || continue
     case "$TAILED" in *" $f "*) continue ;; esac

@@ -14,8 +14,8 @@ check below encodes a drift class that actually happened:
 
 (The chat-era linter also cross-checked documented CLI flags and handoff schemas
 against the Go services; those retired with the services. The typed-handoff schema now
-lives in scripts/handoff_check.py, enforced by the handoff-validator workflow;
-test_handoff_check.py keeps the _policy.md §handoffs documentation in sync.)
+lives in scripts/handoff_check.py, enforced on the runner's wake path and by the
+pre-push suite; test_handoff_check.py keeps _policy.md §handoffs in sync.)
 
 Scope: DESIGN.md, README.md, agents/*.md, .claude/skills/*/SKILL.md, docs/*.md.
 Deliberately NOT scanned: playbook/ (vendored from the governance golden — fix it there

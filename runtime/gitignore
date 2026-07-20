@@ -13,7 +13,7 @@
 
 # Runtime state: spend ledger (state/spend.jsonl), metrics store + cursor, runner cursor
 state/
-# costs.csv is the spend ledger's spreadsheet export (scripts/cost-sync.sh)
+# costs.csv is the spend ledger's spreadsheet export (scripts/costs.py export)
 costs.csv
 
 # Headless agent cycle logs
@@ -27,9 +27,6 @@ subagents.log
 
 # Runner + plain-cron job output
 runner.log
-cost-sync.log
-metrics-watch.log
-rotate-logs.log
 
 # Python venv for the Claude Agent SDK runner (scripts/agent_cycle.py).
 # Recreate with: python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
@@ -44,6 +41,3 @@ __pycache__/
 
 # Local scratch definitions are not tracked
 *.local.md
-logs/
-backups/
-backup-state.log

@@ -124,9 +124,6 @@ def dept_block(name, role, reports_to, model, max_sub, budget, note):
     max_sub = 0 if (is_ceo or is_warden) else 4
     budget = 300000 if is_ceo else 100000 if is_warden else 500000
     model = "haiku" if is_warden else "sonnet"
-    sub_note = ("CEO escalates; it doesn't spawn sub-teams itself" if is_ceo
-                else "the script does the work; there is nothing to fan out" if is_warden
-                else "May spawn sub-teams within this cap")
     # The warden's brain is only the judgment residue its deterministic engine flags, so it
     # runs the org's cheapest tier on its smallest budget — see agents/warden.md.
     preamble = (
@@ -284,7 +281,7 @@ def cmd_init(args):
         d = os.path.join(target, sh)
         for f in os.listdir(d):
             p = os.path.join(d, f)
-            if os.path.isfile(p) and (f.endswith(".sh") or f == "pre-commit"):
+            if os.path.isfile(p) and (f.endswith(".sh") or f.startswith("pre-")):
                 os.chmod(p, 0o755)
 
     # 2. The vendored playbook/ — this golden's docs, pinned so the stamped Makefile's
@@ -361,8 +358,8 @@ def cmd_init(args):
     print("\nNext steps (RUNBOOK.md — vendored in playbook/ — walks through each one):")
     print("  1. Local runtime: python3 -m venv .venv && .venv/bin/pip install -r")
     print("     scripts/requirements.txt; run `make test` — the stamped org's suite must be")
-    print("     green before anything else. Install the guard hook:")
-    print("     cp scripts/hooks/pre-commit .git/hooks/ (after git init).")
+    print("     green before anything else. Wire the guard hooks (after git init):")
+    print("     `make install-hooks` — pre-commit + the pre-push zero-spend CI suite.")
     print("  2. GitHub: create the org repo and push this directory; `gh auth login`,")
     print("     then `gh auth refresh -s project`. `cp .env.example .env` and fill it in.")
     print("  3. Chairman Settings — the two human-only steps no agent can perform:")
@@ -429,7 +426,8 @@ constitution and `org-chart.yaml` for the tree + envelopes.
 
 ## Operate
 `make` prints the operator surface: `tick` / `preview` / `logs` / `halt` / `resume` /
-`blockers` / `warden` / `test` / `sync-playbook` / `check-playbook`.
+`blockers` / `warden` / `dashboard` / `test` / `install-hooks` / `sync-playbook` /
+`check-playbook`.
 
 ## Setup
 1. `python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt`; `make test`.

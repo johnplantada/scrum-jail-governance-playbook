@@ -1154,7 +1154,7 @@ Data (local, read-only):
   outcome (ship|post|noop; only on the primary row of tagged cycle wakes).
 - Logs {logs_dir}/*.log — runner.log = the poller's poll->route->wake decisions;
   agent-<dept>.log = that department's cycle narration; offload.log; subagents.log =
-  Task/Agent fan-outs; every other *.log = ops crons (cost-sync, backup-state, ...).
+  Task/Agent fan-outs; every other *.log = ops crons.
 
 Method — keep token use minimal:
 - A precomputed stats digest arrives with the first question; answer from it when it
