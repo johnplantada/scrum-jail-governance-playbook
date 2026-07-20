@@ -276,11 +276,15 @@ flowchart TD
     G -->|clear| Full["one headless SDK cycle — metered into the spend ledger"]
 ```
 
-One reliability note, stated honestly: delivery is currently **at-most-once**. The runner's
-cursor advances per tick even if a dispatched cycle crashes; the abort is logged loudly, but
-the triggering events are not re-delivered — re-delivery on failure is an open follow-up in
-the live runtime, not a property you can rely on. (The chat-era loop claimed at-least-once;
-that guarantee did not survive the rewrite yet.)
+One reliability note: delivery is **at-least-once, up to a bounded retry ceiling**. The
+runner's cursor still advances per tick, but a dispatched cycle that exits nonzero gets its
+events re-queued through the deferred-event spool and redelivered — on the department's next
+fired wake, or by the catch-up sweep. Past `WAKE_MAX_RETRIES` failed attempts an event
+dead-letters to `state/dead-letter.jsonl` rather than retrying a hard failure forever; every
+failed attempt is recorded in the spend and wake-filter ledgers, and a dead-letter that
+cannot be written is itself loud in the runner log. (The chat-era loop claimed at-least-once
+and lost it in the rewrite; the guarantee is back, with an explicit terminal state instead
+of an unbounded retry.)
 
 ---
 

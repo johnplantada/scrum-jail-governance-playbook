@@ -145,16 +145,18 @@ Two properties that make backpressure safe to lean on:
   triggering event into one wake per department per tick — five comments are one cycle
   carrying five events, not five cycles and not four dropped triggers. (v1: a rate-limited
   wake got one delayed retry instead of a discard.)
-- **Don't advance the read cursor until the cycle succeeds.** A crashed cycle whose events
-  were already marked seen loses them; hold the watermark back on failure so the next tick
-  re-delivers (at-least-once).
+- **Don't let a crashed cycle eat its events.** A crashed cycle whose events were already
+  marked seen loses them; the fix is either holding the watermark back on failure or
+  re-queuing the consumed events so a later wake re-delivers (at-least-once).
 
-  **Honesty note:** the live runner does not have this yet. A failed *poll* is safe (the
-  cursor never advances past what was fetched), but once a tick dispatches, the cursor
-  advances even if the dispatched cycle crashes — delivery is currently **at-most-once**.
-  The cursor hold-back is explicitly on the build list (GITHUB-NATIVE-PLAN.md, item 2
-  follow-up). Until it lands, a crashed wake needs a re-poke — any new comment on the issue
-  re-wakes its owner.
+  **How the live runner does it:** the cursor still advances per tick (a failed *poll* is
+  safe — the cursor never advances past what was fetched), but a dispatched wake that
+  exits nonzero gets its events re-queued through the deferred-event spool, redelivered on
+  the department's next fired wake or by the catch-up sweep. Delivery is **at-least-once
+  up to a bounded retry ceiling**: past `WAKE_MAX_RETRIES` failed attempts an event
+  dead-letters to `state/dead-letter.jsonl`, and every failed attempt is recorded in the
+  spend and wake-filter ledgers. A crashed wake no longer needs a re-poke — the retry is
+  the runner's job.
 
 ---
 

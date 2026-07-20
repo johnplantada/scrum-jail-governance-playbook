@@ -294,9 +294,11 @@ metric (FIELD-NOTES.md §12): tag every wake's outcome, steer on the fraction th
 the record, and defer the provably-pointless wake classes in the router for $0. The
 org-wide backstop is financial: the runner holds live wakes
 once the day's metered spend crosses `SPEND_BREAKER_DAILY_USD`, so spend without progress hits
-a hard ceiling. One honest caveat: delivery today is at-most-once — a wake held at the cap (or
-a crashed cycle) does not get its events re-queued; they stay visible on the issue, but the
-re-wake is manual, and re-delivery is an open follow-up, not a shipped feature. *(v1 damped
+a hard ceiling. One honest caveat: a wake held at the cap does not get its events re-queued —
+the held branch neither fires nor spools, and the cursor advances; the events stay visible on
+the issue, but that re-wake is manual. (A *crashed* cycle, by contrast, is covered now: a
+nonzero dispatch re-queues its events through the deferred-event spool with bounded retries,
+then dead-letters to `state/dead-letter.jsonl` — at-least-once up to the ceiling.) *(v1 damped
 storms with a per-agent 90s cooldown and a rolling 40-wakes/hr breaker, patched to "coalesce,
 not drop" — all retired 2026-07-05 along with the scheduled wakes that made them necessary.)*
 
