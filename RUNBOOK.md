@@ -32,7 +32,7 @@ the whole org** — governance layer AND runtime. What's left for you is GitHub 
 | `_init/.env.example` | The env contract the runtime reads (identity lives ONLY here — the scripts carry no fallback repos) |
 | `_init/github/` | CODEOWNERS (decisions.yaml → the Chairman) + the issue forms, dropdowns stamped from the roster |
 | `runtime/scripts/` | The full runtime: `runner.py` + generated `wake-rules.yaml`, `pm-gh.sh`, `workitems.py`, `agent-run.sh`, `warden.py`, the PreToolUse gates (`subagent_gate.py`, `objective_gate.py`), spend metering, the cadence + output predicates, and the unit tests CI runs |
-| `runtime/.claude/` | `settings.json` (deny-list + fail-open hook wiring) and the governance skills (`blocker-triage`, `board-proposals`, `org-worktree`, `safe-cadence`) |
+| `runtime/.claude/` | `settings.json` (deny-list + fail-open hook wiring) and the governance skills (`blocker-triage`, `board-proposals`, `org-worktree`, `safe-cadence`, `demo-gate`) |
 | `runtime/.github/workflows/` + `runtime/Makefile` | The org CI (tests, linters, ShellCheck, playbook-drift) and the operator surface (`make tick/preview/logs/halt/…`) |
 | The docs | `authorization-gate.md` (the gate walkthrough — the `decisions.yaml`/`workflow_dispatch` mechanism), `envelopes.yaml`, `patterns.md`, `blocker-ledger.md`, `safe.md`, `FIELD-NOTES.md` — vendored into each stamped org's `playbook/`, pinned in `playbook/SOURCE.md` |
 
@@ -40,8 +40,8 @@ the whole org** — governance layer AND runtime. What's left for you is GitHub 
 
 | Component | What it is |
 |---|---|
-| GitHub itself | The org repo (push the stamped directory) + your product repo(s); Issues + one Project (the built-in `Status` single-select, reconciled against the org-chart status canon by `scripts/github-pm-setup.sh`); Actions **only for rare deliberate jobs** — every prod-touching job triggered by **`workflow_dispatch` only** (the deploy gate), nothing hosted triggering per issue-comment, the CI suite run at push time by a local `pre-push` hook (patterns.md Pattern 17; FIELD-NOTES §13); branch protection making CODEOWNERS review binding |
-| The product | Whatever the org runs. `scripts/templates/product-repo/` ships adaptable CI for it (code-review, demo-evidence, preview-deploy, the handoff validator, the metrics endpoint contract) |
+| GitHub itself | The org repo (push the stamped directory) + your product repo(s); Issues + one Project (the board's built-in `Status` single-select, provisioned from `pm_stages` by `scripts/github-pm-setup.sh`); Actions **only for rare deliberate jobs** — every prod-touching job triggered by **`workflow_dispatch` only** (the deploy gate), nothing hosted triggering per issue-comment (typed handoffs are validated on the runner's wake path), the CI suite run at push time by a local `pre-push` hook (patterns.md Pattern 17; FIELD-NOTES §13); branch protection making CODEOWNERS review binding |
+| The product | Whatever the org runs. `scripts/templates/product-repo/` ships adaptable CI for it (code-review, demo-evidence, preview-deploy, the metrics endpoint contract) |
 | Claude | The Claude Code SDK on your plan (`scripts/requirements.txt`); agents run headless through `agent-run.sh` |
 
 **Component contracts (the spec)** — the shipped runtime implements these; they remain
@@ -199,8 +199,11 @@ it green, not building it. In your stamped org repo:
 python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
 make test          # unit tests + constitution lint + blocker lint + decisions check
 cp .env.example .env   # fill in ORG_GH_REPO / PRODUCT_GH_REPO / PRODUCT_REPO
-cp scripts/hooks/pre-commit .git/hooks/   # refuse accidental commits in the runtime checkout
+make install-hooks # pre-commit (no commits in the runtime checkout) + the pre-push CI suite
 ```
+
+(`make dashboard` is there too once the venv exists — a local, read-only spend
+dashboard over `state/spend.jsonl` on http://127.0.0.1:8737.)
 
 The identity env vars have **no fallback defaults** in the scripts (a runtime silently
 talking to someone else's repo is worse than one that refuses to start — the reference

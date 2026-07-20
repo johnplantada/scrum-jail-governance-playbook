@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help test halt resume blockers warden tick preview logs sync-playbook check-playbook install-hooks
+.PHONY: help test halt resume blockers warden dashboard tick preview logs install-hooks sync-playbook check-playbook
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -32,9 +32,9 @@ blockers: ## Show the open human-task ledger (what only the Chairman can clear)
 warden: ## Read-only warden report: Chairman-queue drift + hygiene findings
 	@set -a; [ -f .env ] && . ./.env; set +a; PYTHONPATH=scripts python3 scripts/warden.py audit
 
-install-hooks: ## Wire scripts/hooks/ as this repo's git hooks (pre-commit + pre-push CI gate — covers all worktrees)
-	@git config core.hooksPath scripts/hooks
-	@echo "✓ core.hooksPath = scripts/hooks (pre-push runs the CI suite locally; see docs/actions-budget.md)"
+dashboard: ## Serve the local spend dashboard on http://127.0.0.1:8737 (chat needs the .venv)
+	@if [ -x .venv/bin/python ]; then .venv/bin/python scripts/cost_dashboard.py; \
+	else python3 scripts/cost_dashboard.py; fi
 
 ## ── Tests (same suite CI runs) ────────────────────────────────────────────
 test: ## Python unit tests + constitution lint + blocker-runbook lint + decisions-ledger check
@@ -42,6 +42,10 @@ test: ## Python unit tests + constitution lint + blocker-runbook lint + decision
 	@python3 scripts/lint_constitution.py
 	@python3 scripts/blockers.py lint
 	@python3 scripts/decisions.py check
+
+install-hooks: ## Wire the guard hooks (pre-commit + the pre-push CI suite) for every worktree
+	@git config core.hooksPath scripts/hooks
+	@echo "✓ core.hooksPath = scripts/hooks — pre-commit + pre-push now cover this checkout and every linked worktree"
 
 ## ── Governance playbook (vendored from the golden) ─────────────────────────
 # playbook/ is a vendored snapshot of the scrum-jail-governance-playbook golden. These targets

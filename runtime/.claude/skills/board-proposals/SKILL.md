@@ -22,7 +22,8 @@ an unmerged proposal is a no.
 ## `[CHARTER]` — a new top-level department
 
 Use when the work needs a capability no existing department covers. Sub-teams within an
-envelope need NO charter — the parent just announces them (DESIGN §5).
+envelope need NO charter — the parent's `max_subagents` envelope (org-chart.yaml) already
+authorizes them; the parent just announces them.
 
 ````
 [CHARTER] Product Management

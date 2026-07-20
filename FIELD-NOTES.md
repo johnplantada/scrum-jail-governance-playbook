@@ -73,10 +73,16 @@ runner handles all three in ~30 lines where the chat era needed a dispatcher sub
    an agent forgetting its banner) wakes every labeled department, because a wasted wake
    beats a stalled thread.
 
-The honest caveat, documented in the code itself: delivery is currently **at-most-once**
-— the cursor advances per tick even if a dispatched cycle crashes, so its events are not
-re-delivered. `agent-run.sh` makes the abort loud ("events were NOT re-queued; re-wake
-by hand if needed"); cursor hold-back on failure is an open follow-up.
+The honest caveat that used to sit here — at-most-once delivery, "re-wake by hand if
+needed" — got fixed instead of documented around. A dispatched wake that exits nonzero
+(`agent-run.sh` exits nonzero on an aborted cycle precisely so the runner can see it)
+now has its events **re-queued** through the same deferred-event spool the wake filter
+uses: redelivered on the department's next fired wake, or by the catch-up sweep after
+`WAKE_RETRY_MIN`. Delivery is **at-least-once up to a retry ceiling** — past
+`WAKE_MAX_RETRIES` failed attempts an event **dead-letters** to
+`state/dead-letter.jsonl` instead of looping a hard failure forever, and every failed
+attempt leaves a zero-cost error row in `state/spend.jsonl` and an audit row in
+`state/wake-filter.jsonl`, so a failed dispatch is visible in the ledgers, never silent.
 
 **Conditional polling makes the quiet tick free, not just scarce.** Wakes being scarce
 still leaves the *poll itself* metered — every tick calls 5 endpoints whether or not
@@ -106,8 +112,10 @@ everything else trusts (§6).
 
 - **The org-wide daily breaker** lives in the runner: before firing LIVE wakes it sums
   today's `cost_usd` from `state/spend.jsonl`, and at `SPEND_BREAKER_DAILY_USD`
-  (default $25) it prints `HELD` and fires nothing until the ledger rolls over. Events
-  aren't lost — GitHub is still the queue.
+  (default $25) it prints `HELD` and fires nothing until the ledger rolls over. Honest
+  edge: a held wake's events are neither fired nor spooled and the cursor still
+  advances — they stay visible on the issue, but re-delivery takes a fresh event on
+  the thread or a re-wake by hand (unlike a *failed* wake, whose events re-queue — §1).
 - **The per-department brownout** (`scripts/budget_gate.py`, consulted by
   `agent-run.sh` before every cycle) enforces each node's org-chart
   `envelope.daily_token_budget` — a norm that used to be prompt-level prose no code
@@ -155,8 +163,9 @@ overlapping an in-flight child can all collide.
 - **Stale locks are reclaimed atomically**: rename the dir aside, then re-acquire — two
   racers can't both win a rename; the loser falls through to the contended path.
 - **Exit code 75 for contended direct wakes** (EX_TEMPFAIL — "retry me"); a contended
-  non-direct wake exits 0. Honest footnote: the runner *logs* the 75 but does not yet
-  re-deliver — the at-most-once caveat from §1 again.
+  non-direct wake exits 0. The 75 is honored now, not just logged: any nonzero dispatch
+  re-queues the wake's events through the spool (§1), and the retry ceiling is sized to
+  ride out one full lock-TTL-length cycle of the same agent before dead-lettering.
 - **Bound the cycle so the lock always frees.** The pid check protects against a *dead*
   holder; a wall-clock timeout protects against a *live-but-wedged* one
   (`agent_cycle.py`: `CYCLE_TIMEOUT_S`, default 1500s — deliberately under the 1800s

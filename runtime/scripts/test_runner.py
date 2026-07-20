@@ -6,10 +6,10 @@ Run: PYTHONPATH=scripts python3 scripts/test_runner.py  (CI does this)
 import unittest
 
 from runner import (attribute_issue_bumps, banner_dept, batch_wakes, body_banner, dedup,
-                    depts_from_labels, issue_number_from_url, next_cursor,
-                    normalize_comment, normalize_issue, normalize_run, parse_gh_response,
-                    prune_issue_cache, rate_hold, route, rule_matches, spend_today,
-                    split_retryable)
+                    depts_from_labels, handoff_problems, issue_number_from_url,
+                    next_cursor, normalize_comment, normalize_issue, normalize_run,
+                    parse_gh_response, prune_issue_cache, rate_hold, route, rule_matches,
+                    spend_today, split_retryable)
 
 RULES = [
     {"match": {"kind": "issue", "label": "dept:it"}, "wake": "from-label"},
@@ -387,6 +387,34 @@ class TestPruneIssueCache(unittest.TestCase):
         self.assertEqual(prune_issue_cache(None), {})
         kept = prune_issue_cache({"a": {}, "b": {"ts": "2026-07-01"}}, keep=1)
         self.assertEqual(list(kept), ["b"])
+
+
+class TestHandoffProblems(unittest.TestCase):
+    """The wake-path shape check (the operator-local home Pattern 17 demands)."""
+
+    def test_no_marker_is_clean(self):
+        self.assertEqual(handoff_problems("just prose mentioning [DEMO] mid-sentence\nmore"), [])
+
+    def test_valid_payload_is_clean(self):
+        body = ("[DEMO] shipping the widget\n\n"
+                "```yaml\npr: 12\nevidence_run: url\nacceptance: done-when\nci: green\n```")
+        self.assertEqual(handoff_problems(body), [])
+
+    def test_missing_keys_are_named(self):
+        body = "[CODEREVIEW] verdict\n\n```yaml\npr: 12\nverdict: approve\n```"
+        problems = handoff_problems(body)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("head_sha", problems[0])
+
+    def test_unparseable_yaml_is_a_problem_not_a_crash(self):
+        body = "[AGREEMENT] plan\n\n```yaml\nplan: [unclosed\n```"
+        self.assertTrue(any("unparseable" in p for p in handoff_problems(body)))
+
+    def test_normalize_comment_carries_the_verdict(self):
+        ev = normalize_comment({"id": 1, "body": "[CLOSE] item\n\n```yaml\nitem: 3\n```",
+                                "issue_url": "https://api.github.com/repos/o/r/issues/3"},
+                               "org")
+        self.assertTrue(any("kind" in p for p in ev["handoff_problems"]))
 
 
 if __name__ == "__main__":

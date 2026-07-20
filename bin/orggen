@@ -124,9 +124,6 @@ def dept_block(name, role, reports_to, model, max_sub, budget, note):
     max_sub = 0 if (is_ceo or is_warden) else 4
     budget = 300000 if is_ceo else 100000 if is_warden else 500000
     model = "haiku" if is_warden else "sonnet"
-    sub_note = ("CEO escalates; it doesn't spawn sub-teams itself" if is_ceo
-                else "the script does the work; there is nothing to fan out" if is_warden
-                else "May spawn sub-teams within this cap")
     # The warden's brain is only the judgment residue its deterministic engine flags, so it
     # runs the org's cheapest tier on its smallest budget — see agents/warden.md.
     preamble = (
@@ -284,34 +281,25 @@ def cmd_init(args):
         d = os.path.join(target, sh)
         for f in os.listdir(d):
             p = os.path.join(d, f)
-            if os.path.isfile(p) and (f.endswith(".sh") or f in ("pre-commit", "pre-push")):
+            if os.path.isfile(p) and (f.endswith(".sh") or f.startswith("pre-")):
                 os.chmod(p, 0o755)
 
     # 2. The vendored playbook/ — this golden's docs, pinned so the stamped Makefile's
     #    check-playbook can detect hand-edits (edits belong here, then `make sync-playbook`).
     #    These land in playbook/, NOT the org root: the stamped Makefile's PLAYBOOK_VENDORED
-    #    loop diffs playbook/<doc>, and ci.yml reads the pin out of playbook/SOURCE.md. Writing
-    #    them to the root instead left every stamped org failing check-playbook (DRIFT on all
-    #    nine) and its playbook-drift CI job on the very first push, until someone ran
-    #    `make sync-playbook` by hand — which then left the root copies behind as stale
-    #    duplicates of the playbook/ set.
-    pin = golden_sha()
+    #    loop diffs playbook/<doc>, and ci.yml reads the pin out of playbook/SOURCE.md.
     for doc in VENDORED_DOCS:
         src = os.path.join(REPO, doc)
         if os.path.exists(src):
             write(os.path.join(target, "playbook", doc), read(src))
-    # SOURCE.md is the pin. `make check-playbook` clones the golden at this commit and diffs
-    # against it; without the file the CI job fails before it can even resolve a commit.
     write(os.path.join(target, "playbook", "SOURCE.md"),
-          "# Vendored snapshot\n\n"
-          "playbook/ mirrors the governance golden. Do not hand-edit the\n"
+          "# Vendored snapshot\n\nplaybook/ mirrors the governance golden. Do not hand-edit the\n"
           "vendored docs — change them in the golden and re-run `make sync-playbook`.\n\n"
-          f"Source: scrum-jail-governance-playbook @ {pin}\n"
+          f"Source: scrum-jail-governance-playbook @ {golden_sha()}\n"
           f"Vendored files: {' '.join(VENDORED_DOCS)}\n")
 
-    # 2. org-chart.yaml — from the _init template; the departments: block is generated from the
-    #    SAME dept list that stamps the agent mandates (below), so the chart and agents/ can never
-    #    disagree about who exists.
+    # 3. org-chart.yaml — the departments: block, the roster-derived agent ceiling, and the
+    #    cadences, from the SAME dept list that stamps the mandates below.
     # The warden rides in depts itself — departments() guarantees her exactly once,
     # last, so the chart, mandates, wake rules, and max-agents all see the same roster.
     dept_blocks = "\n".join(dept_block(*d) for d in depts)
@@ -376,9 +364,8 @@ def cmd_init(args):
     print("\nNext steps (RUNBOOK.md — vendored in playbook/ — walks through each one):")
     print("  1. Local runtime: python3 -m venv .venv && .venv/bin/pip install -r")
     print("     scripts/requirements.txt; run `make test` — the stamped org's suite must be")
-    print("     green before anything else. Install the guard hook:")
-    print("     `make install-hooks` (after git init) — sets core.hooksPath, so the")
-    print("     pre-commit guard AND the pre-push CI gate cover every worktree.")
+    print("     green before anything else. Wire the guard hooks (after git init):")
+    print("     `make install-hooks` — pre-commit + the pre-push zero-spend CI suite.")
     print("  2. GitHub: create the org repo and push this directory; `gh auth login`,")
     print("     then `gh auth refresh -s project`. `cp .env.example .env` and fill it in.")
     print("  3. Chairman Settings — the two human-only steps no agent can perform:")
@@ -448,7 +435,8 @@ constitution and `org-chart.yaml` for the tree + envelopes.
 
 ## Operate
 `make` prints the operator surface: `tick` / `preview` / `logs` / `halt` / `resume` /
-`blockers` / `warden` / `test` / `sync-playbook` / `check-playbook`.
+`blockers` / `warden` / `dashboard` / `test` / `install-hooks` / `sync-playbook` /
+`check-playbook`.
 
 ## Setup
 1. `python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt`; `make test`.
