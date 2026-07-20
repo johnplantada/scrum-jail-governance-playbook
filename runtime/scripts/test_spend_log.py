@@ -93,6 +93,52 @@ check("absent-primary: turns sum still == num_turns", sum(r["turns"] for r in ro
 check("absent-primary: turns on highest-cost row (opus)",
       rows_edge[0]["model"] == "opus" and rows_edge[0]["turns"] == 5)
 
+# --- identity fields: the exact model id, kept ALONGSIDE the collapsed tier -----------
+# `model` is lossy where it matters: rates diverge within a tier (opus-4-5 is 5/25,
+# opus-4-1 is 15/75) and one tier row can blend several ids, so a tier row's implied
+# $/token is not any model's real rate. Downstream cost auditing needs the exact id.
+by2 = {r["model"]: r for r in rows2}
+check("model_id carries the exact billed id",
+      by2["haiku"]["model_id"] == "claude-haiku-4-5-20251001"
+      and by2["sonnet"]["model_id"] == "claude-sonnet-4-6")
+check("model tier is unchanged (rollups keep working)",
+      sorted(by2) == ["haiku", "sonnet"])
+
+# --- optional row fields are OMITTED when empty ---------------------------------------
+# Old rows must stay byte-comparable and every reader uses .get()-style access, so a new
+# field may never appear as an empty placeholder.
+import json
+import os
+import tempfile
+
+with tempfile.TemporaryDirectory() as d:
+    p = os.path.join(d, "spend.jsonl")
+    spend_log.append(source="cycle", agent="ceo", model="sonnet", path=p, wake_id="")
+    bare = json.loads(open(p).read().strip())
+    check("bare row omits every optional identity field",
+          not ({"model_id", "session_id", "duration_ms", "duration_api_ms",
+                "api_error_status"} & set(bare)))
+
+    p2 = os.path.join(d, "spend2.jsonl")
+    spend_log.append(source="cycle", agent="ceo", model="sonnet", path=p2, wake_id="w-x",
+                     model_id="claude-sonnet-5", session_id="sess-abc",
+                     duration_ms=1234, duration_api_ms=567, api_error_status=429)
+    full = json.loads(open(p2).read().strip())
+    check("populated row carries model_id", full.get("model_id") == "claude-sonnet-5")
+    check("populated row carries session_id", full.get("session_id") == "sess-abc")
+    check("populated row carries durations",
+          full.get("duration_ms") == 1234 and full.get("duration_api_ms") == 567)
+    check("populated row carries api_error_status", full.get("api_error_status") == 429)
+    # 0 is a real duration and 0 a real status — neither may be dropped as falsy.
+    p3 = os.path.join(d, "spend3.jsonl")
+    spend_log.append(source="cycle", agent="ceo", path=p3, duration_ms=0, api_error_status=0)
+    zero = json.loads(open(p3).read().strip())
+    check("zero duration/status are kept, not treated as absent",
+          zero.get("duration_ms") == 0 and zero.get("api_error_status") == 0)
+
+check("append still never raises on bad input",
+      spend_log.append(source="cycle", path="/nonexistent-dir-xyz/\0/spend.jsonl") is None)
+
 if failures:
     print(f"\n{len(failures)} FAILED: {failures}")
     sys.exit(1)
