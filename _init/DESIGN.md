@@ -61,8 +61,9 @@ config owns.)*
 Work is **GitHub Issues** on the org Project (`scripts/pm-gh.sh`; the board's built-in
 Status field = `org-chart.yaml global.pm_stages`, the only place the status list is
 defined, plus the `pm_holding_stages` parking columns — orthogonal to the flow, so a
-stalled item shows as
-parked instead of feigning progress). The Chairman
+stalled item shows as parked instead of feigning progress — and the `pm_terminal_stages`
+won't-do outcome, set by `pm-gh.sh drop`, which closes as *not planned* with the reason
+on the record; dropping an epic or objective is the Chairman's call alone). The Chairman
 injects work by filing an issue (forms in `.github/ISSUE_TEMPLATE`); the `dept:*` label
 routes it. Objectives decompose as a **work-item tree** on native sub-issues with an
 evidence-gated close at every level (`agents/_policy.md` §workitems): children inherit
