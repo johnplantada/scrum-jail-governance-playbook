@@ -47,7 +47,7 @@ global:
   # is this waiting on": Awaiting Merge and Awaiting Deploy are the Chairman's two queues,
   # so his whole to-do is Awaiting Merge + Awaiting Deploy + Blocked.
   pm_stages: [Todo, In Progress, Awaiting Merge, Demo, Awaiting Deploy, Done]
-  # Holding columns — orthogonal PARKED states, NOT points in the pm_stages flow (safe.md).
+  # Holding columns — orthogonal PARKED states, NOT points in the pm_stages flow (playbook/safe.md).
   # Same board Status field, valid move target, kept out of the ordered list, and exempt
   # from any forward auto-reconcile (a parked item with a PR stays parked).
   pm_holding_stages: [Blocked, On Hold]
@@ -59,7 +59,7 @@ global:
   # These cannot be stamped: neither the board nor the queue epic exists until you have
   # created the org repo. Leaving them null is not a soft default — warden.py exits before
   # doing any work, and the Chairman gets NO queue. That exact omission cost a stamped org
-  # five silent hours (patterns.md Pattern 14). Set them in RUNBOOK commissioning, then
+  # five silent hours (playbook/patterns.md Pattern 14). Set them in RUNBOOK commissioning, then
   # re-pin here if either is ever recreated.
   chairman_queue_issue: null   # ← the UNTYPED epic whose sub-issues = what only the human can do
   pm_project_number: null      # ← the org Project's number (gh project <N>) — pm-gh.sh reads it

@@ -15,7 +15,7 @@ Actions authorship check can tell them apart. The only honest discriminator is t
 wake itself creates: agent-run.sh exports AGENT_NAME; the Chairman's own shell never has
 it. So the gate lives where that env is real — inside the cycle, before the tool runs.
 
-HONEST SCOPE (authorization-gate.md's own warning applies): this is a backstop, not a wall. An
+HONEST SCOPE (playbook/authorization-gate.md's own warning applies): this is a backstop, not a wall. An
 agent holding the token can still reach the API around Bash. It refuses the honest path —
 the one a correctly-behaving agent following a stale mandate would take — and that is the
 failure this org actually had. The wall is the mandate; this is the guardrail on it.

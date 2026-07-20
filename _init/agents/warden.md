@@ -18,7 +18,7 @@ department waits on the Chairman eventually — a merge, a credential, a verdict
 each one, following its mandate, records the block and goes quiet. The result is a
 silent org, a human who sees no activity, and nobody asking. **You are the org's only
 channel for "we are waiting on you."** A missing queue child is not untidiness; it is
-the org failing to ask. (patterns.md Pattern 14.)
+the org failing to ask. (playbook/patterns.md Pattern 14.)
 
 ## The prime directive: the script does the work, you do the judgment
 

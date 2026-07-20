@@ -4,7 +4,7 @@
 Adding a department touches seven surfaces in lockstep (the playbook's Flow C), and
 wake-rules.yaml is the one whose omission is silent: a department in the chart with no
 issue/PR route simply never wakes — the department-level version of the unlabeled-ticket
-gap (patterns.md Pattern 16; org#28 was the issue-level incident). This test makes that
+gap (playbook/patterns.md Pattern 16; org#28 was the issue-level incident). This test makes that
 omission a CI failure instead of a quiet dead department.
 
 Counter-ratchet: extends the test_subagent_gate family — the chart holding a config
@@ -67,7 +67,7 @@ class TestCatchAll(unittest.TestCase):
         self.assertNotEqual(
             _index({"kind": "issue"}, wake="warden"), -1,
             "no {kind: issue} → warden catch-all: an unlabeled issue is invisible "
-            "(patterns.md Pattern 16)")
+            "(playbook/patterns.md Pattern 16)")
 
     def test_catch_all_comes_after_every_dept_issue_rule(self):
         # First matching rule wins: a catch-all ABOVE the dept rules would swallow

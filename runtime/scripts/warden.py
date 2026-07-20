@@ -248,7 +248,7 @@ def expected_stage(current, has_merged_pr, has_open_pr):
     item (org-chart pm_holding_stages: Blocked/On Hold) is left alone — someone put it
     there on purpose, and having a PR must not auto-yank it back into the flow; a
     Dropped item is dead, not behind. An open non-draft PR titled (org#N) IS the
-    awaiting-a-merge fact; a merged one IS the awaiting-demo/acceptance fact (safe.md's
+    awaiting-a-merge fact; a merged one IS the awaiting-demo/acceptance fact (playbook/safe.md's
     column definitions) — Awaiting Deploy and Done are gate outcomes (demo acceptance,
     pm-gh.sh done), never derivable from PR state alone."""
     if current in HOLDING_STAGES or current in TERMINAL_STAGES:
