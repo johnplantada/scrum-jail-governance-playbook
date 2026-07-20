@@ -39,4 +39,4 @@ blockers: []
   #   opened: 2026-01-01
   #   state: open
   #   # gates_market_contact: true  # RARE — only for the org's sole checkout/audience path;
-  #   #                             # stays loud every wake (see blocker-ledger.md §2)
+  #   #                             # stays loud every wake (see playbook/blocker-ledger.md §2)

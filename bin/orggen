@@ -286,6 +286,8 @@ def cmd_init(args):
 
     # 2. The vendored playbook/ — this golden's docs, pinned so the stamped Makefile's
     #    check-playbook can detect hand-edits (edits belong here, then `make sync-playbook`).
+    #    These land in playbook/, NOT the org root: the stamped Makefile's PLAYBOOK_VENDORED
+    #    loop diffs playbook/<doc>, and ci.yml reads the pin out of playbook/SOURCE.md.
     for doc in VENDORED_DOCS:
         src = os.path.join(REPO, doc)
         if os.path.exists(src):
@@ -397,6 +399,9 @@ def cmd_init(args):
     print("     against invariant 1: a mandate that tells an agent to 'turn the north star")
     print("     into objectives' silently repeals your work intake (Pattern 15).")
     print("  8. Read playbook/blocker-ledger.md + playbook/safe.md before week 2.")
+    print("  9. Fill in the filesystem scope (FIELD-NOTES §15): name the absolute paths of")
+    print("     the org repo and product repo(s) in your docs. No agent reads or writes")
+    print("     outside them — unwritten, that rule is a habit, not an invariant.")
 
 
 def org_readme(org, product, depts):

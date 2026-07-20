@@ -509,7 +509,7 @@ compute is free — on the operator's machine, at push time.
 - **Hosted workflows are off by default** (`gh workflow disable` — reversible with
   `enable`), and re-enabling anything needs the Pattern 17 budget line first. The
   `workflow_dispatch`-only deploy gate keeps its workflow: rare-and-deliberate is what
-  the quota is *for*. Budget facts and rules live in the reference org's
+  the quota is *for*. Budget facts and rules ship with the stamp, in
   `docs/actions-budget.md`.
 - **Honesty note:** a git hook is per-clone convention, not server enforcement — an
   unhooked clone can push, and nothing on GitHub's side refuses it. That trade is
@@ -564,7 +564,7 @@ mechanism, plus one cache file that setup already knows how to invalidate.
 # Part II — Retired with the chat stack (2026-07-05)
 
 Six mechanisms from this file's previous edition died with the demolition
-(GITHUB-NATIVE-PLAN.md, item 4). Each was real, tuned, and paid for by an incident — and
+(the retired GITHUB-NATIVE-PLAN.md migration doc, item 4). Each was real, tuned, and paid for by an incident — and
 each is kept at one paragraph because *why it existed* outlives *that it existed*. If
 you run a chat-substrate org, Part II is your Part I.
 
@@ -622,6 +622,33 @@ the Chairman's manual `workflow_dispatch`. The typed-handoff validation duty fou
 Actions successor (§8, built). And the Warden itself came back: re-chartered 2026-07-11
 as a department around a deterministic engine (§11) — the philosophy held; only the
 channels it read didn't.
+
+## 15. Filesystem scope — write it down, or it is a convention nobody can check
+
+**The failure:** every agent inferred *which repo, which path* from wake context alone.
+It was correct in practice for months — and resting on nothing. No constitution line, no
+runbook row, no `docs/` entry stated the scope; it survived because each agent happened
+to infer the same thing. The reference org only noticed when someone asked directly and
+no document could answer.
+
+This is the quiet class of failure the rest of this file is about, in its purest form:
+not a mechanism that broke, but a rule that was *never written* and therefore could never
+be audited, tested, or handed to a new department. An unwritten invariant is
+indistinguishable from a lucky habit until the day it isn't.
+
+**The fix — enumerate the scope explicitly, in the org's own docs:**
+
+- Exactly two parent directories are in scope for every agent: the **org repo**
+  (governance + runtime) and the **product repo(s)**. Name their absolute paths.
+- No agent reads or writes outside them. State it as a prohibition, not a description.
+- The org-repo checkout is shared, read-only runtime state: land changes through the
+  `org-worktree` skill (isolated worktree + PR), never a direct `git commit` /
+  `checkout` / `branch` on it (DESIGN.md §2).
+
+The third bullet is enforced (the skill exists, DESIGN.md §2 binds it). The first two are
+the ones a stamped org must fill in for itself — `orggen` cannot know your paths. Do it
+during commissioning, in the same pass as the Chairman-queue pins: both are the same kind
+of debt, a step that looks optional and is actually load-bearing.
 
 ---
 

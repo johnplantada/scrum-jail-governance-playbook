@@ -12,7 +12,7 @@ runtime; this policy assumes they are installed.)*
 
 ## Where things happen
 
-- **Work** — GitHub issues via `scripts/pm-gh.sh create/tasks/move/comment/comments/done`
+- **Work** — GitHub issues via `scripts/pm-gh.sh create/tasks/move/comment/comments/done/drop`
   (tickets are `org#N`; the board's Status mirrors org-chart `pm_stages`; the `dept:*` label routes the
   wake). One ticket per task; the ticket's comment thread is its single source of truth.
 - **Product code** — PRs against `$PRODUCT_GH_REPO` (`gh pr …`), branch `agent/it/<desc>`.
@@ -66,7 +66,7 @@ Structured handoffs are typed, not prose-by-convention: a fenced ```yaml block i
 relevant issue/PR comment with the required keys. **The authoritative schema is
 `scripts/handoff_check.py`** (ships with the reference runtime), enforced on every
 marker-bearing comment from operator-local compute — the runner's wake path, never a
-per-comment hosted workflow (patterns.md Pattern 17); the lists below document
+per-comment hosted workflow (playbook/patterns.md Pattern 17); the lists below document
 it — keep them in sync with the code.
 
 `[AGREEMENT]` requires: `plan:` (the converged one-liner), `owners:` (who-does-what map),
@@ -101,7 +101,8 @@ title prefix:
 
 **The root is not yours.** `[OBJECTIVE]` is the Chairman's work intake — it has no
 agent-creatable parent because no agent opens one, ever (DESIGN.md invariant 1). `pm-gh.sh`
-mints only `--type epic|feature|story`. A mission pillar with no ticket is a `[PROPOSAL]`
+mints only `--type epic|feature|story`, and `scripts/objective_gate.py` refuses the
+bare-`gh issue create --label objective` path during a wake. A mission pillar with no ticket is a `[PROPOSAL]`
 naming the objective you would file; the Chairman's filing is the answer. Opening it
 yourself reads as diligent coverage and is actually a transfer of his power to you.
 
@@ -114,7 +115,7 @@ will bind to. To brief a peer inside the tree, add `--project <their lane>` — 
 carries their wake label but stays linked under your parent. `pm-gh.sh tree --id N`
 renders any subtree; the rollup, not narrated progress, is the status.
 
-Two norms keep the tree from becoming decomposition theater (patterns.md Pattern 12):
+Two norms keep the tree from becoming decomposition theater (playbook/patterns.md Pattern 12):
 
 - **Decompose just-in-time.** Split a feature into stories only when it's next up
   (Todo); split an epic into features only as the one before it closes. Never expand

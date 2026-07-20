@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# github-pm-setup.sh — idempotent Phase 2 provisioning (GITHUB-NATIVE-PLAN.md): the dept/type
+# github-pm-setup.sh — idempotent provisioning (DESIGN.md §2, the work system): the dept/type
 # labels and the single org Project whose built-in Status field mirrors the org-chart.yaml
 # status canon (pm_stages + holding + terminal) — the one place the list is defined (same
 # canon the linter enforces on prose).

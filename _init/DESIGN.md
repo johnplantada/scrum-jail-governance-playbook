@@ -34,14 +34,14 @@ config owns.)*
    answer. *(Honest scope: a backstop, not a wall — the token can still reach the API around
    Bash. It refuses the honest path, which is the one that actually drifts: an agent obeying a
    mandate that told it to file objectives. Write the mandate right first; this only holds the
-   line. See patterns.md Pattern 15.)*
+   line. See playbook/patterns.md Pattern 15.)*
 2. **Agents never perform human-only actions.** Credentials, accounts, real URLs, publishing
    from personal accounts, repo Settings. Hitting one → record it once in `blockers.yaml`
    (EV-annotated: `value`, `effort_minutes`) and go quiet. **One exception:** an entry
    flagged `gates_market_contact` — the org's only live checkout or only audience — never
    goes quiet; the tooling reprints it loudly every wake until cleared, because a live
    product with no way to pay it and no one told it exists is the one blocker an org must
-   never silence (blocker-ledger.md §2; sunset the flag once a checkout is live and a
+   never silence (playbook/blocker-ledger.md §2; sunset the flag once a checkout is live and a
    demand signal has landed). Only the Chairman clears an entry;
    past `global.unlock_wip_limit` open entries, agents must not start new work whose critical
    path ends in another human-only unlock. *(The WIP rule is prompt-enforced — the injected
@@ -89,7 +89,7 @@ not prose-by-convention. Required keys per type live in `scripts/handoff_check.p
 (documented in `agents/_policy.md` §handoffs; keep the two in sync — CI tests it). `handoff_check.py`
 fails a malformed payload and names the missing keys; it ships in the stamped runtime
 and runs on operator-local compute (the runner's wake path or the pre-push CI suite) —
-never as a per-comment hosted workflow, which bills at agent frequency (patterns.md
+never as a per-comment hosted workflow, which bills at agent frequency (playbook/patterns.md
 Pattern 17).
 
 ## 5 · Counter-ratchet

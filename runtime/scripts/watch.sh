@@ -12,7 +12,7 @@
 #   • <OPS>     — every other root *.log (any ops/infra stream a cron job or script
 #                 grows later) so no stream is silently dropped
 #
-# The old chat + registrar feed retired with the chat stack (GITHUB-NATIVE-PLAN.md). The org's
+# The old chat + registrar feed retired with the chat stack (the GitHub-native migration; DESIGN.md is the standing spec). The org's
 # conversation now lives in GitHub Issues/PRs — watch those on the Project board or with `gh`
 # (e.g. `gh issue list`, `gh pr list`), not here.
 #

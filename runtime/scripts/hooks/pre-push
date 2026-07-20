@@ -1,64 +1,69 @@
 #!/usr/bin/env bash
+# pre-push — run the CI suite locally before any push (zero-spend Actions strategy,
+# docs/actions-budget.md). Hosted workflows are disabled on GitHub; this hook is the
+# merge gate now, so it mirrors .github/workflows/ci.yml job-for-job. If you change a
+# check there, change it here (and vice versa).
 #
-# pre-push — the zero-spend CI gate (FIELD-NOTES §13; patterns.md Pattern 17).
-#
-# Mirrors .github/workflows/ci.yml job-for-job on the operator's machine, at push
-# time, where compute is free — hosted Actions stay for rare deliberate runs (the
-# workflow_dispatch-only deploy gate). Wire it once with `make install-hooks`
-# (core.hooksPath = scripts/hooks): linked worktrees share repo config, so the
-# org-worktree.sh PR worktrees and the runtime checkout all run the same hooks.
-#
-# SKIP_CI_HOOK=1 git push is the deliberate override — never a secret escape hatch.
-set -u
+# Escape hatch for a deliberate unchecked push:  SKIP_CI_HOOK=1 git push …
+set -uo pipefail
+[ -n "${SKIP_CI_HOOK:-}" ] && { echo "pre-push: SKIP_CI_HOOK set — skipping CI suite" >&2; exit 0; }
+cd "$(git rev-parse --show-toplevel)"
+# git exports GIT_DIR (absolute, per-worktree) to hooks; it would override git -C in
+# the golden-clone drift check below and silently warn-skip it on every worktree push.
+unset GIT_DIR GIT_WORK_TREE
 
-if [ "${SKIP_CI_HOOK:-0}" = "1" ]; then
-  echo "pre-push: SKIP_CI_HOOK=1 — suite skipped (deliberate override)"
-  exit 0
-fi
-cd "$(git rev-parse --show-toplevel)" || exit 1
+fail=0
+section() { printf '\n── %s ──\n' "$1"; }
 
-fail() {
-  echo
-  echo "pre-push: REFUSED — $1 failed."
-  echo "pre-push: fix it, or override deliberately with: SKIP_CI_HOOK=1 git push"
-  exit 1
-}
+# ── job: test ────────────────────────────────────────────────────────────────
+section "test: python syntax"
+python3 -m py_compile scripts/*.py || fail=1
 
-# ── ci.yml job `test`: python syntax + every unit test ──────────────────────
-python3 -m py_compile scripts/*.py || fail "python syntax (py_compile)"
+section "test: unit tests"
 for t in scripts/test_*.py; do
-  PYTHONPATH=scripts python3 "$t" || fail "unit test $t"
+  echo "→ $t"
+  PYTHONPATH=scripts python3 "$t" || fail=1
 done
 
-# ── ci.yml job `lint`: shellcheck + the three linters ───────────────────────
+# ── job: lint ────────────────────────────────────────────────────────────────
+section "lint: shellcheck (severity=error)"
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck -S error scripts/*.sh scripts/hooks/pre-commit scripts/hooks/pre-push \
-    || fail "shellcheck"
+  shellcheck --severity=error scripts/*.sh scripts/hooks/* || fail=1
 else
-  echo "pre-push: shellcheck not installed — skipping (install it to mirror CI fully)"
+  echo "⚠ shellcheck not installed (brew install shellcheck) — skipping; CI parity is incomplete" >&2
 fi
-python3 scripts/lint_constitution.py || fail "constitution lint"
-python3 scripts/blockers.py lint || fail "blocker-runbook lint"
-python3 scripts/decisions.py check || fail "decisions-ledger check"
 
-# ── ci.yml job `playbook drift`, against the LOCAL golden at the pinned commit ──
-# A cheap --shared clone checked out at the pin, then the same `make check-playbook`
-# CI runs. Warn-and-skip whenever it can't be judged (no pin, no local golden, pin
-# not fetched yet): a stale local golden must not block a push it can't evaluate.
-GOLDEN_REPO="${GOLDEN_REPO:-$HOME/codebase/scrum-jail-governance-playbook}"
-pin=$(sed -n 's/^Source: scrum-jail-governance-playbook @ //p' playbook/SOURCE.md 2>/dev/null)
-if [ -z "$pin" ] || [ ! -e "$GOLDEN_REPO/.git" ]; then
-  echo "pre-push: playbook drift not evaluable (pin: ${pin:-none}; golden: $GOLDEN_REPO) — skipping"
+section "lint: constitution / blockers / decisions"
+python3 scripts/lint_constitution.py || fail=1
+python3 scripts/blockers.py lint || fail=1
+python3 scripts/decisions.py check || fail=1
+
+# ── job: playbook drift ──────────────────────────────────────────────────────
+# CI clones the golden at the pin from playbook/SOURCE.md. Locally we do the same via a
+# cheap shared clone of the local golden checkout; if the pin isn't present there
+# (stale local golden), warn and skip rather than block the push on an unevaluable check.
+section "playbook drift"
+golden_src="${GOLDEN_REPO:-$HOME/codebase/scrum-jail-governance-playbook}"
+pin="$(sed -n 's/^Source: scrum-jail-governance-playbook @ //p' playbook/SOURCE.md)"
+if [ -z "$pin" ]; then
+  echo "DRIFT: no pinned commit in playbook/SOURCE.md" >&2; fail=1
+elif [ ! -d "$golden_src" ]; then
+  echo "⚠ golden checkout not found ($golden_src) — skipping drift check" >&2
 else
-  tmp=$(mktemp -d) || fail "mktemp for the drift clone"
-  trap 'rm -rf "$tmp"' EXIT
-  if git clone --quiet --shared "$GOLDEN_REPO" "$tmp/golden" 2>/dev/null \
-     && git -C "$tmp/golden" checkout --quiet --detach "$pin" 2>/dev/null; then
-    make check-playbook GOLDEN_REPO="$tmp/golden" \
-      || fail "playbook drift (edits belong in the golden, then: make sync-playbook)"
+  tmp="$(mktemp -d)"
+  if git clone -q --shared --no-checkout "$golden_src" "$tmp/golden" \
+     && git -C "$tmp/golden" checkout -q --detach "$pin" 2>/dev/null; then
+    make check-playbook GOLDEN_REPO="$tmp/golden" || fail=1
   else
-    echo "pre-push: pin $pin not present in the local golden — skipping drift check"
+    echo "⚠ pin $pin not in local golden ($golden_src) — git -C $golden_src fetch, then retry; skipping" >&2
   fi
+  rm -rf "$tmp"
 fi
 
-echo "pre-push: suite green — pushing"
+echo
+if [ "$fail" != 0 ]; then
+  echo "✋ pre-push: CI suite FAILED — push refused (SKIP_CI_HOOK=1 to override deliberately)" >&2
+  exit 1
+fi
+echo "✓ pre-push: CI suite green"
+exit 0

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pm-gh.sh — the GitHub-native PM adapter (GITHUB-NATIVE-PLAN.md Phase 2).
+# pm-gh.sh — the GitHub-native PM adapter (DESIGN.md §2, the work system).
 #
 # Mirrors bin/pm's subcommand surface on GitHub Issues + the org Project, so when the
 # Chairman flips PM_BACKEND=github the mandates' pm workflow carries over verbatim —

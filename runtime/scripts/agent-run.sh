@@ -138,7 +138,7 @@ esac
 # being created). Only the CEO's mandate consumes the boundary today (agents/ceo.md "Periodic
 # reviews"); other agents' counters tick with no consumer yet. At a CEO boundary, run the
 # output predicate + PI counters read-only and inject the results, so ceremony stays
-# output-gated (safe.md: while shipped=no the review closes with one held line) and the cycle
+# output-gated (playbook/safe.md: while shipped=no the review closes with one held line) and the cycle
 # starts at judgment, not orientation. Fail-open to "tick": a broken counter must never turn
 # every wake into a review.
 cadence="$(scripts/cycle-tick.sh "$name" 2>>"$log" || echo tick)"
