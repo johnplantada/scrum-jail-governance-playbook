@@ -1,6 +1,6 @@
 ---
 name: demo-gate
-description: Produce or accept a [DEMO] — the pre-deploy gate. Use when IT has a product-surface PR ready and must gate it before the Chairman's deploy workflow_dispatch, or when Business must accept or reject a [DEMO] against its acceptance criteria (exam-facing work additionally needs Compliance's COMPLIANCE-OK before acceptance). Demos are produced for deployable work only and queue while prod is dark; acceptance criteria scale with the work (a one-line done-when for internal/one-shot tasks).
+description: Produce or accept a [DEMO] — the pre-deploy gate. Use when IT has a product-surface PR ready and must gate it before the Chairman's deploy workflow_dispatch, or when Business must accept or reject a [DEMO] against its acceptance criteria (assurance-facing work additionally needs Compliance's COMPLIANCE-OK before acceptance, where Compliance is chartered). Demos are produced for deployable work only and queue while prod is dark; acceptance criteria scale with the work (a one-line done-when for internal/one-shot tasks).
 ---
 
 # The [DEMO] gate
@@ -32,10 +32,11 @@ Check the output predicate: `scripts/last-ship.sh` → `shipped=`.
 
 1. **Correctness first.** The PR needs a passing `[CODEREVIEW]` (verdict `PASS`, posted as a
    PR review — `_policy.md` §handoffs). A demo may cite only a PASS.
-2. **Compliance sign-off for exam-facing work.** If the change touches a finding surface, a
-   citation, or an eval claim, route the item to `dept:compliance` and get `COMPLIANCE-OK`
-   **before** asking Business to accept — Business must not accept over a missing or held
-   sign-off.
+2. **Compliance sign-off for assurance-facing work, where Compliance is chartered.** If the
+   change touches a claim surface, a citation change, or an eval claim, route the item to
+   `dept:compliance` and get `COMPLIANCE-OK` **before** asking Business to accept — Business
+   must not accept over a missing or held sign-off. Orgs with no chartered Compliance skip
+   this step (VISION.md: Compliance is an optional independent organ).
 3. **Machine evidence, bound to the head SHA.** Run `scripts/demo-verify.sh <prod-pr-number>`
    and require `verified=yes`. It checks for a green demo-evidence workflow run on the PR's
    *current* head commit; a stale run (evidence generated, then more commits pushed) does not
@@ -69,8 +70,9 @@ Judge it **against the acceptance criteria you wrote**, in-reply on the PR:
 - **Verify, don't trust:** open the `evidence_run` and confirm it's green on the PR's current
   head SHA (re-run `scripts/demo-verify.sh <pr>` if in doubt); spot-check each criterion's
   evidence.
-- **Exam-facing?** Confirm Compliance's `COMPLIANCE-OK` is posted on the item. A
-  `COMPLIANCE-HOLD` names what isn't grounded — send the work back; never accept over it.
+- **Assurance-facing, and Compliance chartered?** Confirm Compliance's `COMPLIANCE-OK` is
+  posted on the item. A `COMPLIANCE-HOLD` names what isn't grounded — send the work back;
+  never accept over it.
 - **Accept:** reply that each criterion is met, evidence verified — then move the work item
   to the deploy queue: **`scripts/pm-gh.sh move --id N --to "Awaiting Deploy"`**. That
   column IS the Chairman's dispatch queue (org-chart `pm_stages`); an accepted demo that
