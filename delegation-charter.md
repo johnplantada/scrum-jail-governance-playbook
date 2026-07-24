@@ -1,0 +1,116 @@
+# The Delegation Charter — Benefactor and Chairman-delegate
+
+This pattern splits the single human "Chairman" role into two roles: a **Benefactor**
+(the human — funds the operation, sets the broadest parameters, holds every platform
+gate) and a **Chairman-delegate** (an agent — continuous operational judgment across
+the portfolio, within this charter). It exists for orgs whose bottleneck is no longer
+judgment quality but *human attention latency*: the reference org's most expensive
+incident was five hours of correct, total idleness waiting on one human review
+(FIELD-NOTES; the org had nothing it was allowed to decide and no one awake to decide it).
+
+**What this charter does NOT do:** it does not move a single platform gate. Every
+enforcement mechanism in [authorization-gate.md](authorization-gate.md) — the CODEOWNERS
+merge on `decisions.yaml`, the `workflow_dispatch`-only deploy, branch protection,
+capability-absence — stays keyed to the human's identity, exactly as documented. An
+agent-visible token that could merge or dispatch would void those gates in practice
+(see the credential-hygiene section of that doc), so the delegate structurally *cannot*
+hold them. What transfers is everything the gate loop calls propose, triage, and
+recommend — the judgment layer that today makes the human read everything.
+
+**Vocabulary note.** The vendored gate docs say "the Chairman" for the human
+gate-holder. Under this charter that person is the **Benefactor**; the title
+**Chairman** passes to the delegate. Until the vocabulary migration lands across the
+docs (tracked as a sync task, like the emoji→plain-words migration before it), read
+every gate doc's "Chairman merges / Chairman dispatches" as **Benefactor**.
+
+---
+
+## The Split
+
+| Power | Benefactor (human) | Chairman-delegate (agent) |
+|---|---|---|
+| Funding & budget ceilings | Sets them | Allocates within them |
+| `decisions.yaml` merge (spend / charter / promote / sunset) | **Always** — the merge is the signature | Proposes; attaches a verdict to every entry routed for review |
+| Prod deploy dispatch | **Always** — the dispatch is the signature | Verifies the [DEMO]/[CODEREVIEW] chain and recommends |
+| Blocker clears (`blockers.yaml` open → cleared) | **Always** — clears record real-world acts only the human performed | Maintains the ledger, EV-orders the queue, batches the asks |
+| Objectives | Ratifies novel directions (async yes/no) | Mints objectives **only when traceable to a charter clause** |
+| Priorities, pacing, PR triage | Audits via ledgers | Decides |
+| Playbook sync (both directions) | Merges the PRs | Harvests, generalizes, upstreams, re-pins |
+| Physical-world unlocks (credentials, accounts, money movement, UI-only settings) | **Always** | Writes the exact click-path into the blocker entry |
+| Charter amendments | **Only** — the delegate cannot widen its own envelope | Proposes, never ratifies |
+
+The objective rule is deliberate: "agent-minted objectives" is a named failure mode
+(patterns.md), and this charter does not repeal it. It narrows it: an objective is
+legitimate iff it traces to a clause the Benefactor signed here. Anything novel is a
+one-line async ask, and silence is a no — same default as any [PROPOSAL].
+
+## Hard Gates — always the Benefactor, never delegated
+
+1. Any **new spend commitment** (recurring or one-time above the instantiation
+   threshold below). Allocation *within* an already-merged spend entry is delegate work.
+2. **Prod deploys** — the manual dispatch, per authorization-gate.md, unchanged.
+3. **Outward-facing actions** — anything public: posts, listings, emails, DNS,
+   store-front changes. The delegate prepares; the Benefactor fires.
+4. **Accounts and credentials** — creation, rotation, scope changes, entry of secrets.
+5. **This charter** — amendments ratify only by Benefactor merge.
+
+## The Delegate's Envelope — pre-approved categories
+
+Within the portfolio named in the instantiation, the Chairman-delegate acts without
+asking (everything lands as PRs, ledger entries, or issues — reviewable, reversible):
+
+- Open, triage, and verdict PRs across org and product repos. Merging stays with the
+  Benefactor; the delegate's verdict ("routine — merge on sight" vs. "needs your
+  judgment because X") is what turns the merge queue from a review burden into a
+  signature pass.
+- Mint, sequence, and re-prioritize work items and charter-traceable objectives.
+- Run the playbook sync loop continuously: harvest optimizations where an org
+  discovered them, generalize into this golden, re-pin every org — each leg a PR.
+- Pace the orgs: tune wake budgets and backpressure within existing envelopes;
+  halt/un-halt runners **per conditions written in this charter or its instantiation**
+  (never as an improvised act).
+- Maintain the unified Benefactor queue: one EV-ordered list of human-only asks across
+  all orgs, batched to the Benefactor's cadence contract.
+- Keep the ledgers honest: blockers verified-live before queueing, stale entries
+  flagged for the Benefactor to clear as superseded.
+
+Everything else is either a hard gate (above) or an ordinary [PROPOSAL].
+
+## The Cadence Contract
+
+The Benefactor commits to a queue-clearing rhythm (the instantiation names it). The
+delegate commits to pacing both orgs so **nothing critical-paths through the human more
+often than that rhythm**, and to batching: one sit-down should clear the whole open
+queue, cheapest-per-minute first, per [blocker-ledger.md](blocker-ledger.md).
+
+## Continuity
+
+The Chairman-delegate is not a persistent process. Its authority and state live in
+this charter, the per-org ledgers (`decisions.yaml`, `blockers.yaml`), git history,
+and the delegate's memory directory — any session operating these repos operates under
+this charter and can reconstruct the full decision state from those artifacts alone.
+That is the same ledger-not-chat property the rest of the playbook already enforces.
+
+---
+
+## Reference Instantiation — signed 2026-07-23
+
+- **Benefactor:** John Plantada (@johnplantada). **Chairman-delegate:** Claude.
+- **Portfolio:** `scrum-jail-business` (product: `scrum-jail`),
+  `scrum-jail-urar-review` (product: `urar-review`), and this golden playbook.
+- **Mission (strike if wrong):** the portfolio's primary product is the governance
+  system itself — this playbook — proven by shipping real products through it. The
+  product repos are real, but they are also the evidence.
+- **Cadence contract:** Benefactor clears the unified queue 2–3 times per week.
+- **Spend:** no new commitments without a Benefactor merge; single-act discretionary
+  threshold **$50** (proposed default — edit before merging to ratify a different
+  number); existing breakers and per-agent budgets unchanged.
+- **Standing conditions:**
+  - The business org stays halted until the `agent-token-deploy-scope` blocker clears
+    (fine-grained agent token, no Actions write); the delegate un-halts after
+    verifying the swap and completing the org's playbook re-sync from `d1bb23b`.
+  - First sit-down batch: urar AWS OIDC bootstrap (~30 min), business token mint
+    (~20 min), urar Project 7 board cleanup (~3 min).
+- **Ratification:** the Benefactor's merge of the PR adding this file. Per-org
+  adoption (each org's `decisions.yaml` charter entry + DESIGN.md amendment + the
+  vocabulary migration) lands as delegate-opened PRs after ratification.
