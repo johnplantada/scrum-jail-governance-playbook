@@ -167,6 +167,16 @@ async def run(name: str, model: str, prompt: str) -> int:
             # values partition total_cost_usd (sum == total), so one row per model is exact.
             rows = spend_log.model_usage_rows(
                 result.model_usage, primary_model=model, num_turns=result.num_turns)
+            # Cycle-level scalars off the ResultMessage. Like `outcome` and `turns` these
+            # describe the WAKE, not a model, so they ride the primary row only — putting
+            # a duration on each per-model sibling would invite summing them. getattr
+            # keeps this working against an older SDK that lacks a field.
+            wake_scalars = dict(
+                session_id=getattr(result, "session_id", "") or "",
+                duration_ms=getattr(result, "duration_ms", None),
+                duration_api_ms=getattr(result, "duration_api_ms", None),
+                api_error_status=getattr(result, "api_error_status", None),
+            )
             if rows:
                 # The outcome is cycle-level; it rides the primary-brain row only
                 # (rows[0] — model_usage_rows puts the turns-bearing row first) so a
@@ -174,13 +184,14 @@ async def run(name: str, model: str, prompt: str) -> int:
                 for i, r in enumerate(rows):
                     spend_log.append(source="cycle", agent=name, wake=wake, via="sdk",
                                      status=status, outcome=(outcome if i == 0 else ""),
-                                     **r)
+                                     **(wake_scalars if i == 0 else {}), **r)
             else:
                 # Older CLI with no model_usage breakdown: one scalar row, as before.
                 spend_log.append(
                     source="cycle", agent=name, model=model, wake=wake, via="sdk",
                     status=status, cost_usd=cost or 0.0, turns=result.num_turns,
-                    outcome=outcome, **spend_log.usage_tokens(result.usage),
+                    outcome=outcome, **wake_scalars,
+                    **spend_log.usage_tokens(result.usage),
                 )
         if result.is_error:
             rc = 1

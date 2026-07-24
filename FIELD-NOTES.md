@@ -221,6 +221,20 @@ one row per Claude call, written at the moment of spend:
   into their parent cycle's rows — one SDK session, no double-counting.
 - **Every row of a wake carries the same `wake_id`** (minted by `agent-run.sh`), so a
   grep can join "what did this wake do" to "what did it cost" across every ledger and log.
+- **A row names the exact model, the session, and the clock.** The tier the rollups key
+  on (`model: sonnet`) is lossy exactly where a cost audit needs precision: rates
+  diverge *within* a tier, and one tier row can blend several ids, so a tier row's
+  implied $/token is not any real model's rate. The reference org hit this as a blocked
+  audit — solving for the rate implied by the SDK's own tokens paired with its own
+  costUSD gave haiku at 1.019× published (a clean match, validating the method) but
+  sonnet at 1.656×, unsettleable while the billed id was thrown away. So each row
+  carries `model_id` (the exact id the SDK billed) alongside the tier, and the
+  primary-brain row — like `outcome` — carries the SDK's `session_id` (the
+  wake→transcript join becomes an exact key instead of a ±60s time-window match),
+  `duration_ms`/`duration_api_ms` (their difference is time in tools, not the model),
+  and `api_error_status` (a 429 recorded as a 429, not inferred from tool-error
+  counts). All five are optional and omitted when empty, so old rows stay
+  byte-comparable and every reader keeps working untouched.
 - **Append-only JSONL** because single-line appends are atomic across concurrent agents,
   self-describing, and trivially parsed. Writes are best-effort: a metering failure
   never breaks an agent cycle.

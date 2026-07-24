@@ -27,8 +27,13 @@ LEDGER = os.environ.get("SPEND_LEDGER") or os.path.join(
 
 def append(*, source, agent="", model="", cost_usd=0.0, status="ok", wake="", turns=0,
            in_=0, out=0, cache_read=0, cache_creation=0, via="", ts=None, path=None,
-           wake_id=None, outcome=""):
-    """Append one spend event. Best-effort: never raises."""
+           wake_id=None, outcome="", model_id="", session_id="", duration_ms=None,
+           duration_api_ms=None, api_error_status=None):
+    """Append one spend event. Best-effort: never raises.
+
+    Every field after `outcome` is OPTIONAL and omitted from the row when empty, so old
+    rows stay byte-comparable and every reader (costs.py, efficiency.py, budget_gate.py,
+    cost_dashboard.py) keeps working untouched — they all use .get()-style access."""
     try:
         # Wake correlation: every artifact of one wake carries the same id (agent-run.sh
         # exports WAKE_ID), so `wake-trace.sh <id>` can join spend to logs to bus posts.
@@ -56,6 +61,27 @@ def append(*, source, agent="", model="", cost_usd=0.0, status="ok", wake="", tu
         # it (on the primary-brain row), so absence keeps old rows and offloads unchanged.
         if outcome:
             row["outcome"] = outcome
+        # The EXACT model id the SDK billed (claude-sonnet-5), alongside the collapsed
+        # `model` tier the rollups key on. The tier is lossy in a way that matters: rates
+        # diverge within a tier (opus-4-5 is 5/25, opus-4-1 is 15/75) and a tier row can
+        # blend several ids, so a tier row's implied $/token is not any model's real rate.
+        if model_id:
+            row["model_id"] = model_id
+        # The SDK's own session id. Downstream, joining a wake to its transcript is a
+        # ±60s time-window match against the corpus because no id was ever recorded;
+        # this makes that join exact.
+        if session_id:
+            row["session_id"] = session_id
+        # Wall-clock vs API time for the wake. Their difference is time spent in tools
+        # rather than waiting on the model. Cycle-level, so they ride the primary row.
+        if duration_ms is not None:
+            row["duration_ms"] = int(duration_ms or 0)
+        if duration_api_ms is not None:
+            row["duration_api_ms"] = int(duration_api_ms or 0)
+        # HTTP status of the failing call when the cycle errored (429, 500, 529) — real
+        # rate-limit detection instead of inferring it from tool-error counts.
+        if api_error_status is not None:
+            row["api_error_status"] = int(api_error_status)
         p = path or LEDGER
         d = os.path.dirname(p)
         if d:
@@ -109,8 +135,11 @@ def _model_usage_tokens(u):
 def model_usage_rows(model_usage, *, primary_model="", num_turns=0):
     """Expand a ResultMessage.model_usage dict into one per-model row payload each.
 
-    Returns a list of dicts (model, cost_usd, turns, in_, out, cache_read, cache_creation) — the
-    per-call fields for append(); the caller adds source/agent/wake/via/status. The per-model
+    Returns a list of dicts (model, model_id, cost_usd, turns, in_, out, cache_read,
+    cache_creation) — the per-call fields for append(); the caller adds source/agent/wake/via/
+    status. `model` stays the collapsed tier every rollup keys on; `model_id` carries the exact
+    id the SDK billed, because the tier is lossy where it matters (rates diverge within a tier,
+    and a tier row can blend ids, so its implied $/token is not any model's real rate). The per-model
     costUSD values PARTITION the cycle's total_cost_usd, so summing the rows reproduces the cycle
     total exactly (no double-counting). `turns` is a cycle-level scalar, so it is attributed to the
     primary-brain row only (0 elsewhere) — sum(turns) == num_turns.
@@ -135,7 +164,8 @@ def model_usage_rows(model_usage, *, primary_model="", num_turns=0):
         if not turns_assigned and tier == primary:
             give_turns = int(num_turns or 0)
             turns_assigned = True
-        rows.append(dict(model=tier, cost_usd=float(u.get("costUSD", 0) or 0),
+        rows.append(dict(model=tier, model_id=model_id or "",
+                         cost_usd=float(u.get("costUSD", 0) or 0),
                          turns=give_turns, **_model_usage_tokens(u)))
     # Primary brain absent from the breakdown (edge): attribute turns to the highest-cost row.
     if not turns_assigned and rows:
