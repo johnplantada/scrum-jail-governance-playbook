@@ -42,7 +42,7 @@ RUNTIME = os.path.join(REPO, "runtime")
 # PLAYBOOK_VENDORED list — check-playbook diffs exactly these files.
 VENDORED_DOCS = ["patterns.md", "safe.md", "blocker-ledger.md", "authorization-gate.md",
                  "envelopes.yaml", "README.md", "RUNBOOK.md", "org-chart.yaml",
-                 "FIELD-NOTES.md"]
+                 "FIELD-NOTES.md", "delegation-charter.md"]
 
 # Department archetypes: name → (role, reports_to, model, max_subagents, budget, note).
 # ceo/business/it are the production chain; warden and compliance are independent organs

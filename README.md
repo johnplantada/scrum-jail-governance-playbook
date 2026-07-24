@@ -140,7 +140,7 @@ chat-based gate and cut over to the GitHub-native model described above on
 2026-07-05 — and this template has followed it across: `RUNBOOK.md` is the current
 GitHub-native operating guide (setup, runtime contracts, and the gate verification
 tests), and the rest of the docs — `authorization-gate.md`, `safe.md`, `patterns.md`,
-`blocker-ledger.md`, `FIELD-NOTES.md`, `envelopes.yaml`, `docs/ARCHITECTURE.md`,
+`blocker-ledger.md`, `FIELD-NOTES.md`, `delegation-charter.md`, `envelopes.yaml`, `docs/ARCHITECTURE.md`,
 `org-chart.yaml`, and the `_init/` stamped templates — describe the same model. Where
 a doc keeps a lineage note about the chat era, that's deliberate history, not a
 second supported path.
