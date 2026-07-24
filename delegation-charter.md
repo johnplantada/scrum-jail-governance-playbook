@@ -13,8 +13,9 @@ enforcement mechanism in [authorization-gate.md](authorization-gate.md) — the 
 merge on `decisions.yaml`, the `workflow_dispatch`-only deploy, branch protection,
 capability-absence — stays keyed to the human's identity, exactly as documented. An
 agent-visible token that could merge or dispatch would void those gates in practice
-(see the credential-hygiene section of that doc), so the delegate structurally *cannot*
-hold them. What transfers is everything the gate loop calls propose, triage, and
+(see the credential-hygiene section of that doc), so the delegate must never hold
+them — a requirement with teeth only once the delegate has its own platform identity
+(see **The Identity Requirement** below). What transfers is everything the gate loop calls propose, triage, and
 recommend — the judgment layer that today makes the human read everything.
 
 **Vocabulary note.** The vendored gate docs say "the Chairman" for the human
@@ -90,6 +91,71 @@ this charter, the per-org ledgers (`decisions.yaml`, `blockers.yaml`), git histo
 and the delegate's memory directory — any session operating these repos operates under
 this charter and can reconstruct the full decision state from those artifacts alone.
 That is the same ledger-not-chat property the rest of the playbook already enforces.
+
+## The Identity Requirement
+
+Everything above assumes the platform can tell the parties apart. **If the delegate
+operates under the Benefactor's credential, this charter is fiction**: the audit trail
+cannot distinguish a Benefactor signature from a delegate action, the self-merge and
+no-dispatch rules become behavioral promises rather than platform facts, and the
+ratchet (below) rests on the delegate's self-reported record — author = reviewer at
+the exact tier this charter creates. The playbook's own warning applies: the gate is
+void in practice while looking intact in every git log.
+
+So the delegate operates under **its own platform identity** — on GitHub, a GitHub App
+(bot) with fine-grained permissions: Contents/Issues/PRs read-write, **no Actions
+access, no admin, never a CODEOWNER**. Three rings, strictly nested:
+
+- **Ring 0 — the Benefactor**: owner, sole CODEOWNER, sole workflow dispatcher.
+- **Ring 1 — the delegate**: the bot identity above. Branch protection then
+  *mechanically* prevents the delegate from merging gated paths or dispatching.
+- **Ring 2 — roster agents**: a narrower credential still (open PRs and comment —
+  never merge, never dispatch).
+
+Identity is also what makes the ratchet enforceable: a decision category the
+Benefactor promotes to routine can be granted to the delegate identity as a narrow,
+revocable permission — trust as configuration, not as memory. A bootstrap period on a
+shared credential may be unavoidable; treat it as a named, ledgered condition and
+close it **before** delegate operations scale.
+
+## Verifying the Delegate
+
+Every check in this playbook enforces author ≠ reviewer for agents (the review check,
+the demo's demand-side acceptance, the warden's ground-truth reconciliation). The
+delegate tier gets the same treatment, not an exemption:
+
+- **Digest, then audit**: the delegate logs every non-trivial decision to an
+  append-only digest. The org's hygiene layer (warden) reconciles digest claims
+  against repo facts — the same pattern it already runs on board state, pointed up.
+- **Outcome predicates**: the Benefactor's audit anchors on script-computed ground
+  truth (shipped/spend/cycle predicates in the last-ship.sh style), never solely on
+  the delegate's narrative.
+- **The ratchet**: delegate decision categories start as flag-for-judgment and are
+  promoted to routine only by explicit Benefactor amendment after repeated
+  ratification — and demoted the same way. Start tight, loosen deliberately applies
+  to the delegate's envelope exactly as it applies to every agent's.
+
+## Scaling to a Portfolio
+
+When one delegate serves multiple orgs, add a thin portfolio layer rather than
+coupling the orgs (detail belongs in a companion operations doc; the invariants are
+charter-level):
+
+- **A portfolio seat** — a small private repo: the org roster (with budget
+  allocations and standing conditions), the unified Benefactor queue, the delegate's
+  digest, and the delegate's wake wiring.
+- **Two-tier escalation** — ordinary judgment routes to the delegate; only hard-gate
+  items pass through to the Benefactor, verdict attached. The human-only blocker
+  ledger stays pure: delegate-clearable items are never blockers.
+- **Decision rights, not just resource caps** — envelopes gain a decides/escalates
+  block at every tier, CI-lintable so no tier grants itself what its parent didn't.
+- **A traceability chain** — charter clauses → delegate objectives → epics → stories,
+  mechanically checkable, so legitimacy is auditable from any work item to the root.
+- **Hub-and-spoke** — orgs never depend on each other directly; cross-org needs route
+  through the delegate as briefs, and the playbook remains the only shared artifact.
+- **Summed limits** — a portfolio-level spend breaker and attention budget on top of
+  per-org ones; moving allocation between orgs within the total is delegate work,
+  raising the total is the Benefactor's.
 
 ---
 
