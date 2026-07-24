@@ -52,7 +52,7 @@ install-hooks: ## Wire the guard hooks (pre-commit + the pre-push CI suite) for 
 # keep it honest: sync pulls the golden's root docs in + pins the source commit; check fails on
 # drift. Business-specific files (DEPLOY-RUNBOOK.md, templates/) are NOT synced.
 GOLDEN_REPO ?= $(HOME)/codebase/scrum-jail-governance-playbook
-PLAYBOOK_VENDORED := patterns.md safe.md blocker-ledger.md authorization-gate.md envelopes.yaml README.md RUNBOOK.md org-chart.yaml FIELD-NOTES.md
+PLAYBOOK_VENDORED := patterns.md safe.md blocker-ledger.md authorization-gate.md envelopes.yaml README.md RUNBOOK.md org-chart.yaml FIELD-NOTES.md delegation-charter.md
 
 sync-playbook: ## Pull the golden's governance docs into playbook/ + pin the source (GOLDEN_REPO=...)
 	@test -d "$(GOLDEN_REPO)" || { echo "GOLDEN_REPO not found: $(GOLDEN_REPO)"; exit 1; }

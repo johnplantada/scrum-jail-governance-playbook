@@ -337,7 +337,7 @@ flowchart LR
     Args["orggen init &lt;target&gt;<br/>product · goal · chairman GitHub username · product repo · departments"] --> Tup["departments(): one tuple per department<br/>name, role, reports_to"]
     Tup --> Chart["org-chart.yaml<br/>departments: block"]
     Tup --> Agents["agents/&lt;name&gt;.md<br/>one mandate per tuple"]
-    Args --> Docs["vendor VENDORED_DOCS (9) into playbook/:<br/>patterns · safe · authorization-gate · envelopes · blocker-ledger · FIELD-NOTES · RUNBOOK · README · org-chart"]
+    Args --> Docs["vendor VENDORED_DOCS (10) into playbook/:<br/>patterns · safe · authorization-gate · envelopes · blocker-ledger · FIELD-NOTES · RUNBOOK · README · org-chart · delegation-charter"]
     Args --> Fill["fill DESIGN.md + .env.example<br/>copy blockers.yaml · stamp a README"]
     Chart --> Inv(["Invariant: one tuple list →<br/>chart and agents/ never disagree"])
     Agents --> Inv
@@ -357,7 +357,7 @@ bin/orggen init ../my-org --product "myproduct.com" --goal "$10k/month" \
 organ, not a choice** — appended to every roster exactly once (reports to the board, `haiku`,
 `0 / 100k`), because `--departments` picks the org's business shape, never whether it can ask
 the Chairman for anything. `compliance` also reports to the board (the assurance second line);
-every other name reports to the CEO with an envelope of `4 / 500k`. The nine governance docs
+every other name reports to the CEO with an envelope of `4 / 500k`. The ten governance docs
 are vendored into `playbook/` pinned to this golden's commit (the stamped `check-playbook` and
 CI drift job keep them honest); `DESIGN.md`, `.env.example` (the org/product repo slugs the
 runner and `pm-gh.sh` read), and the org chart are filled from your flags. The generator stamps

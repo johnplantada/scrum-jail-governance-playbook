@@ -34,7 +34,7 @@ the whole org** — governance layer AND runtime. What's left for you is GitHub 
 | `runtime/scripts/` | The full runtime: `runner.py` + generated `wake-rules.yaml`, `pm-gh.sh`, `workitems.py`, `agent-run.sh`, `warden.py`, the PreToolUse gates (`subagent_gate.py`, `objective_gate.py`), spend metering, the cadence + output predicates, and the unit tests CI runs |
 | `runtime/.claude/` | `settings.json` (deny-list + fail-open hook wiring) and the governance skills (`blocker-triage`, `board-proposals`, `org-worktree`, `safe-cadence`, `demo-gate`) |
 | `runtime/.github/workflows/` + `runtime/Makefile` | The org CI (tests, linters, ShellCheck, playbook-drift) and the operator surface (`make tick/preview/logs/halt/…`) |
-| The docs | `authorization-gate.md` (the gate walkthrough — the `decisions.yaml`/`workflow_dispatch` mechanism), `envelopes.yaml`, `patterns.md`, `blocker-ledger.md`, `safe.md`, `FIELD-NOTES.md` — vendored into each stamped org's `playbook/`, pinned in `playbook/SOURCE.md` |
+| The docs | `authorization-gate.md` (the gate walkthrough — the `decisions.yaml`/`workflow_dispatch` mechanism), `envelopes.yaml`, `patterns.md`, `blocker-ledger.md`, `safe.md`, `FIELD-NOTES.md`, `delegation-charter.md` — vendored into each stamped org's `playbook/`, pinned in `playbook/SOURCE.md` |
 
 **You bring (NOT included here):**
 
