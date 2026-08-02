@@ -1,0 +1,30 @@
+schema_version: 1
+source_roots:
+  - _init
+  - runtime
+  - LICENSE
+  - VERSION
+  - bin/orggen
+  - bin/sjg-install
+  - bin/sjg-activate
+  - control
+  - schemas
+  - stamp-manifest.yaml
+  - patterns.md
+  - safe.md
+  - blocker-ledger.md
+  - authorization-gate.md
+  - envelopes.yaml
+  - README.md
+  - RUNBOOK.md
+  - org-chart.yaml
+  - FIELD-NOTES.md
+  - role-terminology.md
+  - delegation-charter.md
+rules:
+  exclude_ignored: true
+  reject_symlinks: true
+  preserve_executable_mode: true
+  clean_source: git-commit
+  dirty_source: manifest-listed-worktree
+  dirty_release_qualified: false

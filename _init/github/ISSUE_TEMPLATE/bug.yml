@@ -18,10 +18,10 @@ body:
     validations:
       required: true
   - type: dropdown
-    id: department
+    id: role
     attributes:
-      label: Owning department
+      label: Accountable role
       options:
-{{DEPT_OPTIONS}}
+{{ROLE_OPTIONS}}
     validations:
       required: true

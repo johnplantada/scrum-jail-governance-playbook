@@ -7,19 +7,14 @@ check below encodes a drift class that actually happened:
 
   1. cadence literals   — "every 5 wakes" / "5-cycle review" hardcoded in seven files
                           while org-chart.yaml said review_interval: 20
-  2. stage canon        — the constitution and agents/it.md disagreed on the kanban
-                          stage list and order; the canon is org-chart.yaml
+  2. stage canon        — prose disagreed with the kanban stage list and order;
+                          the canon is org-chart.yaml
                           global.pm_stages
   3. skill references   — mandates invoked skills that weren't version-controlled
 
-(The chat-era linter also cross-checked documented CLI flags and handoff schemas
-against the Go services; those retired with the services. The typed-handoff schema now
-lives in scripts/handoff_check.py, enforced on the runner's wake path and by the
-pre-push suite; test_handoff_check.py keeps _policy.md §handoffs in sync.)
-
 Scope: DESIGN.md, README.md, agents/*.md, .claude/skills/*/SKILL.md, docs/*.md.
-Deliberately NOT scanned: playbook/ (vendored from the governance golden — fix it there
-and `make sync-playbook`), content/ (marketing copy tells stories about past
+Deliberately NOT scanned: playbook/ (integrity-covered vendored governance docs),
+content/ (marketing copy tells stories about past
 configurations), scripts/ (code comments).
 
 Usage: python3 scripts/lint_constitution.py   (exit 0 clean, 1 with findings on stderr)

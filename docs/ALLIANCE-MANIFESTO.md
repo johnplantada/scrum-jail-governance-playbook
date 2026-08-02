@@ -40,7 +40,7 @@ what AI can do now. Every purpose from 2023 carries forward, one level up:
 - **Still a hoax.** A fictional correctional institution for agile process violations,
   now with a real product surface instead of a Google Sites brochure.
 - **Still a time capsule.** In 2023, AI could write the website. In 2026, AI *runs the
-  company*: an autonomous multi-agent organization — a CEO, departments, reviews,
+  company*: an autonomous multi-agent organization — a Project Orchestrator, functional roles, reviews,
   deploys — builds and operates the site.
 - **And now, an actual experiment.** How do you orchestrate multiple agents, get them
   to follow a strict process, and keep the whole thing auditable and controllable by
@@ -57,5 +57,5 @@ the architecture.
 
 The experiment is ongoing, and it's quite fun.
 
-— John, Chairman<br>
+— John, Human Principal<br>
 The Scrum Jail Alliance (est. 2023 · sentenced to production 2026)

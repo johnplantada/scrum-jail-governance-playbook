@@ -1,187 +1,46 @@
-# Scaled Agile for an Agent Org — without the theater
+# Evidence-gated delivery cadence
 
-If you run more than a couple of agents, you'll be tempted to give them a process: sprints,
-demos, planning. Do it — a little structure helps. But agent orgs fail at this in a specific,
-expensive way (see [patterns.md](patterns.md) Pattern 10): the **ceremony runs on a clock, not
-on delivery**, so it keeps running over an org that has shipped nothing. We ran *PI Planning for
-a product that had never deployed once.* This is how to get the value without the theater.
+Cadence is derived from durable work events, not a clock that wakes agents to restate status.
+No routed event means no wake and no provider usage.
 
-## The one principle
+## Work hierarchy
 
-> **Ceremony is gated on shipped output, not on elapsed time.**
+The Human Principal creates objectives. Project Orchestrator creates and assigns the minimum
+epics needed to coordinate an objective. Delivery owners create features and stories just in
+time. The controller enforces `objective → epic → feature → story`, typed parents, ownership,
+and complete child enumeration.
 
-No clock advances process state. Only a real production ship does. Everything below hangs off a
-single predicate.
+Features and stories carry acceptance or done-when text. Completion requires evidence bound
+to the exact issue:
 
-## The output predicate (the keystone)
+- a merged product pull request that relates to the item;
+- an accepted `[DEMO]` comment containing the item reference and current acceptance digest.
 
-Define "did we actually ship?" once, as a script every ritual checks first:
+Repeating an acceptance or done-when statement is never completion evidence.
 
-```bash
-# last-ship.sh → shipped=<yes|no>, plus the sha/time of the last real deploy.
-# A "real ship" = a SUCCESSFUL deploy of production (e.g. a green deploy workflow on main).
-```
+Closing keywords in agent pull requests are rejected. Objective and epic closure remains a
+Human decision or deterministic rollup commissioned on the Human path.
 
-One subtlety worth stealing: scope it to the **current** pipeline on your release branch, so a
-stale or pre-org green run doesn't read as `shipped=yes`. While the predicate is `no`, the whole
-process layer is **dormant by design** — you cannot demo, accept, or plan an increment for a
-program that has incremented nothing.
+## Flow
 
-## Iterations
+`Todo → In Progress → Awaiting Merge → Demo → Awaiting Deploy → Done` is the ordered flow.
+`Blocked` and `On Hold` are holding states, not progress. `Dropped` is terminal and requires a
+reason. Agents may move only their own work forward; backward movement and terminal changes
+outside the feature/story evidence gate require Human intervention.
 
-An iteration = N wakes (the live org started at 5 and now runs 20 — by Chairman directive, once
-reviews every 5 wakes proved too frequent; tune N to your org's tempo). It opens with
-objectives and closes with a review. Make the
-review's **first line a binary**: *"Shipped to prod this iteration? Y/N (cite the deploy)."* If
-the answer is N for three iterations running, the review degenerates to one line naming the
-single external blocker — no retro over a hold. This kills the "executed cleanly within our
-constraints" report that lets a stuck org feel productive.
+## Reviews and deployments
 
-## The work-item tree — decomposition with a closing rule
+Review and demo workflows are manual-only and bind a Human-supplied pull-request number to
+its live head SHA. A review result is evidence, not approval or merge authority. The preview
+workflow builds an unprivileged sealed artifact first; only the approval-gated deploy job
+receives OIDC and deployment permissions.
 
-Give the objectives themselves a structure, or "decomposed the objective" becomes another
-artifact that reads as progress. The live org runs a four-level tree on native GitHub
-sub-issues, kind carried by a plain label + matching title prefix:
+The Human Principal reads the bound evidence, merges the pull request, and separately
+dispatches deployment. A merge never implies a deployment.
 
-    [OBJECTIVE] → [PROPOSAL]*   competing means; epics descend from the ACCEPTED one
-    [OBJECTIVE] → [EPIC] → [FEATURE] → [STORY]
+## Failure behavior
 
-A story's plan is a `## Plan` section in the story body — deliberately not a fifth level.
-Children inherit the parent's `dept:*` routing label at creation, so the poller routes them
-with zero added cost (`pm-gh.sh create --type epic|feature|story --parent N` in the
-reference runtime; `pm-gh.sh tree --id N` renders the rollup).
-
-The tree only works because it is designed against an asymmetry: **for an agent,
-decomposing is nearly free and looks like progress; verification is scarce and is the
-progress.** Left alone, every edge points downward and the tree only grows (patterns.md
-Pattern 12). So every level gets a closing rule as explicit as its decomposing rule,
-enforced in code (`workitems.py can-close` + a typed `[CLOSE]` payload — the same
-shape-vs-facts split as the other gates):
-
-- a **story** closes only citing a merged, repo-qualified PR — or a one-line done-when for
-  internal work;
-- a **feature** closes only citing its accepted `[DEMO]` (or a done-when when it has no
-  product surface) — which means acceptance criteria are written at *decomposition* time:
-  the reference runtime refuses to create a feature/story without them;
-- **epics and objectives** close by rollup — every child closed, nothing else;
-- a **proposal** closes freely: rejected must be cheap to bury.
-
-And one rule *above* the kind-specific rules, paid for by a real incident: **verify
-whatever the caller cites, regardless of kind.** The live org's gate originally validated
-PR-merge evidence only where the kind demanded it (stories) — so an untyped ticket that
-*cited* `--pr <unmerged>` sailed through with zero verification and was closed three times
-against a PR that had never merged. A cited PR must be repo-qualified and actually merged
-for **every** kind; the kind's own rules only govern what happens when no evidence is
-cited. Gates must check what's asserted, not just what's required.
-
-Two norms complete it: **decompose just-in-time** (split a feature into stories only when
-it's next up — a pre-built tree is inventory that rots and burns wakes re-syncing dead
-issues), and **close only through the gate** (a refusal means the work isn't done — fix the
-fact it names, never close around it).
-
-## The `[CODEREVIEW]` gate — correctness, before the demo
-
-The `[DEMO]` proves a change *reaches a user*; it does not prove the *code* is correct or safe.
-Add one gate in front of it for product-surface work: an independent review — structurally
-separate from whoever authored the code (**author ≠ reviewer**) — gives every product-surface
-PR a `PASS` / `CHANGES-REQUESTED` verdict before it can be demoed or deployed. In the live org
-that reviewer is a `claude-code-action` check running *on the PR itself*, with its workflow
-runs routed to IT by `wake-rules.yaml` so a department owns acting on the verdict. (Lineage:
-v1 chartered an independent Reviewer *department* for this; retired 2026-07-05 with the chat
-stack, replaced by the CI check.) Three rules keep it honest:
-
-- **Anchor the verdict to evidence, not vibes.** Bind it to the PR's current **head SHA** —
-  a new push invalidates a stale PASS. The review itself
-  happens *on the PR* (inline `file:line` comments), where the code is.
-- **A demo may cite only a PASS.** The `[DEMO]` carries the passing review's id. The payload
-  *shape* is mechanically enforced by `scripts/handoff_check.py` (successor to the
-  chat-era Warden), run on operator-local compute — the runner's wake path or the
-  pre-push CI suite, never a per-comment hosted workflow (patterns.md Pattern 17). It
-  fails any `[DEMO]` missing its required keys.
-  HONESTY NOTE: that the cited review is actually a PASS is checked by the facts layer
-  (`demo-verify.sh` re-derives evidence from the head SHA), not by the shape validator.
-- **Ship it dormant.** The gate is dormant until the review check is installed on the product
-  repo — no check, no citation required — then binding. Until then, don't pretend to have it.
-
-This is the "author ≠ reviewer" separation the authorization gate already applies to spend and
-deploy, extended to code correctness — a CI check on the PR, not a department and not a parser.
-
-## The `[DEMO]` gate — the one gate worth adding
-
-A `[DEMO]` is a worked demonstration that a change meets agreed **acceptance criteria**. Make it
-the prerequisite for a deploy request: no product-surface PR reaches a deploy dispatch without a
-demand-side-**accepted** `[DEMO]` (which cites its passing `[CODEREVIEW]`), and the approval
-relay cites the accepted demo's id. Two rules keep it honest:
-
-- **A demo proves a feature reaches a user, so it's produced at deploy time, for deployable work
-  only.** While prod is dark, an accepted PR *merges* (green CI) and **queues** — it does not
-  demo. You cannot demo a feature that cannot reach a user; this is what stops the "demo gate
-  demoing itself."
-- **Acceptance criteria scale with the work.** ACs (≤3 observable-outcome bullets) are required
-  only for product-surface work. Process, manual, or one-shot tasks get a one-line "done-when,"
-  not a Definition-of-Done. (Over-documenting a one-shot task is the overhead agents rightly
-  resent — and a tell that the process is running ahead of the substance.)
-
-A `[DEMO]` needs no special tooling — it's a message type, a convention. Don't build a parser.
-Do steal the live org's one predicate behind it, though: `scripts/demo-verify.sh` answers "is
-there a green `demo-evidence.yml` run on this PR's **current head SHA**?" — same pattern as the
-output predicate, evidence in code, not prose. A stale run (evidence generated, then more
-commits pushed) does not verify, and the run URL goes in the `[DEMO]` so the acceptor opens
-artifacts, not adjectives.
-
-**Let the tracker hold the queue.** Give the board a fixed, ordered set of columns so a
-change can't silently skip the gate — and name each column for **who it waits on**, so the
-human can read their own queue off the board. The live org runs
-**Todo → In Progress → Awaiting Merge → Demo → Awaiting Deploy → Done**:
-`Awaiting Merge` = PR open, in the Chairman's merge queue; `Demo` = merged to main, demo
-being produced or awaiting demand-side acceptance of the `[DEMO]`; `Awaiting Deploy` =
-demo accepted, waiting on the Chairman's manual `workflow_dispatch`; `Done` = shipped (or,
-for non-product tasks, completed). The two `Awaiting` columns plus `Blocked` ARE the
-Chairman's to-do list. Define the status list in **one place** and have your docs and lint
-reference it — the column *is* the queue, so accepted-but-undeployed work visibly waits in
-`Awaiting Deploy` instead of being quietly treated as shipped (while a deploy path stays
-dark, that column doubles as the visible deploy debt).
-
-**Parked states are not flow stages.** The live board also carries two **holding columns**
-— `Blocked` (waiting on a ledgered human-only blocker) and `On Hold` (deliberately
-deprioritized) — kept in a *separate* `pm_holding_stages` list, not appended to the
-ordered flow. They're options of the same board Status field and a valid move target, but
-three properties depend on keeping them out of the ordered list: the flow linter and any
-`.index()` math over the status sequence stay honest; a stalled item shows as *parked*
-instead of feigning progress in `In Progress`; and any forward auto-reconcile (a bot
-moving cards to match PR state) must **exempt** them — a parked item that happens to have
-a PR must not be yanked back into the flow while the thing that parked it still holds.
-A third kind of non-stage, `Dropped` (`pm_terminal_stages`), records the won't-dos:
-closed as *not planned* with the reason on the record, so the board stops conflating
-"shipped" with "abandoned" — and dropping an epic or objective is the Chairman's
-deprioritization call alone.
-
-## Program Increments — gate the planning, not just the cadence
-
-A PI bundles a few iterations. A counter (`pi-tick`) tells you the cadence boundary — the live
-org's `scripts/pi-tick.sh` counts closed `[REVIEW]` issues as completed iterations, with
-`iters_per_pi` read from the org chart's `pi_interval`, so the cadence is derived from the
-record, not a clock — but emit a
-**second** flag: `pi_planning_eligible = (due AND shipped-in-window)`. **PI Planning convenes
-only when eligible.** Otherwise the lead posts a one-line conclusion: *"PI N closed with zero
-prod ships; planning suppressed; sole blocker = X; no theme set."* You cannot plan an increment
-that didn't increment. When it *is* eligible, set the theme from real signal and close with
-Inspect & Adapt (score the increment, commit one process change).
-
-## What to build vs. skip
-
-| Build | Skip |
-|---|---|
-| `last-ship.sh` output predicate | a separate `#demos` channel (reuse the board) |
-| `pi-tick` counter + `pi_planning_eligible` flag | a custom `[DEMO]` parser (it's just a tag) |
-| The `[DEMO]`-before-deploy rule in the constitution + mandates | per-task Definitions-of-Done |
-| ACs only for product-surface work | a sprint tool / burndown charts |
-| Output-gating on every ceremony | ceremony that runs on a clock |
-
-## Adopt it deliberately
-
-The process layer is a constitution change — gate its adoption behind an operator charter
-approval, and ship
-the capabilities (the counter, the demo column) **dormant**. The gate becomes binding the moment
-your first deploy goes green and the output predicate flips to `yes`. Until then, the most honest
-thing your org can do is stay quiet and point at the one blocker in [blocker-ledger.md](blocker-ledger.md).
+Partial pagination advances no cursor. Delayed events are recovered through a bounded
+overlap window and deduplicated by external identity and version. Expired pre-start leases
+may retry; an expired running lease becomes uncertain. Budget-held work remains queued.
+Dead letters and uncertain mutations require explicit Human review.

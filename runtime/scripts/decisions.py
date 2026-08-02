@@ -15,7 +15,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATH = os.path.join(REPO, "decisions.yaml")
 
 TYPES = ("spend", "charter", "promote", "sunset")
-REQUIRED = ("id", "type", "dept", "what", "why", "cost_usd", "chairman_minutes",
+REQUIRED = ("id", "type", "role", "what", "why", "cost_usd", "principal_minutes",
             "reversibility", "unblocks", "proposed")
 
 
@@ -59,7 +59,7 @@ def render(entries):
     out = []
     for d in sorted(entries or [], key=lambda x: str(x.get("proposed") or ""), reverse=True):
         out.append(f"- {d.get('proposed', '?')}  [{d.get('type', '?')}] {d.get('id', '?')} "
-                   f"(${d.get('cost_usd', '?')}, {d.get('dept', '?')}) — "
+                   f"(${d.get('cost_usd', '?')}, {d.get('role', '?')}) — "
                    f"{' '.join(str(d.get('what') or '').split())[:120]}")
     return "\n".join(out)
 

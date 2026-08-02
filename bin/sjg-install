@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Install a reviewed control release into an agent-unwritable version directory.
+
+This is a Human/operator action. It does not activate organization policy or copy any
+credential. Run it under the intended service owner; commissioning verifies ownership.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import importlib.machinery
+import importlib.util
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import stat
+import sys
+import tempfile
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def digest_tree(root: Path):
+    rows = []
+    for path in sorted(value for value in root.rglob("*") if value.is_file()):
+        if path.is_symlink():
+            raise SystemExit(f"sjg-install: refusing symlink: {path}")
+        rows.append({"path": str(path.relative_to(root)),
+                     "mode": format(stat.S_IMODE(path.stat().st_mode), "04o"),
+                     "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+    return rows
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--prefix", required=True,
+                        help="absolute installation prefix, e.g. /Library/Application Support/ScrumJail")
+    parser.add_argument("--version", default=(ROOT / "VERSION").read_text().strip())
+    parser.add_argument("--allow-dirty", action="store_true",
+                        help="install a development-only dirty control release")
+    args = parser.parse_args(argv)
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", args.version):
+        raise SystemExit("sjg-install: --version must be semantic x.y.z")
+    loader = importlib.machinery.SourceFileLoader("sjg_orggen_for_install", str(ROOT / "bin/orggen"))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    source_commit, source_state, source_digest = module.golden_provenance(args.allow_dirty)
+    prefix = Path(args.prefix)
+    if not prefix.is_absolute():
+        raise SystemExit("sjg-install: --prefix must be absolute")
+    if prefix == Path("/"):
+        raise SystemExit("sjg-install: refusing filesystem root as installation prefix")
+    target = prefix / "releases" / args.version
+    if target.exists():
+        raise SystemExit(f"sjg-install: release already exists: {target}")
+    prefix.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{args.version}.staging-", dir=prefix))
+    try:
+        package = staging / "lib" / "sjg_control"
+        package.parent.mkdir(parents=True)
+        shutil.copytree(ROOT / "control" / "sjg_control", package,
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"))
+        shutil.copytree(ROOT / "control" / "provider-policy", staging / "provider-policy")
+        bindir = staging / "bin"
+        shutil.copytree(ROOT / "control" / "bin", bindir)
+        for executable in bindir.iterdir():
+            executable.chmod(0o555)
+        for path in staging.rglob("*"):
+            if path.is_file() and path.parent != bindir:
+                path.chmod(0o444)
+        rows = digest_tree(staging)
+        (staging / "MANIFEST.json").write_text(
+            json.dumps({"schemaVersion": 1, "version": args.version,
+                        "sourceCommit": source_commit, "sourceState": source_state,
+                        "sourceTreeSha256": source_digest,
+                        "releaseQualified": source_state == "clean", "files": rows},
+                       indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        (staging / "MANIFEST.json").chmod(0o444)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(staging, target)
+        for path in sorted(target.rglob("*"), reverse=True):
+            if path.is_dir():
+                path.chmod(0o555)
+        target.chmod(0o555)
+    finally:
+        if staging.exists():
+            for directory in [staging, *staging.rglob("*")]:
+                if directory.is_dir():
+                    directory.chmod(0o755)
+            shutil.rmtree(staging)
+    print(target)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

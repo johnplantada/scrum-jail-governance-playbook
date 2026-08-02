@@ -1,43 +1,19 @@
-# Secrets — NEVER commit. `gh` holds the org's credentials; .env carries only config.
+# Secret files are forbidden in commissioned provider workspaces and ignored defensively.
 .env
+.env.*
 *.token
+.git-credentials
 
-# Emergency-stop flag (scripts/halt.sh / a human)
-.halt
-
-# Per-agent single-flight lock dirs (scripts/agent-run.sh) — runtime only
-.locks/
-
-# Per-agent wake-cycle counters for periodic reviews
-.cycles/
-
-# Runtime state: spend ledger (state/spend.jsonl), metrics store + cursor, runner cursor
-state/
-# costs.csv is the spend ledger's spreadsheet export (scripts/costs.py export)
-costs.csv
-
-# Headless agent cycle logs
-agent-*.log
-
-# Central record of offloaded subtasks (which tier/model handled each delegation)
-offload.log
-
-# Central record of subagent (Task/Agent) fan-outs per cycle
-subagents.log
-
-# Runner + plain-cron job output
-runner.log
-
-# Python venv for the Claude Agent SDK runner (scripts/agent_cycle.py).
-# Recreate with: python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
+# Local validation and observation artifacts. Controller state lives outside this repo.
 .venv/
-
-# Agent-generated artifacts (runtime output, not source)
+reports/
+*.log
 briefs/
 
-# Python bytecode cache
+# Python bytecode.
 __pycache__/
 *.pyc
+*.pyo
 
-# Local scratch definitions are not tracked
+# Local notes are never governance input.
 *.local.md

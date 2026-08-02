@@ -32,7 +32,7 @@ TERMINAL = ["Dropped"]
 class TestCadence(unittest.TestCase):
     def test_every_n_wakes_flagged(self):
         # the constitution pre-fix
-        hits = check_cadence("d.md", "- **Every 5 wakes** — Business and IT each post `REVIEW`")
+        hits = check_cadence("d.md", "- **Every 5 wakes** — Commercial Planner and Software Implementer each post `REVIEW`")
         self.assertEqual(len(hits), 1)
 
     def test_n_cycle_review_flagged(self):
@@ -47,7 +47,7 @@ class TestCadence(unittest.TestCase):
 
     def test_parameter_reference_clean(self):
         text = ("Every review interval (`global.review_interval` wakes — org-chart.yaml), "
-                "Business and IT post a [REVIEW]. A PI = `global.pi_interval` iterations.")
+                "Commercial Planner and Software Implementer post a [REVIEW]. A PI = `global.pi_interval` iterations.")
         self.assertEqual(check_cadence("d.md", text), [])
 
     def test_unrelated_numbers_clean(self):
@@ -128,7 +128,7 @@ class TestMultiWordStages(unittest.TestCase):
         self.assertTrue(any("out of canonical order" in h for h in hits))
 
     def test_terminal_stage_in_chain_recognized_not_flagged(self):
-        line = "buried: `In Progress → Dropped` (Chairman's call for epics/objectives)"
+        line = "buried: `In Progress → Dropped` (Human Principal's call for epics/objectives)"
         self.assertEqual(
             check_stages("d.md", line, NEW_STAGES, NEW_HOLDING, TERMINAL), [])
 

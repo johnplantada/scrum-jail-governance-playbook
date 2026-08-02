@@ -1,185 +1,146 @@
 # ============================================================
-# SCRUM JAIL GOVERNANCE PLAYBOOK — org-chart.yaml template
+# SCRUM JAIL GOVERNANCE PLAYBOOK — 1.0 role schema example
 # ============================================================
-# Fill in the blanks marked with <ANGLE_BRACKETS>.
-# Then run: cp org-chart.yaml ../org-chart.yaml
-# This file is the source of truth for org SHAPE: who exists, who reports to whom,
-# each agent's authority envelope (envelopes.yaml), and the org-wide knobs the
-# scripts read. Changing money or org-shape reality goes through a decisions.yaml
-# PR that the Chairman merges — this chart then records the approved shape.
-#
-# RULE: every agent has a parent; authority flows DOWN the tree.
-# The Chairman (you, the human) holds the keys. Agents propose; you approve.
+# Functional identities are canonical. Friendly titles may be shown in a UI, but policy,
+# grants, logs, labels, and manifests use the ids below.
 
-chairman:
-  github: "<your-github-username>"  # Decision authority hangs off this handle: it goes in
-                                    # .github/CODEOWNERS (so decisions.yaml PRs route to you —
-                                    # your MERGE is the authorization); deploys are yours
-                                    # because the product repo's deploy workflows trigger on
-                                    # manual workflow_dispatch only (your DISPATCH is the deploy).
+schema_version: "1.0"
+
+human_principal:
+  kind: human
+  github: "<your-github-username>"
+  authority:
+    - ratify_charter
+    - authorize_spend
+    - deploy_production
+    - authorize_external_action
+    - clear_halt
+
+portfolio_orchestrator:
+  kind: agent
+  scope: portfolio
+  external: true
+  authority:
+    - prioritize_within_ratified_charter
+    - allocate_within_ratified_envelope
+    - recommend_project_objective
+  prohibited:
+    - ratify_charter
+    - commit_spend
+    - deploy_production
+    - perform_external_action
+    - create_project_objective
 
 governance:
-  # The gate vocabulary — ledger `type` strings for decisions.yaml entries and issue/PR
-  # prose. Pure vocabulary, not a signal any bot listens for: authorization is the
-  # Chairman's merge (decisions.yaml PR) or manual deploy dispatch (workflow_dispatch).
-  charter: charter a new department
-  sunset:  dissolve a department or team
-  promote: raise an agent's model tier
-  fund:    approve spend up to a stated ceiling
-  ship:    approve a production deploy
-  halt:    emergency stop — a .halt file in the repo root halts the runner and every
-           agent cycle; only a human clears it
+  charter: change the durable role or authority shape
+  sunset: remove a role or deterministic service
+  promote: raise an agent role's model profile
+  fund: approve spend up to a stated ceiling
+  ship: approve a production deploy
+  halt: emergency stop; only a human clears it
 
 limits:
-  global_max_agents: 16         # Org-wide agent ceiling, CI-checked: the reference tests fail
-                                # any chart whose roster arithmetic (every brain + its full
-                                # permitted fan-out) exceeds this. Per-wake refusal of each
-                                # agent's share is subagent_gate.py (envelope.max_subagents).
+  global_max_agents: 8
 
-# ── GLOBAL CONFIG ────────────────────────────────────────────
-# Org-wide knobs the scripts read. Field reference: envelopes.yaml § global config.
 global:
-  # SAFe cadence (safe.md): an iteration = review_interval wakes; a PI = pi_interval
-  # iterations (review_interval × pi_interval = wakes per PI; 20×3 = 60).
-  review_interval: 20           # start ~5; raise once it proves too frequent
+  review_interval: 20
   pi_interval: 3
-
-  # Chairman-queue discipline: once blockers.yaml holds more open human-only entries than
-  # this, scripts/blockers.py prepends a WIP warning to the queue it injects into every
-  # wake prompt — agents must not START new work whose critical path ends in another
-  # human-only unlock. Prompt-enforced. 0/absent disables the warning.
   unlock_wip_limit: 5
-
-  # Canonical pm/kanban workflow statuses, in order — the ONLY place the list is defined.
-  # ENFORCED BY USE: github-pm-setup.sh provisions the board's built-in Status field from
-  # it, and pm-gh.sh moves cards against it. Each column answers "who is this waiting
-  # on" — Awaiting Merge and Awaiting Deploy are the Chairman's two queues (his whole
-  # to-do is Awaiting Merge + Awaiting Deploy + Blocked); the Demo column is the
-  # [DEMO]-gate queue (safe.md).
   pm_stages: [Todo, In Progress, Awaiting Merge, Demo, Awaiting Deploy, Done]
-
-  # Holding columns — orthogonal PARKED states, NOT points in the pm_stages flow
-  # (safe.md "Parked states are not flow stages"). Options of the SAME board Status
-  # field and a valid move target, but kept out of the ordered list so flow lint and
-  # index math stay honest — and EXEMPT from any forward auto-reconcile (a parked item
-  # with a PR must not be yanked back into the flow while the blocker holds).
   pm_holding_stages: [Blocked, On Hold]
-
-  # Terminal-alternate — "won't do", closed as not-planned via pm-gh.sh drop (a [DROP]
-  # record with the reason, never a bare close). Not a flow position, not parked.
-  # Dropping an epic or objective is the Chairman's call alone.
   pm_terminal_stages: [Dropped]
+  principal_queue_issue: <N>
+  pm_project_number: <N>
+# Concrete providers and model ids are supervisor-owned commissioning state.
 
-  # REQUIRED pins (FIELD-NOTES.md §11) — the ONE place scripts resolve these coordinates
-  # from, so recreating the board or the queue epic is a one-line re-pin. These were once
-  # documented as OPTIONAL, "uncomment when you build one" — and a stamped org duly skipped
-  # them, then sat silently blocked on its Chairman for five hours with no way to tell him
-  # (patterns.md Pattern 14). The queue is not a reconciler nicety; it is the org's only
-  # channel for "we are waiting on you." warden.py exits before doing any work without the
-  # pin, and because nothing wakes a department that doesn't exist, the omission is silent.
-  chairman_queue_issue: <N>   # the UNTYPED epic whose sub-issues = what only the human can do
-  pm_project_number: <N>      # the org Project's number (gh project <N>) — pm-gh.sh reads it
-                              # too; un-pinned, every board call pays a by-title GraphQL lookup
-                              # (FIELD-NOTES §14)
+services:
+  - name: governance-monitor
+    kind: deterministic-service
+    scope: project
+    implementation: scripts/governance_monitor.py
+    schedule: "~4h"
+    reports_to: human-principal
+    judgment_residue_to: governance-reviewer
+    consumes_model_tokens: false
 
-  # Model tier → exact API model id. The ONE place tier→model resolution lives. Everything
-  # else (spend ledger, wake banners, budget brownouts, PROMOTE) keeps speaking in
-  # tiers; a PROMOTE changes an AGENT's tier, editing THIS map upgrades what a tier MEANS
-  # org-wide. Pin ids so a provider's silent default can't drift you onto a different model.
-  model_ids:
-    haiku:  "<haiku-model-id>"     # cheapest tier that reliably does the job
-    sonnet: "<sonnet-model-id>"    # the workhorse tier for department heads
-    opus:   "<opus-model-id>"      # stakes-only escalation tier
-
-departments:
-  # A department node is deliberately small: name, role, reports_to, model, envelope,
-  # teams. Wake routing lives in wake-rules.yaml (a dept:<name> label on an issue routes
-  # its events here) — the node itself carries no channel, cadence, or bot id.
-
-  # ── CEO ──────────────────────────────────────────────────────
-  - name: ceo
-    role: chief-executive         # Sets strategy, objectives, department charters
-    reports_to: board
-    model: sonnet                 # Authority isn't tied to compute — most CEO cycles (routing,
-                                  # arbitration, standups) are well within sonnet. Escalate to
-                                  # opus by STAKES on a specific hard call, not by default.
-    envelope:                     # The authority box — field-by-field notes in envelopes.yaml.
-      max_subagents: 0            # CEO escalates; it doesn't spawn sub-teams itself
-      daily_token_budget: 300000  # ENFORCED: budget_gate.py browns out non-direct wakes past it
-      can_spend: false            # Only the Chairman authorizes spend (decisions.yaml merge)
-      can_deploy: false           # Only the Chairman deploys (manual workflow_dispatch)
-    teams: []
-
-  # ── BUSINESS ─────────────────────────────────────────────────
-  - name: business
-    role: demand                  # Positioning, pricing, content, growth hypotheses
-    reports_to: ceo
-    model: sonnet                 # Raise to opus only on an approved business case
+roles:
+  - name: project-orchestrator
+    kind: agent
+    scope: project
+    lifetime: resumable
+    role: objective-coordination
+    reports_to: portfolio-orchestrator
+    model_profile: standard
+    workers:
+      allowed: []
+      max_per_wake: 0
+      max_concurrent: 0
     envelope:
-      max_subagents: 4            # May spawn SEO / content sub-teams within this cap
+      daily_token_budget: 300000
+      can_spend: false
+      can_deploy: false
+
+  - name: commercial-planner
+    kind: agent
+    scope: project
+    lifetime: resumable
+    role: commercial-planning
+    reports_to: project-orchestrator
+    model_profile: standard
+    workers:
+      allowed: [researcher, drafter]
+      max_per_wake: 4
+      max_concurrent: 2
+    envelope:
       daily_token_budget: 500000
       can_spend: false
       can_deploy: false
-    teams: []
 
-  # ── IT ───────────────────────────────────────────────────────
-  - name: it
-    role: supply                  # Ships PRs, infra, reliability
-    reports_to: ceo
-    model: sonnet
+  - name: software-implementer
+    kind: agent
+    scope: project
+    lifetime: resumable
+    role: software-delivery
+    reports_to: project-orchestrator
+    model_profile: standard
+    workers:
+      allowed: [researcher, drafter, implementer]
+      max_per_wake: 4
+      max_concurrent: 2
     envelope:
-      max_subagents: 4
       daily_token_budget: 500000
       can_spend: false
       can_deploy: false
-    teams: []
 
-  # ── WARDEN ───────────────────────────────────────────────────
-  # NOT optional, and not a department you choose — an organ every org gets (orggen stamps
-  # it; --departments cannot drop it). It is the org's only channel for "we are waiting on
-  # you": every department blocks on the Chairman eventually, records it, and correctly goes
-  # quiet, so without a queue the org looks idle while it waits (patterns.md Pattern 14 —
-  # written after a stamped org that had ALL the plumbing, and none of the state, sat silent
-  # for five hours). Engine-first (FIELD-NOTES.md §11): a DETERMINISTIC script does the
-  # reconciling (Chairman queue, board, [SYNC] convening) on plain cron — token-free; this
-  # smallest-budget haiku brain wakes only on dept:warden events for the judgment residue.
-  # Reports to the BOARD: a node reporting into the production chain could be told not to ask.
-  # Requires global.chairman_queue_issue above to be pinned, or its engine no-ops.
-  - name: warden
-    role: hygiene
-    reports_to: board
-    model: haiku
+  - name: governance-reviewer
+    kind: agent
+    scope: project
+    lifetime: resumable
+    role: governance-judgment
+    reports_to: human-principal
+    model_profile: fast
+    workers:
+      allowed: []
+      max_per_wake: 0
+      max_concurrent: 0
     envelope:
-      max_subagents: 0            # the script does the work; there is nothing to fan out
       daily_token_budget: 100000
       can_spend: false
       can_deploy: false
-    teams: []
 
-  # ── ADD MORE DEPARTMENTS BELOW ────────────────────────────────
-  # Chartering a department is a Board act: open a PR appending a [CHARTER] entry to
-  # decisions.yaml whose payload is exactly the node you'd add below; the Chairman's
-  # merge is the authorization, then the node lands here.
-  #
-  # ── WHERE THE REVIEWER DEPARTMENT WENT ────────────────────────
-  # Earlier revisions carried a dormant `reviewer` department for the [CODEREVIEW] gate.
-  # There deliberately isn't one anymore: code review is a claude-code-action CI check on
-  # product PRs (DESIGN.md §5), not a chartered agent — author ≠ reviewer holds
-  # without a standing department burning budget. Charter one via a decisions.yaml
-  # [CHARTER] entry only if a CI check genuinely can't do the job.
-  #
-  # ── A GENERIC EXTRA DEPARTMENT ────────────────────────────────
-  # Copy, fill in, and propose via decisions.yaml:
-  # - name: ops
-  #   role: operations
-  #   reports_to: ceo
-  #   model: haiku                # Cheapest tier that reliably does the job
-  #   envelope:
-  #     max_subagents: 2
-  #     daily_token_budget: 200000
-  #     can_spend: false
-  #     can_deploy: false
-  #   teams: []
-  #
-  # (The warden used to be offered here, commented out, as an optional extra to copy. That
-  # framing is exactly what produced Pattern 14 — it is a real department above now.)
+# Optional independent second line:
+# - name: policy-reviewer
+#   kind: agent
+#   scope: project
+#   lifetime: resumable
+#   role: policy-review
+#   reports_to: human-principal
+#   model_profile: standard
+#   workers:
+#     allowed: [researcher, drafter]
+#     max_per_wake: 4
+#     max_concurrent: 2
+#   envelope:
+#     daily_token_budget: 500000
+#     can_spend: false
+#     can_deploy: false

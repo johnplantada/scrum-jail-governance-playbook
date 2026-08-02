@@ -1,0 +1,32 @@
+# Installed in a supervisor-owned home. The generated project remains untrusted, so its
+# .codex layer cannot override this config or these adjacent rules.
+sandbox_mode = "workspace-write"
+approval_policy = "never"
+allow_login_shell = false
+web_search = "disabled"
+
+[sandbox_workspace_write]
+network_access = false
+exclude_slash_tmp = true
+exclude_tmpdir_env_var = true
+writable_roots = []
+
+[history]
+persistence = "none"
+
+[features]
+multi_agent = false
+apps = false
+remote_plugin = false
+hooks = false
+memories = false
+goals = false
+network_proxy = false
+
+[tools]
+web_search = false
+
+[shell_environment_policy]
+inherit = "none"
+ignore_default_excludes = false
+experimental_use_profile = false

@@ -1,4 +1,9 @@
-# Field-Tested Mechanisms — what the live org runs that the docs alone won't give you
+# Historical field notes — superseded implementations and the incidents behind 1.0
+
+> This entire file is historical evidence, including sections formerly titled “Running
+> today.” Script names, counters, provider maps, direct CLI calls, and retired role terms
+> below are not current interfaces or compatibility paths. The enforceable 1.0 design is in
+> `docs/CONTROL-PLANE.md`, `docs/ARCHITECTURE.md`, `organization.yaml`, and `control/`.
 
 The rest of this playbook is the governance layer: gates, envelopes, ledgers. This file
 is the other half — the mechanisms the live Scrum Jail org grew *after* going live, each
@@ -14,7 +19,7 @@ paying the tuition twice.
 
 ---
 
-# Part I — Running today
+# Part I — mechanisms that ran before the 1.0 trusted-control-plane cutover
 
 ## 1. The event loop — GitHub as the durable queue, wakes scarce by construction
 
@@ -24,12 +29,12 @@ rebuild inverted the premise: don't rate-limit an abundant wake supply, make wak
 scarce by construction.
 
 **How it works:** one poller (`scripts/runner.py`, the org's only scheduled process
-*that spends tokens* — the deterministic maintainers beside it, plain-cron log/metrics
-jobs and the warden engine of §11, never call a model; cron'd via `runner-watch.sh`
+*that spends tokens* — the deterministic maintainers beside it and the governance
+monitor of §11 never call a model; cron'd via `runner-watch.sh`
 every ~5 minutes). Each tick: read a cursor → ask GitHub
 what changed since (issues + comments on both repos, completed product-repo workflow
 runs) → normalize to events → route through `wake-rules.yaml` → wake the owning
-departments via `agent-run.sh` → advance the cursor.
+roles via `agent-run.sh` → advance the cursor.
 
 - **The runner self-deploys.** Each tick, `runner-watch.sh` fast-forwards the runtime
   checkout to `origin/main` before running, so a merged org-repo PR goes live on its own
@@ -48,8 +53,8 @@ departments via `agent-run.sh` → advance the cursor.
   (routing sorts by event timestamp), so catch-up order is event order.
 - **Routing is a committed, PR-reviewed file.** `wake-rules.yaml` replaced the wake
   logic scattered across the watcher fleet — first matching rule wins. An issue matching
-  no `dept:*` rule falls through to the warden for triage (patterns.md Pattern 16 — a
-  web-form filing that skips the department dropdown must not be invisible); any other
+  no `role:*` rule falls through to `governance-reviewer` for triage (patterns.md
+  Pattern 16 — a web-form filing that skips the role dropdown must not be invisible); any other
   event matching nothing wakes nobody (logged as unrouted).
 - **A failed poll is a no-op tick, never a crash** — `gh api` errors return empty and
   the cursor doesn't advance past what was seen. **Shadow mode** (`RUNNER_MODE=shadow`,
@@ -62,22 +67,22 @@ runner handles all three in ~30 lines where the chat era needed a dispatcher sub
 1. **The dedup ring.** Every event carries a stable id (issue number + updated-at,
    comment id, run id); the cursor keeps the newest **500** seen ids, and a re-polled
    event whose id is in the ring is dropped as overlap, not new inbound.
-2. **One wake per department per tick.** `batch_wakes()` coalesces a tick's routed
-   events by department, the wake note carrying every triggering event. Waking a dept
+2. **One wake per role per tick.** `batch_wakes()` coalesces a tick's routed
+   events by role, the wake note carrying every triggering event. Waking a role
    five times for five comments is the noise the old architecture taught the org to
    suppress — now structurally impossible.
 3. **The echo-skip.** All agents share one GitHub identity, so the mandated identity
-   banner (`**IT —** …`) is the only author signal. The runner parses it off each
-   comment (`banner_dept()`) and excludes the author's own department from the fan-out —
+   banner (`**Software Implementer —** …`) is the only author signal. The runner parses it off each
+   comment (`banner_role()`) and excludes the author's own role from the fan-out —
    an agent never echo-wakes itself. **It fails safe:** an unsigned comment (a human, or
-   an agent forgetting its banner) wakes every labeled department, because a wasted wake
+   an agent forgetting its banner) wakes every labeled role, because a wasted wake
    beats a stalled thread.
 
 The honest caveat that used to sit here — at-most-once delivery, "re-wake by hand if
 needed" — got fixed instead of documented around. A dispatched wake that exits nonzero
 (`agent-run.sh` exits nonzero on an aborted cycle precisely so the runner can see it)
 now has its events **re-queued** through the same deferred-event spool the wake filter
-uses: redelivered on the department's next fired wake, or by the catch-up sweep after
+uses: redelivered on the role's next fired wake, or by the catch-up sweep after
 `WAKE_RETRY_MIN`. Delivery is **at-least-once up to a retry ceiling** — past
 `WAKE_MAX_RETRIES` failed attempts an event **dead-letters** to
 `state/dead-letter.jsonl` instead of looping a hard failure forever, and every failed
@@ -102,7 +107,7 @@ is §12's territory: measure wake *yield*, then filter in the router.)
 
 ---
 
-## 2. Spend guards — the org-wide breaker and the per-department brownout
+## 2. Spend guards — the org-wide breaker and the per-role brownout
 
 **The failure:** the chat era's 40-wakes-per-hour breaker capped *frequency* — a proxy.
 The rebuild caps the real thing: dollars and tokens, read from the same ledger
@@ -113,18 +118,15 @@ everything else trusts (§6).
 - **The org-wide daily breaker** lives in the runner: before firing LIVE wakes it sums
   today's `cost_usd` from `state/spend.jsonl`, and at `SPEND_BREAKER_DAILY_USD`
   (default $25) it prints `HELD` and fires nothing until the ledger rolls over. Honest
-  edge: a held wake's events are neither fired nor spooled and the cursor still
-  advances — they stay visible on the issue, but re-delivery takes a fresh event on
-  the thread or a re-wake by hand (unlike a *failed* wake, whose events re-queue — §1).
-- **The per-department brownout** (`scripts/budget_gate.py`, consulted by
+  behavior: a held wake exits with the runtime's dedicated budget-hold status, so its
+  events remain deferred without consuming the hard-failure retry budget. Date rollover
+  releases the hold automatically.
+- **The per-role brownout** (`scripts/budget_gate.py`, consulted by
   `agent-run.sh` before every cycle) enforces each node's org-chart
   `envelope.daily_token_budget` — a norm that used to be prompt-level prose no code
-  read. Over budget → **non-direct wakes are skipped** ("BUDGET BROWNOUT", logged);
-  **direct wakes always run** — a spent budget must never block a runner-routed event
-  (the Chairman's issue, a deploy failure), and the overage stays visible in the log
-  and ledger. Two details worth copying: cache reads are *excluded* (the budget bounds
-  fresh work), and the gate **fails open with a reason on stderr** — a broken meter
-  must brown out the metering, never the org, but must not be silently unlimited either.
+  read. Over budget, every wake is held and deferred until the ledger date rolls over.
+  Cache reads are excluded because the budget bounds fresh work. The hold is distinct
+  from a failed cycle: it increments neither retries nor the dead-letter count.
 
 ---
 
@@ -156,7 +158,7 @@ overlapping an in-flight child can all collide.
 - **Staleness is pid-liveness first, TTL second.** A lock whose recorded pid is gone is
   stale immediately. Past the TTL (30 minutes) it's stale **only if the pid is no longer
   actually an agent runner** (checked via the process's command line). The earlier rule
-  — "older than TTL = stale, regardless of pid" — got field-corrected after a CEO cycle
+  — "older than TTL = stale, regardless of pid" — got field-corrected after a Project Orchestrator cycle
   legitimately ran 2h08m: age-alone staleness would have stolen a *live* lock mid-cycle,
   while the command check still catches what the age rule really defended against — a
   SIGKILLed runner whose pid got recycled.
@@ -169,7 +171,7 @@ overlapping an in-flight child can all collide.
 - **Bound the cycle so the lock always frees.** The pid check protects against a *dead*
   holder; a wall-clock timeout protects against a *live-but-wedged* one
   (`agent_cycle.py`: `CYCLE_TIMEOUT_S`, default 1500s — deliberately under the 1800s
-  lock TTL — plus a 60-turn cap; normal cycles run 11–27 turns). A timed-out cycle
+  lock TTL). A timed-out cycle
   logs TIMEOUT, writes a zero-cost error row to the spend ledger, exits non-zero, and
   its EXIT trap frees the lock.
 
@@ -180,17 +182,19 @@ overlapping an in-flight child can all collide.
 **The failure it forecloses:** an ephemeral worker subagent — spun up mid-cycle for
 parallel decomposition — inheriting its parent's full toolset. A worker with a shell
 can git-push, comment via `gh`, or trigger spend three delegation levels below anything
-the Chairman sees; authority must not silently deepen.
+the Human Principal sees; authority must not silently deepen.
 
 **How it works:** workers are declared as plain data (`scripts/worker_policy.py`,
-stdlib-only) — named specs, each with a pinned tier and an explicit tool allowlist;
-`agent_cycle.py` turns each spec into an SDK `AgentDefinition`:
+stdlib-only) — named specs, each with a provider-neutral profile and an explicit tool
+allowlist. Delegation is enabled only when the selected CLI can enforce that boundary;
+Codex native delegation remains disabled until its local policy can enforce the same
+envelope.
 
 | Worker | Model | Tools | Can't |
 |---|---|---|---|
-| researcher | haiku | Read, Grep, Glob, WebSearch, WebFetch | edit, run, post, spend |
-| drafter | haiku | Read, WebSearch, WebFetch | edit, run, post, spend |
-| implementer | sonnet | Read, Grep, Glob, Edit, Write | **no shell** — can't test, commit, push, or deploy |
+| researcher | fast | Read/search | edit, run, post, spend |
+| drafter | fast | Read/search | edit, run, post, spend |
+| implementer | standard | named-file edits | **no shell** — can't test, commit, push, or deploy |
 
 A worker's only channel back to the parent is its returned text. The parent cycle holds
 all authority — it runs the build and tests, does the commit/PR, and answers to the
@@ -211,14 +215,13 @@ had accumulated in wakes nobody was metering. A governance layer that gates a $1
 proposal while its own token spend goes untracked is theater.
 
 **How it works:** one append-only ledger (`state/spend.jsonl`, via `scripts/spend_log.py`),
-one row per Claude call, written at the moment of spend:
+one row per provider call, written at the moment of spend:
 
-- **Full agent wakes** report cost from the SDK's own result stats (source=cycle) — and
-  since the SDK exposes a per-model breakdown, a cycle writes **one row per model
-  touched**, the per-model costs partitioning the cycle total exactly (even a plain
-  cycle touches a helper Haiku alongside its brain). **Every offload** is metered by a
-  wrapper capturing the call's token/cost JSON (source=offload); worker subagents roll
-  into their parent cycle's rows — one SDK session, no double-counting.
+- **Full agent wakes** report usage from the selected CLI's structured result stream
+  (`source=cycle`). Where a provider reports dollar or per-model detail, the ledger
+  preserves it; token counts remain the portable hard budget. **Every offload** is
+  metered by a wrapper capturing the call's token/cost JSON (`source=offload`);
+  delegated work rolls into the parent cycle's usage where the provider reports it.
 - **Every row of a wake carries the same `wake_id`** (minted by `agent-run.sh`), so a
   grep can join "what did this wake do" to "what did it cost" across every ledger and log.
 - **Append-only JSONL** because single-line appends are atomic across concurrent agents,
@@ -231,31 +234,25 @@ one row per Claude call, written at the moment of spend:
 
 `scripts/costs.py` totals and trends by source / agent / model / day, and
 `scripts/efficiency.py` divides it by shipped output. Note what the metering *costs*:
-nothing — pure local accounting, zero Claude tokens — so there is no temptation to turn
+nothing — pure local accounting, zero model tokens — so there is no temptation to turn
 it off to save money. Every number the governance layer talks about (the breaker, the
 brownouts, an offload's claimed savings) is auditable against this ledger. That's the
 standard: a mechanism that claims to save tokens must log the evidence.
 
 ---
 
-## 7. Model-tier pinning — a tier is a name; its meaning lives in one map
+## 7. Model-profile pinning — a profile is a name; each provider maps it once
 
-**The failure it forecloses:** the org talks in *tiers* everywhere — `model: sonnet` in
-the chart, "sonnet" in the spend ledger, a PROMOTE that raises an agent to opus. But
-"sonnet" is not a model; it's a label that has to resolve to an *exact* API id at the
-call boundary. Let each caller resolve it however it likes and a provider's silent
-default (or a half-updated script) can drift two agents onto two different models while
-both logs still say "sonnet" — untraceable, and it corrupts every per-model cost number.
+**The failure it forecloses:** provider model ids leaking into durable governance state.
+That couples role policy to one vendor and makes a provider switch silently change the
+meaning of promotion decisions.
 
-**How it works:** one map — `global.model_ids` in `org-chart.yaml` — is the single place
-a tier becomes an id (`sonnet → claude-sonnet-5`, …). A tiny resolver
-(`scripts/model_id.py`) reads it at the SDK boundary and nowhere else — `agent_cycle.py`
-resolves the cycle's brain and every worker spec's tier as it builds the SDK options;
-argv, banners, ledger rows, and brownouts keep speaking tiers. Anything already shaped
-like a full id passes through unchanged, so you can pin an exact id in an emergency
-without touching the chart. The governance payoff is the clean split: a **PROMOTE**
-changes *one agent's* tier; editing the **map** upgrades what a tier *means* for the
-whole org, in one line — two changes, two authorities, one obvious place each.
+**How it works:** every role declares `model_profile: fast|standard|deep`.
+`runtime.providers.<provider>.model_profiles` is the only map from those names to exact
+provider ids. `scripts/model_id.py` resolves at the CLI boundary. A **PROMOTE** changes
+one role's profile; editing a provider map changes what that profile means for every
+role using that provider. Governance records keep the portable profile while runtime
+metadata preserves the resolved model id.
 
 ---
 
@@ -274,7 +271,7 @@ chain as key lookups, not paraphrase. Human-facing messages stay prose; only wha
 gate acts on gets a schema.
 
 **The honest enforcement status:** the chat-era enforcers (the bus's malformed-payload
-warning, the Warden citation — Part II §R6) died in the demolition; their Actions
+warning, the legacy Warden citation — Part II §R6) died in the demolition; their Actions
 successor was built next — and became a paid-for lesson of its own: a hosted workflow
 triggered on every marker-bearing comment runs at agent frequency, and its rounded-up
 per-job minutes helped burn the account's monthly Actions quota in days (patterns.md
@@ -316,7 +313,7 @@ each degrading safely when `gh` is absent:**
   from `global.pi_interval` and splits **due** from **eligible**: PI Planning is *due*
   by cadence but *eligible* only if `last-ship.sh` says `shipped=yes` — you cannot plan
   a Program Increment for a program that has incremented nothing. It only exposes a
-  counter; convening remains a human/CEO act.
+  counter; convening remains a human/Project Orchestrator act.
 - **`scripts/demo-verify.sh`** — the evidence predicate: a `[DEMO]` is real only if the
   product repo's demo-evidence workflow has a **green run on the PR's current head
   SHA**. A stale run (evidence generated, then more commits pushed) does **not**
@@ -336,7 +333,7 @@ nothing defines what evidence closes each level. The tree only grows.
 prefix (GitHub issue *types* need an org account; labels work everywhere). A story's
 plan is a `## Plan` section in its body, not a fifth level. `pm-gh.sh create --type
 <kind> --parent N` births children correctly: kind prefix + label applied, the parent's
-`dept:*` routing inherited (the runner routes children with **zero** added poll cost),
+`role:*` routing inherited (the runner routes children with **zero** added poll cost),
 taxonomy edges pre-flighted so a bad link is refused before the issue exists, and a
 feature/story refused unless its description carries the acceptance line its closure
 will later bind to. `pm-gh.sh tree --id N` renders the rollup.
@@ -352,71 +349,69 @@ in the mandates: decompose **just-in-time**, and never close around the gate's r
 
 ---
 
-## 11. The warden, reborn — a deterministic engine with a haiku residue
+## 11. The governance monitor — deterministic reconciliation with explicit judgment residue
 
 **The failure:** the operator is single-threaded, and the org's picture of "what does
 the human need to do" and "does the board match the code" drifts the moment it's
-hand-built. The live org's Chairman action queue (one epic whose sub-issues are the
-human-only actions) was assembled once by the CEO — and began rotting immediately: 3 of
+hand-built. The live org's Human Principal action queue (one epic whose sub-issues are the
+human-only actions) was assembled once by the Project Orchestrator — and began rotting immediately: 3 of
 8 entries stale within a day, because upkeep was nobody's *mechanical* job.
 
-**The failure this section originally undersold (2026-07-16):** the queue is not a
+**The commissioning incident (2026-07-16; historical names retained):** the queue is not a
 tidiness feature — it is the org's **only channel for "we are waiting on you,"** and this
 note was read as optional until an org proved what that costs. A second org, stamped from
 this playbook, sat silent for five hours: every thread sequenced behind one product PR
 that had been open, clean and mergeable since 00:03; the supply department woke, said so,
 and correctly went quiet. Nothing was broken — invariants 2 and Pattern 12 were working
-exactly as designed, and *that is what produced the silence*. The Chairman saw an idle org
+exactly as designed, and *that is what produced the silence*. The Human Principal saw an idle org
 and reasonably concluded his agents were broken.
 
 Worse, the omission was **invisible**. That org had inherited every moving part —
-`wake-rules.yaml` routed `dept:warden` from the bootstrap, `warden.py` was vendored
+`wake-rules.yaml` routed `role:warden` from the bootstrap, `warden.py` was vendored
 repo-correct with 22 passing tests, the pre-wake engine injection was byte-identical. Only
-the *state* was missing: no department, no `dept:warden` label, no queue epic, no pin. So
+the *state* was missing: no department, no `role:warden` label, no queue epic, no pin. So
 `warden.py` exited on an unresolvable `chairman_queue_issue` — and nothing noticed, because
 nothing wakes a department that doesn't exist. Every check you'd think to run said
 "installed."
 
 Two rules came out of it, both now enforced in `bin/orggen` rather than advised here:
-**the warden is an organ, not a department you choose** (stamped unconditionally;
-`--departments` cannot drop it), and **the pins are commissioning steps, not optional
-config** (`org-chart.yaml` ships them `null` and the stamp checklist makes setting them
-step 5). See patterns.md Pattern 14.
+**governance review is a canonical role and the monitor is a deterministic service**,
+and **the pins are commissioning steps, not optional config** (`org-chart.yaml` ships
+them `null` and the stamp checklist requires them). See patterns.md Pattern 14.
 
-**Assign the children to the human.** The original queue used a `Chairman:` title prefix
-and a `dept:warden` label and set no GitHub assignee — so reading it meant remembering to
-open the org repo's board. Pass the chart's `chairman.github` through to
+**Assign the children to the human.** The original queue used a Human Principal title prefix
+and a governance label but set no GitHub assignee — so reading it meant remembering to
+open the org repo's board. Pass the chart's `human_principal.github` through to
 `gh issue create --assignee` and the queue lands in the one inbox every operator already
 reads: *Assigned to me*. A queue he must remember to visit is a queue he stops visiting.
 
 **Keep the queue epic UNTYPED.** The original was labeled `objective` — a repurposed
-Chairman objective from before the work-item tree existed. Once objectives are a reserved
+Human Principal objective from before the work-item tree existed. Once objectives are a reserved
 power (invariant 1), a container labeled `objective` is a lie that the taxonomy will
 eventually be asked to enforce. `workitems.py` permits an untyped side anywhere, so untyped
 parent + untyped children is a legal, honest tree: infrastructure, not work intake.
 
-**How it works:** the org re-chartered a `warden` department (2026-07-11, via a
-`decisions.yaml` charter — the name deliberately reclaimed from the retired chat-era
-checker, §R6) with an unusual shape: **the engine is a deterministic, token-free script;
-the agent brain is the org's smallest.**
+**How it works now:** the engine is a deterministic, token-free
+`governance-monitor` service and the judgment residue belongs to the separately declared
+`governance-reviewer` role.
 
-- **`scripts/warden.py`**, on plain launchd/cron, reconciles *desired state from ground
-  truth*: the Chairman-queue epic's sub-issues are derived from the open `blockers.yaml`
-  entries, Chairman-ready PRs, and open `[PROPOSAL]`s (each child keyed by a
-  `warden-source:` marker so the sync is idempotent); the project board is reconciled
+- **`scripts/governance_monitor.py`**, on plain launchd/cron, reconciles *desired state from ground
+  truth*: the Human Principal-queue epic's sub-issues are derived from the open `blockers.yaml`
+  entries, Human Principal-ready PRs, and open `[PROPOSAL]`s (each child keyed by a
+  `governance-monitor-source:` marker so the sync is idempotent); the project board is reconciled
   **forward-only** from PR/code truth (backward drift is reported, never auto-moved, and
   the holding columns are exempt — a parked item with a PR must not be yanked back);
-  in-flight friction between departments (merge conflicts, same-file PRs, unmet declared
+  in-flight friction between roles (merge conflicts, same-file PRs, unmet declared
   dependencies) is convened as marker-managed `[SYNC]` issues labeled for both sides,
   auto-closed when the fact clears.
 - **Pin the coordinates in the chart, not the code:** the queue epic's issue number and
   the project number live in `org-chart.yaml` `global:` — the one place scripts resolve
   them from, so recreating the board or the epic is a one-line re-pin.
-- **The haiku brain wakes only on `dept:warden` events** — the judgment residue the
-  engine flags, not the reconciliation itself. Its budget is the org's smallest on
-  purpose. Route the queue epic's churn to `dept:warden` so queue upkeep never wakes the
-  CEO.
-- **Engine-first wakes** — the commissioning lesson, paid for on the warden's first live
+- **The `governance-reviewer` wakes only on `role:governance-reviewer` events** — judgment
+  residue the engine flags, not reconciliation itself. Its `fast` profile and zero-worker
+  envelope are intentionally small. Route queue churn to that role so upkeep never wakes
+  the Project Orchestrator.
+- **Engine-first wakes** — the commissioning lesson, paid for on the monitor's first live
   wake, which burned ~10 of its 37 turns *hunting the filesystem for its own script*.
   When an agent's job is to act on a deterministic engine's output, run the engine
   *before* the cycle and inject its output into the wake prompt ("your engine ALREADY
@@ -424,8 +419,8 @@ the agent brain is the org's smallest.**
   the loop could hand it.
 
 Keep the checker deterministic when you build yours — the §R6 rule survived its own
-mechanism: a warden that needs a model to judge a violation is just another agent to
-argue with.
+mechanism: a governance monitor that needs a model to reconcile facts is an agent, not
+a deterministic service.
 
 ---
 
@@ -451,13 +446,13 @@ correctly.
   GitHub state, recent outcomes) that the runner consults before dispatching. The live
   org's first two rules (**v1**): **closed-thread echo defer** (a non-human comment on a
   closed issue defers the wake) and **noop-streak cooldown** (N consecutive `noop`
-  outcomes for a department defers its next non-direct wake). Hard piercing rules ride
+  outcomes for a role defers its next non-direct wake). Hard piercing rules ride
   above both: a human's comment, an unsigned comment, a workflow run, or any
-  direct/Chairman event **always wakes** — the filter may only defer what provably
+  direct/Human Principal event **always wakes** — the filter may only defer what provably
   cannot need a brain. **v2** (business#286) closed the gap v1 left open: an edited
   comment bumps its parent issue's `updatedAt` to the exact same timestamp, so the
   runner mints a fresh *issue* event that v1's comment-side rule never saw — attribution
-  (`attribute_issue_bumps`, pre-dedup) stamps the bump's department when a same-poll
+  (`attribute_issue_bumps`, pre-dedup) stamps the bump's role when a same-poll
   comment shares its exact timestamp, then defers it as `issue-self-echo`
   (open issue) or `issue-closed-thread-echo` (closed); unattributed issue events —
   human edits, label changes, CI — still fire exactly as v1.
@@ -492,24 +487,22 @@ Actions quota in days, and GitHub's block-at-quota took CI dark **account-wide**
 required status check unreportable, every PR unmergeable without an admin override,
 governance stalled in two orgs at once.
 
-**How it works:** the org spends **$0** on hosted Actions and runs the CI suite where
-compute is free — on the operator's machine, at push time.
+**How it works:** ordinary development spends **$0** on hosted Actions and runs the
+authoritative suite where compute is free — on the operator's machine, at push time.
 
 - **A `pre-push` hook mirrors `ci.yml` job-for-job** (`scripts/hooks/pre-push`): python
   syntax + every unit test; shellcheck + the constitution/blockers/decisions linters;
-  playbook drift checked against the pin via a cheap `--shared` clone of the local
-  golden checkout — warn-and-skip when it can't be evaluated, because a stale local
-  golden must not block a push it can't judge. `SKIP_CI_HOOK=1 git push` is the
+  playbook drift checked against the pin via the configured local golden checkout.
+  Missing or mismatched source state fails loudly. `SKIP_CI_HOOK=1 git push` is the
   deliberate override, and the hook's refusal message names it, so the escape hatch is
   never a secret.
 - **Wired once, covers every worktree:** `make install-hooks` sets
   `core.hooksPath = scripts/hooks` on the runtime repo. Linked worktrees share repo
   config, so the isolated PR worktrees (`org-worktree.sh`) and the runtime checkout all
   run the same hooks with no per-clone setup.
-- **Hosted workflows are off by default** (`gh workflow disable` — reversible with
-  `enable`), and re-enabling anything needs the Pattern 17 budget line first. The
-  `workflow_dispatch`-only deploy gate keeps its workflow: rare-and-deliberate is what
-  the quota is *for*. Budget facts and rules ship with the stamp, in
+- **Hosted verification is manual-only** (`workflow_dispatch`), so a push or comment
+  cannot spend quota. The dispatch-only deploy gate remains separate: rare-and-deliberate
+  is what the quota is for. Budget facts and rules ship with the stamp, in
   `docs/actions-budget.md`.
 - **Honesty note:** a git hook is per-clone convention, not server enforcement — an
   unhooked clone can push, and nothing on GitHub's side refuses it. That trade is
@@ -518,8 +511,8 @@ compute is free — on the operator's machine, at push time.
   required *reviews* (no status checks), keep it — the review gate doesn't ride the
   meter.
 
-**The counter-ratchet line:** this replaces the hosted CI workflow (disabled, not
-deleted) — one gate moved, none added.
+**The counter-ratchet line:** push-triggered hosted CI became operator-local pre-push
+verification plus an optional manual workflow — one gate moved, none added.
 
 ## 14. The GraphQL budget — board coordinates are cached, list reads ride REST
 
@@ -537,7 +530,7 @@ GraphQL hour while the runner's ETag'd REST polls (§1) cost nothing, and the
 **How it works:** three rules, all in `scripts/pm-gh.sh`:
 
 - **Pin, don't look up.** The board number resolves from `$PM_PROJECT_NUMBER`, then the
-  org-chart `global.pm_project_number` pin (§11's REQUIRED pin — the warden already
+  org-chart `global.pm_project_number` pin (§11's REQUIRED pin — the governance monitor already
   refused to run without it; now pm-gh.sh reads it too). The by-title lookup survives
   only as the un-pinned fallback.
 - **Cache the immutable coordinates.** Project id, Status field id, and option ids
@@ -549,7 +542,7 @@ GraphQL hour while the runner's ETag'd REST polls (§1) cost nothing, and the
   `item-add` straight to `set_status`, so its status set is one request.
 - **List reads ride REST.** `tasks`, label reads, and parent-label inheritance go
   through `gh api repos/…` — the separately-metered REST pool that was sitting idle
-  while GraphQL starved. (The warden's full-board `item-list` stays GraphQL: it
+  while GraphQL starved. (The governance monitor's full-board `item-list` stays GraphQL: it
   genuinely reconciles every item, on a bounded cron cadence, not per agent action.)
 
 A warm board move now costs 2 GraphQL requests (item lookup + write) and a create's
@@ -580,15 +573,15 @@ handle the residue, and the breaker meters dollars instead of frequency.
 channels woke every department, so a haiku classifier decided per-agent whether a
 broadcast merited a full cycle (~75:1 payoff per DEFER, logged not asserted). **Replaced
 by nothing — deliberately.** There are no broadcast channels to gate; an event routes to
-the departments its `dept:*` labels name and no one else. Companion lesson kept: a
+the departments its `role:*` labels name and no one else. Companion lesson kept: a
 second shadow-mode gate never proved net-positive and was deleted — measure, then
 enforce, in both directions.
 
 **R3. The collaboration channel (`#projects`, `[DELEGATE]`, the 8-reply turn budget).**
-Built because every Business↔IT handoff routed through the CEO — the org's most
+Built because every Business↔IT handoff routed through the Project Orchestrator — the org's most
 expensive agent had become its slowest message bus. **Replaced by multi-label issues:**
-a joint ticket carries both `dept:*` labels, each side's comments wake the peer (minus
-the echo-skip, §1), and escalation is adding `dept:ceo` for a decision, not a relay.
+a joint ticket carries both `role:*` labels, each side's comments wake the peer (minus
+the echo-skip, §1), and escalation is adding `role:ceo` for a decision, not a relay.
 The `[AGREEMENT]` exit survives as a typed handoff (§8). The turn budget has no direct
 successor — a runaway thread's backstops are now the brownout and the daily breaker
 (§2), which is blunter; watch that spot.
@@ -617,8 +610,8 @@ STATUS posts restating a hold — and filed a `[WARDEN]` alert past a weight thr
 Retired with the channels it read. **The philosophy — enforcement in code, not in a
 prompt — moved into CI and the platform:** `lint_constitution.py` and `decisions.py
 check` are required merge checks (`test_agent_workers.py` rides the same test job),
-CODEOWNERS routes every `decisions.yaml` PR to the Chairman, and deploys run only from
-the Chairman's manual `workflow_dispatch`. The typed-handoff validation duty found its
+CODEOWNERS routes every `decisions.yaml` PR to the Human Principal, and deploys run only from
+the Human Principal's manual `workflow_dispatch`. The typed-handoff validation duty found its
 Actions successor (§8, built). And the Warden itself came back: re-chartered 2026-07-11
 as a department around a deterministic engine (§11) — the philosophy held; only the
 channels it read didn't.
@@ -647,7 +640,7 @@ indistinguishable from a lucky habit until the day it isn't.
 
 The third bullet is enforced (the skill exists, DESIGN.md §2 binds it). The first two are
 the ones a stamped org must fill in for itself — `orggen` cannot know your paths. Do it
-during commissioning, in the same pass as the Chairman-queue pins: both are the same kind
+during commissioning, in the same pass as the Human Principal-queue pins: both are the same kind
 of debt, a step that looks optional and is actually load-bearing.
 
 ---

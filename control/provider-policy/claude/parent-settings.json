@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "disableBypassPermissionsMode": "disable",
+    "disableAutoMode": "disable",
+    "allow": ["Read", "Glob", "Grep", "Edit", "Write", "Bash"],
+    "deny": ["Agent", "Task", "WebSearch", "WebFetch", "Bash(sudo:*)", "Bash(git push:*)", "Bash(git fetch:*)", "Bash(gh:*)", "Bash(curl:*)", "Bash(wget:*)", "Bash(security:*)", "Read(**/.env)", "Read(~/.ssh/**)", "Read(~/.aws/**)", "Read(~/.config/gh/**)", "Read(~/.claude/**)", "Read(~/.config/claude/**)"]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": false,
+    "filesystem": {
+      "denyRead": [".env", "**/.env", "~/.ssh", "~/.aws", "~/.config/gh", "~/.claude", "~/.config/claude", "~/Library/Application Support/Claude"],
+      "denyWrite": ["~/.ssh", "~/.aws", "~/.config/gh", "~/.claude", "~/.config/claude", "~/Library/Application Support/Claude"]
+    },
+    "excludedCommands": [],
+    "network": {"deniedDomains": ["*"], "allowUnixSockets": [], "allowAllUnixSockets": false}
+  },
+  "hooks": {},
+  "disableRemoteControl": true
+}

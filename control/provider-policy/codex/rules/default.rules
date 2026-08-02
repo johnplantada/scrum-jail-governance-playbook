@@ -1,0 +1,27 @@
+# Defense in depth. The workspace sandbox already has no outbound network and no GitHub
+# credentials. These rules also reject direct command forms before execution.
+prefix_rule(
+    pattern = ["gh"],
+    decision = "forbidden",
+    justification = "Use scripts/pm-gh.sh or scripts/git-push-branch.sh through the wake broker.",
+    match = ["gh api repos/o/r", "gh issue close 7", "gh workflow run deploy.yml"],
+)
+prefix_rule(
+    pattern = ["git", ["push", "fetch", "pull"]],
+    decision = "forbidden",
+    justification = "Remote Git operations are controller-owned; use git-push-branch.sh.",
+    match = ["git push origin agent/software-implementer/topic", "git fetch origin main"],
+    not_match = ["git status", "git commit -m local"],
+)
+prefix_rule(
+    pattern = [["curl", "wget", "ssh", "scp", "sftp", "rsync"]],
+    decision = "forbidden",
+    justification = "Direct process networking is unavailable inside an agent wake.",
+    match = ["curl https://api.github.com", "ssh git@github.com", "rsync x host:y"],
+)
+prefix_rule(
+    pattern = [["codex", "claude"]],
+    decision = "forbidden",
+    justification = "Nested provider sessions are supervisor-owned named workers only.",
+    match = ["codex exec do-work", "claude -p do-work"],
+)

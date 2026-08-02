@@ -1,70 +1,50 @@
-# TEMPLATE — copy to $PRODUCT_REPO/.github/workflows/demo-evidence.yml
-#
-# Machine-produced demo evidence for the [DEMO] gate (org DESIGN.md §12). Instead of IT
-# pasting claims into chat, this workflow GENERATES the evidence bound to the PR's head
-# SHA — test output, build log, and a screenshot — and uploads it as one artifact. The
-# [DEMO] post cites this run's URL; the org side verifies it with
-# scripts/demo-verify.sh <pr-number> (green run + SHA must match the PR head, so stale
-# or fabricated evidence can't pass).
-#
-# Lines marked ADAPT assume the documented repo layout (frontend/ = React via npm,
-# backend/ = Go Lambda) — adjust to reality when copying.
-name: demo-evidence
+# TEMPLATE — install only after adapting scripts/ci-demo-evidence.sh in the product repository.
+name: Human-dispatched demo evidence
 
 on:
-  pull_request:
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number under demonstration
+        required: true
+        type: number
+      head_sha:
+        description: Exact 40-character PR head SHA
+        required: true
+        type: string
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
-  group: demo-evidence-${{ github.ref }}
-  cancel-in-progress: true
+  group: demo-evidence-${{ inputs.pr_number }}-${{ inputs.head_sha }}
+  cancel-in-progress: false
 
 jobs:
   evidence:
+    if: github.actor == vars.HUMAN_PRINCIPAL_LOGIN && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Stamp the evidence with the exact code under demo
+      - name: Bind request to the current PR head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_SHA: ${{ inputs.head_sha }}
         run: |
-          mkdir -p evidence
-          { echo "sha=$(git rev-parse HEAD)"; echo "ref=${{ github.ref }}"; date -u +"generated=%Y-%m-%dT%H:%M:%SZ"; } | tee evidence/provenance.txt
-
-      - uses: actions/setup-go@v5
+          test "$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq .head.sha)" = "$EXPECTED_SHA"
+          test "${#EXPECTED_SHA}" -eq 40
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          go-version: '1.24'                     # ADAPT: match backend/go.mod
-          cache-dependency-path: backend/go.sum  # ADAPT
-
-      - name: Backend evidence — go test
-        working-directory: backend               # ADAPT
-        run: go test -race ./... 2>&1 | tee ../evidence/backend-test.txt
-
-      - uses: actions/setup-node@v4
+          ref: ${{ inputs.head_sha }}
+          persist-credentials: false
+      - name: Generate evidence without credentials or mutation permissions
+        env:
+          DEMO_SHA: ${{ inputs.head_sha }}
+        run: scripts/ci-demo-evidence.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          node-version: '22'                     # ADAPT: match frontend/.nvmrc or package.json engines
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json  # ADAPT
-
-      - name: Frontend evidence — build
-        working-directory: frontend              # ADAPT
-        run: |
-          npm ci
-          npm run build 2>&1 | tee ../evidence/frontend-build.txt
-
-      - name: Frontend evidence — screenshot of the built site
-        working-directory: frontend              # ADAPT
-        run: |
-          npm exec --yes playwright install --with-deps chromium
-          npm exec --yes vite preview -- --port 4173 &   # ADAPT: or `npx serve dist`
-          sleep 3
-          npm exec --yes playwright screenshot --full-page http://localhost:4173 ../evidence/screenshot.png
-
-      - name: Upload the evidence bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: demo-evidence-${{ github.event.pull_request.number || github.run_id }}
+          name: demo-evidence-${{ inputs.pr_number }}-${{ inputs.head_sha }}
           path: evidence/
+          if-no-files-found: error
           retention-days: 30

@@ -1,427 +1,130 @@
-# Your Agent Governance Setup in an Afternoon
+# Scrum Jail 1.0 commissioning runbook
 
-A practical walkthrough for the operator who just got burned by an agent — or who
-wants to make sure they never do.
+All installation, activation, credential, repository-setting, and hosted-workflow steps in
+this runbook are Human Principal/operator actions. Never execute them inside an agent wake.
 
-**Time required**: 2-4 hours (the governance layer) + however long your runtime takes  
-**What you'll have when done**: a multi-agent org with human-in-the-loop
-controls — a `decisions.yaml` + CODEOWNERS ledger gating money/org-shape, a
-`workflow_dispatch`-only deploy gate — and a clear audit trail that's just git history.
+## 1. Verify the golden
 
-**No special infrastructure.** This runs on your laptop, a cheap VPS, or CI. The only
-external service is GitHub itself — you already have it if you're reading this here.
+Run `make verify`. It covers the control package, generator boundary tests, a fresh dirty
+development stamp and its complete generated test suite, Python compilation, ShellCheck,
+workflow policy, provenance, and whitespace checks.
 
----
+A publishable release additionally requires a clean working tree. `orggen` and the
+installer refuse dirty release output unless `--allow-dirty` is explicit; such output is
+permanently marked `releaseQualified: false`.
 
-## What This Repo Ships vs. What You Build
+## 2. Stamp the organization
 
-Read this first. Since the runtime landed in `runtime/`, the answer is: **the stamp is
-the whole org** — governance layer AND runtime. What's left for you is GitHub itself
-(repos, the two Chairman-only Settings steps) and your product.
+Run `bin/orggen init` with the Human Principal login and both repository identities. Review:
 
-**Ships in this repo (usable today, no other dependencies):**
+- `organization.yaml` for authority, repositories, budgets, canonical agents, worker caps,
+  and the required control-release digest;
+- `org-chart.yaml`, `agents/`, `wake-rules.yaml`, issue forms, CODEOWNERS, and workflows;
+- `playbook/SOURCE.json` with `scripts/verify-provenance.py`.
+- For release verification, set the protected repository variable
+  `SJG_SOURCE_MANIFEST_SHA256` to the SHA-256 of the Human-approved
+  `playbook/SOURCE.json`; release verification fails closed when it is absent or stale.
 
-| Piece | What it is |
-|---|---|
-| `bin/orggen` | Generator — stamps a complete org repo from `_init/` + `runtime/` (run it right now) |
-| `_init/org-chart.yaml` | Org tree + envelope template; `departments:`, `global_max_agents`, wake rules, and the issue-form dropdowns are all generated from one roster |
-| `_init/DESIGN.md` | The constitution template (invariants — incl. Chairman-only work intake — gates, guardrails) |
-| `_init/VISION.md` | The one-page why + who template |
-| `_init/agents/` | The shared `_policy.md`, the generic department template, and role mandates for `ceo`, `warden` (hygiene organ), `compliance` (assurance second line) |
-| `_init/blockers.yaml` | The blocker ledger, empty and documented |
-| `_init/.env.example` | The env contract the runtime reads (identity lives ONLY here — the scripts carry no fallback repos) |
-| `_init/github/` | CODEOWNERS (decisions.yaml → the Chairman) + the issue forms, dropdowns stamped from the roster |
-| `runtime/scripts/` | The full runtime: `runner.py` + generated `wake-rules.yaml`, `pm-gh.sh`, `workitems.py`, `agent-run.sh`, `warden.py`, the PreToolUse gates (`subagent_gate.py`, `objective_gate.py`), spend metering, the cadence + output predicates, and the unit tests CI runs |
-| `runtime/.claude/` | `settings.json` (deny-list + fail-open hook wiring) and the governance skills (`blocker-triage`, `board-proposals`, `org-worktree`, `safe-cadence`, `demo-gate`) |
-| `runtime/.github/workflows/` + `runtime/Makefile` | The org CI (tests, linters, ShellCheck, playbook-drift) and the operator surface (`make tick/preview/logs/halt/…`) |
-| The docs | `authorization-gate.md` (the gate walkthrough — the `decisions.yaml`/`workflow_dispatch` mechanism), `envelopes.yaml`, `patterns.md`, `blocker-ledger.md`, `safe.md`, `FIELD-NOTES.md` — vendored into each stamped org's `playbook/`, pinned in `playbook/SOURCE.md` |
+The target must be new and outside the golden. Generation stages into a sibling directory,
+validates all structured output, then renames atomically.
 
-**You bring (NOT included here):**
+## 3. Install and activate the controller
 
-| Component | What it is |
-|---|---|
-| GitHub itself | The org repo (push the stamped directory) + your product repo(s); Issues + one Project (the board's built-in `Status` single-select, provisioned from `pm_stages` by `scripts/github-pm-setup.sh`); Actions **only for rare deliberate jobs** — every prod-touching job triggered by **`workflow_dispatch` only** (the deploy gate), nothing hosted triggering per issue-comment (typed handoffs are validated on the runner's wake path), the CI suite run at push time by a local `pre-push` hook (patterns.md Pattern 17; FIELD-NOTES §13); branch protection making CODEOWNERS review binding |
-| The product | Whatever the org runs. `scripts/templates/product-repo/` ships adaptable CI for it (code-review, demo-evidence, preview-deploy, the metrics endpoint contract) |
-| Claude | The Claude Code SDK on your plan (`scripts/requirements.txt`); agents run headless through `agent-run.sh` |
+Install under an administrator-owned prefix, normally `/usr/local/libexec/scrum-jail`:
 
-**Component contracts (the spec)** — the shipped runtime implements these; they remain
-the contract if you ever replace a piece with your own:
-
-| Component | Its contract (what the docs assume it does) |
-|---|---|
-| `pm-gh.sh` | The ticket CLI — `create`/`tasks`/`move`/`comment`/`comments`/`done`/`drop`, plus the work-item tree verbs: `create --type epic\|feature\|story --parent N` (kind label + prefix, routing inherited, native sub-issue link) and `tree --id N` — mapped onto Issues + the Project's built-in `Status` field; ticket ids are `org#N` (the issue number) |
-| `workitems.py` | The tree's closure gate (safe.md): `can-close` re-derives the facts live — no open children; story evidence = merged repo-qualified PR or done-when; feature evidence = accepted `[DEMO]` or done-when — and `pm-gh.sh done` refuses to close a work-item the gate rejects, posting the typed `[CLOSE]` payload when it passes |
-| `runner.py` + `wake-rules.yaml` | The poller: each tick, diffs GitHub (issues + PRs, comments on both repos, workflow runs on the product repo) against a saved cursor, normalizes to events, and routes each through the rules table to wake the owning department |
-| `agent-run.sh` | Runs one headless Claude cycle per wake — loads the department's mandate + `agents/_policy.md` + the open `blockers.yaml` queue, single-flight-locks so two wakes of the same agent never race, respects the `.halt` kill switch |
-| `decisions.py check` (CI) | Validates every `decisions.yaml`-touching PR (unique ids, required fields) so a malformed entry can't merge |
-
-The same runtime powers the live Scrum Jail org.
-
----
-
-## Before You Start
-
-You need:
-- [ ] A GitHub account, with a repo for your org (stamp this one into it) and one per product
-- [ ] The `gh` CLI installed and authenticated: `gh auth login`, then
-      `gh auth refresh -s project` (Project-board writes need the extra scope)
-- [ ] An Anthropic API key or Claude subscription (for the agent LLMs)
-- [ ] Your GitHub username (the Chairman — CODEOWNERS keys off it, and the deploy
-      dispatch is yours to click)
-- [ ] 30 minutes of uninterrupted focus for the initial setup
-
-**You do NOT need**: Kubernetes, a load balancer, any SaaS beyond GitHub, any payment
-processor, or a chat server. The whole system can run on a $5/mo VPS (or nothing at all,
-if you're happy triggering ticks by hand or from a laptop cron).
-
----
-
-## Step 1 — Stamp Your Org Repo (15 min, works today)
-
-Generate a fresh org skeleton from this repo's templates:
-
-```bash
-bin/orggen init ../my-org --product "myproduct.com" --goal "$10k/month" \
-  --chairman-github <YOUR_GITHUB_USERNAME> --departments ceo,business,it,warden
+```sh
+sudo bin/sjg-install --prefix /usr/local/libexec/scrum-jail
+sudo bin/sjg-activate \
+  --prefix /usr/local/libexec/scrum-jail \
+  --version 1.0.0 \
+  --organization /absolute/path/to/org/organization.yaml
 ```
 
-Verify what you got — every one of these files now exists and is yours to edit:
-
-```bash
-ls -A ../my-org
-# .claude/ .env.example .github/ .gitignore DESIGN.md Makefile README.md VISION.md
-# agents/ blockers.yaml decisions.yaml org-chart.yaml playbook/ scripts/ wake-rules.yaml
-cat ../my-org/org-chart.yaml   # your chairman's GitHub username + one department block per --departments
-ls ../my-org/agents            # _policy.md + one stamped mandate per department
-cat ../my-org/wake-rules.yaml  # the runner's routing table, generated from the same roster
-```
-
-The stamp includes the **runtime** (`scripts/`, `.claude/`, the CI workflows, the
-Makefile) and the **vendored playbook** (`playbook/`, pinned to this golden's commit —
-`make check-playbook` keeps it honest). The departments you name generate *seven*
-surfaces in lockstep: the org-chart block, the agent mandate, the wake rules, the issue-form
-dropdowns, the `dept:*` labels (via `github-pm-setup.sh` reading the chart), the agent
-ceiling, and the README roster — adding a department later means touching those same seven
-(the reference org once shipped a follow-up commit for a forgotten dropdown; the generator
-exists so you don't).
-
-(Prefer to work by hand? Fork this repo instead and edit `org-chart.yaml` from the
-template at the repo root. `orggen` exists so the chart and `agents/` can never
-disagree about who exists.)
-
----
-
-## Step 2 — Configure Your Org (30 min, works today)
-
-**Edit `org-chart.yaml`** in your new org repo:
-
-1. Confirm `chairman.github` is your GitHub username
-2. Set the governance vocabulary (`charter`/`sunset`/`fund`/`ship`/`halt`/`promote`) —
-   leave the defaults unless you want different words. This is ledger language — a
-   `decisions.yaml` entry's `type` field and the corresponding issue/PR prose — not a
-   signal any bot listens for
-3. Adjust envelopes: start with the `department_head` preset, tighten after you see how
-   the agents behave
-
-See `envelopes.yaml` for a field-by-field explanation — including which fields are
-code-enforced (the spawn ceilings, and `daily_token_budget` via the budget gate — see
-"Tuning After Week 1") and which are declared policy (`can_spend`, `can_deploy`).
-
-**Edit each `agents/<name>.md`** — these are the standing instructions:
-- Replace the example product with your product
-- Replace the example ticket/label conventions with your own if you've renamed anything
-- Keep the governance protocol sections intact — those are the safety rails
-
----
-
-## Step 3 — Provision GitHub: Issues, the Project, CODEOWNERS, the deploy gate (20 min)
-
-Unlike the chat era, there are no bot accounts to create and no tokens to mint per
-agent — every agent shares your own `gh auth login` session (a shared git identity;
-each agent banners its comments, e.g. `**IT —**`, to stay legible). What you do need
-to provision, for **both** your org repo and your product repo:
-
-1. **Labels + the Project board.** `scripts/github-pm-setup.sh` does this idempotently —
-   it creates the `dept:*` wake labels plus `objective`/`proposal`, and the one shared
-   Project whose built-in `Status` single-select options mirror `org-chart.yaml`'s
-   `pm_stages` + `pm_holding_stages` + `pm_terminal_stages` (the only place that list is
-   defined). Safe to re-run. Two UI-only switches finish it (Project → ⋯ → Workflows):
-   keep "Item added → Todo" ON, turn "Item closed → Done" OFF (it can't tell Done from
-   Dropped — the `done`/`drop` gates set the terminal state).
-2. **`.github/CODEOWNERS`** naming yourself (the Chairman) as owner of `decisions.yaml` —
-   this is what routes a money/org-shape PR to you for review.
-3. **Branch protection on `main`**: Settings → Branches → add a rule → enable "Require a
-   pull request before merging" + "Require review from Code Owners". Without this,
-   CODEOWNERS only *requests* your review — it doesn't *require* it, and a
-   `decisions.yaml` PR could merge unreviewed.
-   **Then verify it took:** `gh api repos/<you>/<org-repo>/branches/main/protection` —
-   a 404 means the gate is convention-only, and nothing else will tell you (an org
-   stamped from this playbook ran for weeks unprotected because this step was skipped
-   and nothing noticed; private repos also need a paid plan for branch protection at
-   all). If you add required **status checks**, know the coupling: they run on metered
-   Actions, so quota exhaustion (patterns.md Pattern 17) freezes every merge behind a
-   check that can never report.
-4. **The deploy gate**, in your product repo — it's code, not Settings: every workflow
-   that touches prod triggers on **`workflow_dispatch` only**. The common shape is one
-   workflow with both triggers, where a push to `main` runs only the verify jobs:
-
-   ```yaml
-   on:
-     push:
-       branches: [main]    # verify only — build + test, no prod credentials
-     workflow_dispatch:    # the gate: deploy runs ONLY from your manual dispatch
-   jobs:
-     verify: ...
-     deploy:
-       if: github.event_name == 'workflow_dispatch'
-       ...
-   ```
-
-   A merge builds; only your dispatch deploys, and the Actions run history is the
-   SHA-bound audit trail. *(The `production` environment with yourself as required
-   reviewer is the approve-button variant of this gate — use it **only if your plan
-   enforces it**: required reviewers work on public repos, but on a **private** repo
-   they need Team/Enterprise; on a private Free-plan repo the Settings screen accepts
-   them and silently doesn't enforce. The live org shipped the environment first and
-   found out via Test 2. Whichever you pick, run the test.)*
-
-Create Mattermost channels — no. That's the whole point: there is nothing here to
-stand up beyond a handful of GitHub Settings clicks and one setup script.
-
----
-
-## Step 4 — Install the Runtime Locally (20 min)
-
-The runtime ships with the stamp — this step is installing its dependencies and proving
-it green, not building it. In your stamped org repo:
-
-```bash
-python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
-make test          # unit tests + constitution lint + blocker lint + decisions check
-cp .env.example .env   # fill in ORG_GH_REPO / PRODUCT_GH_REPO / PRODUCT_REPO
-make install-hooks # pre-commit (no commits in the runtime checkout) + the pre-push CI suite
-```
-
-(`make dashboard` is there too once the venv exists — a local, read-only spend
-dashboard over `state/spend.jsonl` on http://127.0.0.1:8737.)
-
-The identity env vars have **no fallback defaults** in the scripts (a runtime silently
-talking to someone else's repo is worse than one that refuses to start — the reference
-org learned this porting its own runtime, which carried the previous org's repo slug in
-six files). `runner.py` exits with a clear message until `.env` is filled in; the
-read-only predicates (`last-ship.sh`, `pi-tick.sh`) degrade safely instead.
-
-How the pieces fit (the contracts live in the table at the top): `runner.py` polls
-GitHub and routes events through `wake-rules.yaml`; `agent-run.sh` runs one locked,
-metered, headless Claude cycle per wake; `pm-gh.sh` is the ticket CLI the agents use;
-the `.claude/settings.json` hooks enforce the subagent cap and Chairman-only work
-intake inside each cycle. Guards, every tick: a `.halt` file stops everything; the
-daily spend cap holds live wakes once `state/spend.jsonl` crosses it.
-
-Smoke-test against GitHub (after Step 3's provisioning):
-
-```bash
-scripts/pm-gh.sh create --project ceo --title "CEO online" --desc "smoke test"
-```
-
-You should see a new issue land in your org repo, labeled `dept:ceo`, sitting in the
-Project board's `Todo` column.
-
----
-
-## Step 5 — Run the Governance Gate Test (20 min, requires Step 4)
-
-Before trusting your governance system, verify the gates behave as designed.
-
-**Test 1 — Money / org-shape gate (`decisions.yaml`)**
-
-Have an agent open a PR appending one `decisions.yaml` entry (`type: spend`,
-`cost_usd: 10`, a test description).
-
-Verify:
-- [ ] `.github/CODEOWNERS` auto-requests your review on the PR
-- [ ] CI's `decisions.py check` runs and passes (a well-formed entry)
-- [ ] The agent does **not** proceed until the PR merges — the merge itself is the
-      authorization, there's no separate reaction step
-- [ ] To decline: close the PR without merging. No reaction, no separate "no" — nothing
-      happens
-- [ ] Confirm the PR is blocked from merging without your review (branch protection:
-      "Require review from Code Owners") — if it merges anyway, bootstrap step 3
-      didn't take; a 404 from the branch-protection API is the tell
-
-**Test 2 — Deploy gate (the dispatch-only trigger)**
-
-Have IT open a product-repo PR, get it green on CI, and merge it (or merge any trivial
-change).
-
-Verify:
-- [ ] The push to `main` runs **verify jobs only** — the deploy job shows as skipped,
-      not run. Merged ≠ deployed
-- [ ] Nothing is waiting for you, because nothing can deploy without you: dispatch the
-      workflow by hand (Actions → the deploy workflow → Run workflow → `main`) and
-      verify the deploy job runs *now*
-- [ ] Don't dispatch — the merged change sits, indefinitely, no timeout
-- [ ] If you used the `production`-environment variant instead: verify the run actually
-      **pauses** at the environment. If it sails straight through, your plan does not
-      enforce required reviewers on this repo — fall back to the dispatch-only trigger
-
-**Test 3 — Wrong actor**
-
-Have a second GitHub account (or a friend) with no write access try to dispatch the
-deploy workflow, or review the `decisions.yaml` PR.
-- [ ] Verify GitHub itself refuses — workflow dispatch requires write access, and
-      CODEOWNERS routing is platform-enforced, not something any of your scripts have
-      to check
-
-**Test 4 — Capability absence (the one that actually matters)**
-
-The gates above are the approval interface. The enforcement is what the agent *cannot
-reach*:
-- [ ] Grep your agent host for payment or cloud-deploy credentials the agent could read
-      directly (as opposed to its own scoped `gh` session) — there should be none
-- [ ] Confirm the agent's `gh` token cannot push straight to `main`, dismiss a
-      required review, **or dispatch the deploy workflow** — branch protection and the
-      dispatch-only trigger are what actually stop it, not a prompt instruction (an
-      agent-visible token with Actions-write rights can self-authorize a deploy; see
-      the credential-hygiene note in authorization-gate.md)
-
-If all four pass, your governance layer is live.
-
----
-
-## Step 6 — First Real Objective (30 min)
-
-File your first objective as a GitHub issue (you, the Chairman):
-
-```bash
-gh issue create --repo <your-org-repo> \
-  --title "Objective: <your goal>. Due: <date>." \
-  --label objective --label dept:ceo \
-  --body "No spend or deploy without a decisions.yaml merge or the Chairman's workflow dispatch."
-```
-
-The CEO wakes on the runner's next tick — the `dept:ceo` label is what routes it — reads
-the objective, and routes it to an owning department, which decomposes it as a
-**work-item tree** on native sub-issues (`[PROPOSAL]`s under the objective, epics under
-the accepted one, features/stories just-in-time — see safe.md): each child is born with
-the `dept:*` label that routes it and the acceptance line its closure will bind to.
-
-**What to watch for in the first week:**
-- Agents opening `[PROPOSAL]` issues or `decisions.yaml` PRs (good — they're asking, not
-  acting)
-- Tickets moving `Todo → In Progress → Awaiting Merge → Demo → Awaiting Deploy → Done` on the Project board
-- The tree closing **upward** — stories citing merged PRs, features citing accepted
-  `[DEMO]`s (`pm-gh.sh tree --id N` shows the rollup; a tree that only grows is
-  patterns.md Pattern 12)
-- Any unexpected spend or deploy attempt (should be zero — not because a watcher blocks
-  it, but because agents hold no payment credentials or prod access; if an attempt
-  could ever have *succeeded*, you have a capability leak to fix, not a prompt problem)
-
----
-
-## Step 7 — Harden against the blocked loop (do this before week 2)
-
-The `decisions.yaml`/deploy-dispatch gates stop agents doing too *much*. The other
-failure mode — agents doing nothing but *re-announcing* that they're blocked — burns
-just as much money and is what most operators hit first. Three primitives stop it (full
-detail in [blocker-ledger.md](blocker-ledger.md), including the one flagged exception
-for a blocker gating your only checkout or only audience — that one must stay loud):
-
-1. **`blockers.yaml`** ledger. When an agent hits a human-only blocker (a credential, a
-   URL, an approval, a repo-Settings action), it records the blocker there once and
-   goes quiet. That file — not the issue stream — is your queue. Inject its open
-   entries into each agent's wake prompt.
-2. **Wake backpressure.** A tick that finds nothing new since the runner's last cursor
-   is a no-op — no model call. `runner.py`'s cursor is what carries this now (there's no
-   channel watermark to maintain). A blocked org on a quiet day should cost zero tokens.
-   Even an unblocked, actively-polling org can hold its steady-state GitHub API cost
-   near zero: conditional polling (ETag/`If-None-Match`) means an unchanged endpoint
-   answers `304 Not Modified`, which GitHub does not bill against the rate limit — see
-   [FIELD-NOTES.md §1](FIELD-NOTES.md) for the mechanism.
-3. **Comments are the only "something changed" signal.** No ticket gets a "no change
-   from yesterday" comment — every comment on a labeled issue re-wakes every department
-   that label names, so a noise comment is a self-wake storm across your whole org, not
-   just chatter.
-
-If you'll run a process layer (sprints/demos/planning), read [safe.md](safe.md) first — the one
-rule that keeps it from becoming theater is **gate every ceremony on a real prod ship, not on a
-clock.**
-
-## Tuning After Week 1
-
-After you've watched the agents run for a week:
-
-**If agents are asking too often:**
-Raise their envelopes in `org-chart.yaml` for the categories you've already approved
-multiple times. E.g. if IT has asked to run tests 10 times, that's within-envelope
-now — remove the gate for that specific action.
-
-**If agents are doing things you didn't expect:**
-Read their `agents/<name>.md` file. The instructions may be too broad. Narrow the
-charter, not the model tier.
-
-**If an agent is burning too many tokens:**
-`daily_token_budget` is code-enforced now, at two layers. Per envelope,
-`scripts/budget_gate.py` sums the agent's day from the spend ledger; `agent-run.sh`
-consults it before every cycle and **skips non-direct wakes** for an agent over budget.
-Direct wakes — a runner-routed GitHub event like the Chairman's issue or a deploy
-failure — still run, so this is a brownout, not a blackout: a spent budget never blocks
-the Chairman, and the overage stays visible in the ledger. Org-wide, the runner holds
-**all** wakes once the day's metered spend in `state/spend.jsonl` crosses
-`SPEND_BREAKER_DAILY_USD` (the constitution's metering invariant). The cheaper levers
-still come first: wake backpressure (a tick that finds nothing new is a no-op — zero
-model calls), comment-triggered wakes staying rare (fewer noise comments → fewer peer
-wakes), and pinning the agent to a cheaper model tier. Audit the spend ledger against
-the declared budget and tighten those before you're leaning on the breakers.
-
-**If you want to add a department:**
-Open a `decisions.yaml` PR (`type: charter`) describing the new department. Your merge
-**is** the charter — update `org-chart.yaml`'s `departments:` list in the same PR (or a
-follow-up) so the chart and the decision stay in sync. Never add a department by editing
-`org-chart.yaml` outside a reviewed PR; that's exactly what CODEOWNERS on the ledger
-exists to prevent.
-
----
-
-## What This Doesn't Cover
-
-This playbook covers the governance layer and ships the runtime that enforces it. It
-does not cover:
-
-- **What your agents should actually do** — that's your `agents/<name>.md` files (the
-  stamped mandates carry `CUSTOMIZE` markers where your org's substance goes)
-- **Your product** — `scripts/templates/product-repo/` gives you adaptable CI, not an app
-- **Multi-tenant or team setups** — the org-chart is single-Chairman by design
-- **Security hardening** — `.env`/secrets need standard secrets management, and scoping
-  the `gh` token each agent runs under is on you
-
-For the hard-won operational mechanisms the live org runs — wake backpressure numbers,
-single-flight locks, worker tool-scoping, deploy-hold hibernation, and more — see
-[FIELD-NOTES.md](FIELD-NOTES.md); the shipped runtime implements them.
-
----
-
-## Quick Reference — the runtime command surface
-
-These are the commands the stamped runtime exposes (`make` with no target prints the
-operator surface):
-
-| Task | Reference shape |
-|---|---|
-| Create a ticket | `pm-gh.sh create --project <dept> --title "…"` |
-| Create a work-item tree child (kind label + prefix, routing inherited, sub-issue link) | `pm-gh.sh create --type epic\|feature\|story --parent N` |
-| Render an objective's tree (the rollup) | `pm-gh.sh tree --id N` |
-| Move a ticket | `pm-gh.sh move --id N --to <Status>` (quote multi-word names: `--to "In Progress"`) |
-| Drop a ticket (won't-do) | `pm-gh.sh drop --id N --reason "…"` (epics/objectives: Chairman only) |
-| List tickets | `pm-gh.sh tasks --project <dept>` |
-| Comment on a ticket | `pm-gh.sh comment --id N --body "…"` |
-| Read a ticket's thread | `pm-gh.sh comments --id N` |
-| Close a ticket (work-items pass the closure gate and post their `[CLOSE]` evidence) | `pm-gh.sh done --id N [--pr <owner/repo#N> \| --done-when "…" \| --demo <url>]` |
-| Run one poll tick | `make tick` (wraps `scripts/runner-watch.sh`, which drives `scripts/runner.py`) |
-| Dry-run a tick — show would-be wakes without firing or advancing the cursor | `make preview` (`scripts/runner.py preview`) |
-| Start one agent wake by hand | `scripts/agent-run.sh <dept>` |
-
----
-
-*Built by the Scrum Jail autonomous org. If your agents went rogue, this is how we stopped ours.*  
-*scrumjail.org*
+Installation copies no credentials. Activation verifies every release file and requires
+the organization’s version and source digest to match before atomically changing `current`.
+Dirty activation requires an explicit development override and must never be production.
+
+Keep mutable service state, sockets, provider homes, and GitHub App credentials outside the
+release and organization repositories. The service identity may read the active release but
+must not write it. Agent processes may write only commissioned workspaces and their own
+scratch paths.
+
+## 4. Commission provider sessions
+
+Choose Codex CLI or Claude CLI in supervisor-owned configuration and use absolute executable
+paths. Log the service identity into the selected first-party subscription/OAuth session.
+Do not set provider API keys, alternate base URLs, Bedrock, Vertex, or Foundry flags.
+Use a fixed administrator-reviewed `PATH` and shell; never inherit either from a wake or
+workspace. For Codex, place the validated installed policy at the managed home's `.codex`
+config/rules location so the same home supplies both sealed policy and first-party login.
+Before enabling wakes, place a harmless sentinel beside the provider auth state and prove a
+sandboxed tool subprocess cannot read it. Treat a readable sentinel as a commissioning
+failure even when subscription status is healthy.
+
+Run the read-only supervisor authentication check. Unknown status output or an unexpected
+CLI version fails closed. Codex uses an installed config/rules layer with no process network,
+no project trust, no multi-agent tools, and forbidden direct network/GitHub/provider command
+forms. Claude uses validated settings plus redundant sealed command-line restrictions;
+sandbox unavailability, excluded commands, unsandboxed retry, bypass mode, auto mode,
+project hooks, MCP expansion, remote control, and arbitrary Unix sockets are denied.
+
+## 5. Commission GitHub
+
+Use a controller-only GitHub App installation or equivalently scoped service credential.
+Do not share the Human Principal token and do not expose `GH_TOKEN`, `GITHUB_TOKEN`, or the
+GitHub configuration directory to agents.
+
+As the Human Principal:
+
+1. Create both repositories and the organization Project.
+2. Install the labels and Project fields using `scripts/github-pm-setup.sh` from an operator
+   shell. This is the only generated direct-`gh` commissioning utility.
+3. Protect `main`: PR required, Human/Code Owner review required, force pushes and deletion
+   disabled, and workflows unable to satisfy the Human review.
+4. Set repository variable `HUMAN_PRINCIPAL_LOGIN` to the exact principal login.
+5. Keep all hosted workflows manual-only. Configure the `preview` environment with the
+   Human Principal as required reviewer and a prefix-scoped OIDC role.
+6. Create and pin the Human Principal action queue and Project number.
+
+Do not run live GitHub mutation or spend/deploy smoke tests during ordinary verification.
+
+## 6. Start in observation mode
+
+The playbook ships the enforcement core and clients, not a turnkey privileged service
+daemon. Before this step, implement the host integration contract in
+`docs/CONTROL-PLANE.md` under a separate OS identity; provide its own reviewed service
+entrypoint, source adapters, GitHub App credential loader, provider launcher, and admin/wake
+socket lifecycle. Do not point the generated clients at an ad-hoc wrapper around `gh` or a
+provider CLI.
+
+Start that commissioned supervisor with source polling in preview mode. Each of the five sources
+has an independent checkpoint: org issues, org comments, product issues, product comments,
+and product workflow runs. Confirm complete pagination, routing, duplicate suppression,
+leases, retry waits, budget holds, and dead-letter visibility before enabling wakes.
+
+Then run the deterministic governance audit in dry-run mode. Incomplete observations must
+produce no planned mutation. Enable reconciliation writes only after stable source markers,
+preconditions, idempotency keys, and a separately reviewed, operation-specific marker verifier
+are visible. The reference core records ambiguous results as `verify_pending` but does not ship
+that host verifier; until it exists, keep reconciliation writes disabled.
+
+## 7. Inject work
+
+The Human Principal creates the first objective. The Project Orchestrator may create an epic
+only under that objective; downstream roles create features and stories under typed parents.
+Agents may propose governance or spending, but only Human merge/activation and Human payment
+execution have effect.
+
+## 8. Operate and recover
+
+- Halt with `make halt`; this requests the supervisor-owned pause state. The host terminates
+  every parent/worker process group before revoking active wake sessions. Resume with
+  `make resume` through the authenticated operator socket.
+- On an incomplete source read, retain its checkpoint and process no absence-based action.
+- On a retryable read, back off without consuming delivery.
+- On an ambiguous mutation, mark verification pending. Never retry until the commissioned
+  operation-specific verifier proves the write absent.
+- On budget exhaustion, retain queued work in `budget_hold` until a later eligible epoch.
+- On a dead letter, preserve event, route, attempts, and error; require explicit Human replay.
+- Upgrades are install-new, verify, Human activate, and restart. Never self-fetch authority
+  code from a generated organization.

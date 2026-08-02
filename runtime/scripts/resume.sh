@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Clears the kill switch so agents may act again.
+# Operator client for clearing the supervisor-owned kill switch.
 set -euo pipefail
-cd "$(dirname "$0")/.."
-rm -f .halt
-echo "resumed — .halt cleared."
+client="${SJG_ADMIN_BIN:-/usr/local/libexec/scrum-jail/current/bin/sjg-admin}"
+[ -x "$client" ] || { echo "resume: installed controller unavailable: $client" >&2; exit 69; }
+[ -n "${SJG_SUPERVISOR_SOCKET:-}" ] || {
+  echo "resume: SJG_SUPERVISOR_SOCKET is not set" >&2
+  exit 77
+}
+exec "$client" runner resume
