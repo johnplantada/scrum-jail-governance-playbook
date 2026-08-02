@@ -9,7 +9,8 @@ uses standard-library protocols and SQLite rather than an agent framework.
   release, repositories, budgets, and worker capabilities.
 - `authz.py` is a closed role-operation matrix. Human-only operations are absent, not
   prompt-denied. Ownership, typed hierarchy, evidence, PR head role, protected path, and
-  current-state checks are deterministic.
+  current-state checks are deterministic. `control_backend.py` refreshes mutable GitHub facts
+  and repeats authorization immediately before the fixed backend's first write.
 - `store.py` reserves requests, workers, budgets, snapshots, deliveries, and reconciliation
   operations in immediate transactions with WAL and full synchronization.
 - `github_backend.py` constructs every endpoint, method, repository, branch, label, and
@@ -17,9 +18,11 @@ uses standard-library protocols and SQLite rather than an agent framework.
 - `delivery.py` never advances a source checkpoint on a partial failure.
 - `reconcile.py` maps incomplete facts to no mutation.
 - `provider.py` validates subscription auth, strips ambient credentials/config overrides,
-  validates Claude settings, and constructs sealed launches.
+  validates Claude settings and the exact Codex execution-policy digest, and constructs sealed
+  launches.
 - `workers.py` imports only declared changes from a disposable worker scratch directory and
-  never grants recursive authority.
+  never grants recursive authority. Import is rejected if any changed parent file no longer
+  matches the worker's starting snapshot.
 
 ## Host integration contract
 

@@ -36,7 +36,8 @@ RUNTIME = os.path.join(REPO, "runtime")
 # Docs vendored into the new org's playbook/ and covered by SOURCE.json.
 VENDORED_DOCS = ["patterns.md", "safe.md", "blocker-ledger.md", "authorization-gate.md",
                  "envelopes.yaml", "README.md", "RUNBOOK.md", "org-chart.yaml",
-                 "FIELD-NOTES.md", "role-terminology.md", "delegation-charter.md"]
+                 "FIELD-NOTES.md", "role-terminology.md", "delegation-charter.md",
+                 "docs/CONTROL-PLANE.md"]
 
 # Canonical 1.0 role archetypes: id → (function, reports_to, model profile, worker cap,
 # budget, note). Human/agent/service kinds are explicit in org-chart.yaml; names describe
@@ -407,7 +408,7 @@ def organization_document(org, principal, org_repo, product_repo, role_specs, *,
         "budgets": {"organizationDailyTokens": 2_000_000},
         "limits": {"globalMaxAgents": global_max_agents},
         "agents": agents,
-        "workflows": {"hostedExecution": "manual-only", "principalActor": principal},
+        "workflows": {"hostedExecution": "manual-only"},
     }
 
 

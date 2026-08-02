@@ -5,6 +5,7 @@ import unittest
 from unittest import mock
 from pathlib import Path
 
+from sjg_control.authz import Session
 from sjg_control.policy import compile_policy
 from sjg_control.store import Store
 from sjg_control.workers import WorkerError, WorkerSupervisor
@@ -23,6 +24,17 @@ class Launcher:
         if self.change:
             (workspace / self.change).write_text("changed\n", encoding="utf-8")
         return self.output
+
+
+class ParentRaceLauncher(Launcher):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+
+    def run_worker(self, *, worker_type, model, prompt, workspace, environment, timeout_seconds):
+        (workspace / "allowed.txt").write_text("worker version\n", encoding="utf-8")
+        (self.parent / "allowed.txt").write_text("parent newer version\n", encoding="utf-8")
+        return "result"
 
 
 class WorkerTests(unittest.TestCase):
@@ -65,6 +77,28 @@ class WorkerTests(unittest.TestCase):
             "writePaths": ["allowed.txt"]}, parent_workspace=self.workspace)
         self.assertEqual(("allowed.txt",), result.changed_paths)
         self.assertEqual("changed\n", (self.workspace / "allowed.txt").read_text())
+
+    def test_worker_import_refuses_to_overwrite_a_newer_parent_file(self):
+        with self.assertRaisesRegex(WorkerError, "newer parent file"):
+            self.supervisor(ParentRaceLauncher(self.workspace)).run(self.session, {
+                "type": "implementer", "task": "change", "readPaths": ["allowed.txt"],
+                "writePaths": ["allowed.txt"]}, parent_workspace=self.workspace)
+        self.assertEqual("parent newer version\n",
+                         (self.workspace / "allowed.txt").read_text(encoding="utf-8"))
+        state = self.store.connection.execute(
+            "SELECT state FROM worker_attempt ORDER BY sequence DESC LIMIT 1").fetchone()[0]
+        self.assertEqual("failed", state)
+
+    def test_worker_supervisor_resolves_the_controller_bound_parent_session(self):
+        forged = Session(
+            self.session.session_id, self.session.wake_id, self.session.org_id,
+            "commercial-planner", self.session.policy_digest, frozenset({"org"}),
+            self.session.expires_at,
+        )
+        with self.assertRaisesRegex(WorkerError, "controller-owned state"):
+            self.supervisor(Launcher()).run(forged, {
+                "type": "researcher", "task": "inspect", "readPaths": ["allowed.txt"],
+                "writePaths": []}, parent_workspace=self.workspace)
 
     def test_readonly_worker_cannot_receive_write_scope(self):
         with self.assertRaises(WorkerError):

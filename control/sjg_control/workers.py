@@ -132,6 +132,35 @@ def _copy_scoped_input(root: Path, relative: str, destination: Path) -> bool:
         os.close(directory)
 
 
+def _regular_file_state(root: Path, relative: str) -> tuple[str, int]:
+    """Hash one scoped parent file without following any workspace link."""
+    parent = _parent_fd(root, relative, create=False)
+    if parent is None:
+        return ("absent", 0)
+    directory, leaf = parent
+    try:
+        try:
+            descriptor = os.open(leaf, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory)
+        except FileNotFoundError:
+            return ("absent", 0)
+        except OSError as exc:
+            if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
+                raise WorkerError(f"worker path contains a symlink: {relative}") from exc
+            raise
+        digest = hashlib.sha256()
+        size = 0
+        with os.fdopen(descriptor, "rb") as source:
+            metadata = os.fstat(source.fileno())
+            if not stat.S_ISREG(metadata.st_mode):
+                raise WorkerError(f"worker path is not a regular file: {relative}")
+            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(chunk)
+                size += len(chunk)
+        return (digest.hexdigest(), size)
+    finally:
+        os.close(directory)
+
+
 def _parent_identity_matches(root: Path, relative: str, held_directory: int) -> bool:
     try:
         current = _parent_fd(root, relative, create=False)
@@ -203,17 +232,7 @@ def _unlink_scoped(root: Path, relative: str) -> None:
 
 def snapshot(root: Path, paths: tuple[str, ...]) -> dict[str, tuple[str, int]]:
     root = root.resolve(strict=True)
-    result = {}
-    for relative in paths:
-        path = _scoped_path(root, relative)
-        if path.exists():
-            if not path.is_file():
-                raise WorkerError(f"worker path is not a regular file: {relative}")
-            data = path.read_bytes()
-            result[relative] = (hashlib.sha256(data).hexdigest(), len(data))
-        else:
-            result[relative] = ("absent", 0)
-    return result
+    return {relative: _regular_file_state(root, relative) for relative in paths}
 
 
 def snapshot_tree(root: Path) -> dict[str, tuple[str, int]]:
@@ -248,6 +267,10 @@ class WorkerSupervisor:
         self.max_output_bytes = max_output_bytes
 
     def run(self, session: Session, arguments: dict[str, Any], *, parent_workspace: str | Path) -> WorkerResult:
+        bound_session = self.store.session(session.session_id)
+        if bound_session != session:
+            raise WorkerError("worker parent session does not match controller-owned state")
+        session = bound_session
         role = self.policy.role(session.role)
         worker_type = str(arguments.get("type") or "")
         if worker_type not in role.worker_types:
@@ -297,6 +320,13 @@ class WorkerSupervisor:
             total = sum(after.get(path, ("absent", 0))[1] for path in changed)
             if total > self.max_patch_bytes:
                 raise WorkerError("worker output exceeds the patch-size limit")
+            # Check every path before importing any output. A parent that changed while
+            # the worker ran wins; partial or stale worker output is never overlaid.
+            for relative in changed:
+                expected = before.get(relative, ("absent", 0))
+                if _regular_file_state(parent, relative) != expected:
+                    raise WorkerError(
+                        f"worker import conflicted with a newer parent file: {relative}")
             for relative in changed:
                 source = scratch / relative
                 if relative not in after:

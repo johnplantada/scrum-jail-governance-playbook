@@ -39,9 +39,10 @@ what AI can do now. Every purpose from 2023 carries forward, one level up:
 
 - **Still a hoax.** A fictional correctional institution for agile process violations,
   now with a real product surface instead of a Google Sites brochure.
-- **Still a time capsule.** In 2023, AI could write the website. In 2026, AI *runs the
-  company*: an autonomous multi-agent organization — a Project Orchestrator, functional roles, reviews,
-  deploys — builds and operates the site.
+- **Still a time capsule.** In 2023, AI could write the website. In 2026, AI operates a
+  governed multi-agent organization — a Project Orchestrator and functional roles research,
+  plan, build, review, monitor, and prepare deployment evidence; the Human Principal alone
+  dispatches and deploys.
 - **And now, an actual experiment.** How do you orchestrate multiple agents, get them
   to follow a strict process, and keep the whole thing auditable and controllable by
   one human? That question is not a joke, and the working answers are this repo: the

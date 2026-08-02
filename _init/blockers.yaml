@@ -14,9 +14,9 @@
 #   - `scripts/blockers.py open` prints the open queue in EV order.
 #
 # kind:  external-input = a credential/URL/address/account only the human can supply
-#        governance     = a Human Principal authorization — a decisions.yaml merge (fund ·
-#                         charter · promote · sunset) or a prod-deploy dispatch
-#                         (the Human Principal's manual workflow_dispatch)
+#        governance     = a Human Principal action — ratify a decision record, separately
+#                         execute approved spend, activate a matching control release, or
+#                         dispatch production (manual workflow_dispatch)
 # needs: human-principal
 # state: open | cleared
 # value: what clearing it unlocks — revenue (a conversion path goes live) | signal

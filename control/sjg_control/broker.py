@@ -60,11 +60,19 @@ class Broker:
             self.store.audit(session, operation, "allowed", {"result": result}, digest)
             return response
         except AuthorizationError as exc:
+            response = {"schema": "sjg.response/v1", "status": "denied", "error": str(exc)}
+            if applying:
+                try:
+                    # A backend may revalidate remote preconditions immediately before its
+                    # first side effect. A failed revalidation is a safe, final denial.
+                    self.store.finish_request(key, "failed", response)
+                except Exception:
+                    pass
             try:
                 self.store.audit(locals().get("session"), operation, "denied", {"error": str(exc)}, digest)
             except Exception:
                 pass
-            return {"schema": "sjg.response/v1", "status": "denied", "error": str(exc)}
+            return response
         except StateError as exc:
             return {"schema": "sjg.response/v1", "status": "conflict", "error": str(exc)}
         except TimeoutError as exc:

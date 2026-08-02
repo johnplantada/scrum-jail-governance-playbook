@@ -1,6 +1,7 @@
-# Agent → Human Principal proposal: the discussion surface before a decision. An approving Human Principal
-# comment here is direction only — money/org-shape changes take effect solely via a
-# decisions.yaml PR whose CODEOWNERS-routed merge is the authorization (DESIGN.md invariant 1).
+# Agent → Human Principal proposal: the discussion surface before a decision. A
+# CODEOWNERS-routed decisions.yaml merge ratifies and records the Human decision. Spending
+# still requires separate Human execution; org-shape still requires a matching immutable
+# control release and explicit Human activation.
 name: Proposal
 description: "Agent → Human Principal: a bet, spend, or role change that needs a human verdict"
 title: "[PROPOSAL] "

@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
 
 from sjg_control.authz import AuthorizationError, Facts, Session, authorize
 from sjg_control.broker import Broker
+from sjg_control.control_backend import ControlBackend
 from sjg_control.policy import PolicyError, compile_policy
 from sjg_control.provider import (ProviderPolicyError, load_claude_settings,
                                   materialize_claude_wake_settings, parent_command,
                                   parse_auth_evidence, read_subscription_auth,
                                   sanitized_environment,
-                                  validate_workspace, worker_command)
+                                  validate_codex_config, validate_workspace, worker_command)
 from sjg_control.store import StateError, Store
 
 
@@ -44,7 +46,7 @@ def policy_data():
              "dailyTokenBudget": 100000,
              "workers": {"allowed": [], "maxPerWake": 0, "maxConcurrent": 0}},
         ],
-        "workflows": {"hostedExecution": "manual-only", "principalActor": "alice"},
+        "workflows": {"hostedExecution": "manual-only"},
     }
 
 
@@ -69,6 +71,17 @@ class FailingBackend(FakeBackend):
         raise RuntimeError("connection ended")
 
 
+class SequencedGitHub(FakeBackend):
+    def __init__(self, policy, facts):
+        super().__init__()
+        self.policy = policy
+        self.fact_sequence = list(facts)
+
+    def facts(self, operation, arguments):
+        self.fact_calls.append((operation, arguments))
+        return self.fact_sequence.pop(0)
+
+
 class PolicyTests(unittest.TestCase):
     def test_required_roles_and_no_custom_compatibility(self):
         data = policy_data()
@@ -88,6 +101,10 @@ class PolicyTests(unittest.TestCase):
     def test_unknown_fields_and_capability_widening_fail_closed(self):
         data = policy_data()
         data["compatibility"] = True
+        with self.assertRaises(PolicyError):
+            compile_policy(data, source_commit="abc")
+        data = policy_data()
+        data["workflows"]["principalActor"] = "mallory"
         with self.assertRaises(PolicyError):
             compile_policy(data, source_commit="abc")
         data = policy_data()
@@ -160,6 +177,15 @@ class AuthorizationTests(unittest.TestCase):
             with self.subTest(facts=facts), self.assertRaises(AuthorizationError):
                 authorize(self.policy, self.session, "pm.issue.create", valid, facts)
 
+    def test_delivery_taxonomy_requires_exact_lowercase_kinds(self):
+        with self.assertRaisesRegex(AuthorizationError, "canonical lowercase"):
+            authorize(
+                self.policy, self.session, "pm.issue.create",
+                {"repository": "org", "kind": "Feature", "title": "Mixed case",
+                 "parent": 9, "body": "Acceptance: exact evidence"},
+                Facts(parent_kind="epic"),
+            )
+
     def test_project_created_delivery_work_has_a_real_owner(self):
         project = Session("p", "w", "acme-org", "project-orchestrator",
                           self.policy.policy_digest, frozenset({"org"}),
@@ -177,6 +203,14 @@ class AuthorizationTests(unittest.TestCase):
             with self.subTest(target=target), self.assertRaises(AuthorizationError):
                 authorize(self.policy, project, "pm.issue.create", invalid,
                           Facts(parent_kind="objective"))
+        with self.assertRaisesRegex(AuthorizationError, "may not create feature"):
+            authorize(
+                self.policy, project, "pm.issue.create",
+                {"repository": "org", "kind": "feature", "title": "Over-decomposed",
+                 "parent": 2, "target_role": "software-implementer",
+                 "body": "Acceptance: exact evidence"},
+                Facts(parent_kind="epic"),
+            )
 
     def test_feature_and_story_creation_require_evidence_text(self):
         with self.assertRaises(AuthorizationError):
@@ -279,6 +313,24 @@ class AuthorizationTests(unittest.TestCase):
                       {"repository": "product", "event": "APPROVE"},
                       Facts(pr_open=True, pr_head_role="software-implementer"))
 
+    def test_pull_request_reviews_are_independent_and_non_authorizing(self):
+        governance = Session("g", "w", "acme-org", "governance-reviewer",
+                             self.policy.policy_digest, frozenset({"org"}),
+                             "2999-01-01T00:00:00Z")
+        review = {"repository": "org", "pr": 7, "body": "Evidence-backed hold",
+                  "event": "REQUEST_CHANGES"}
+        authorize(self.policy, governance, "pr.review", review,
+                  Facts(pr_open=True, pr_head_role="software-implementer"))
+        for session, head, event in (
+            (governance, "governance-reviewer", "COMMENT"),
+            (self.session, "commercial-planner", "COMMENT"),
+            (governance, "software-implementer", "APPROVE"),
+        ):
+            with self.subTest(role=session.role, head=head, event=event), self.assertRaises(
+                    AuthorizationError):
+                authorize(self.policy, session, "pr.review",
+                          {**review, "event": event}, Facts(pr_open=True, pr_head_role=head))
+
     def test_worker_scope_is_validated_before_execution(self):
         valid = {"repository": "product", "type": "implementer", "task": "edit",
                  "readPaths": ["src/app.py"], "writePaths": ["src/app.py"]}
@@ -359,6 +411,30 @@ class StoreAndBrokerTests(unittest.TestCase):
         self.assertEqual("indeterminate", broker.handle(self.session.session_id, request)["status"])
         self.assertEqual("indeterminate", broker.handle(self.session.session_id, request)["status"])
         self.assertEqual(1, len(backend.calls))
+
+    def test_remote_preconditions_are_revalidated_immediately_before_mutation(self):
+        permitted = Facts(complete=True, issue_kind="story",
+                          owner_role="software-implementer", has_open_children=False,
+                          evidence_valid=True)
+        changed = Facts(complete=True, issue_kind="story",
+                        owner_role="commercial-planner", has_open_children=False,
+                        evidence_valid=True)
+        github = SequencedGitHub(self.policy, [permitted, changed])
+        backend = ControlBackend(github, None, lambda _session, _repository: self.temp.name)
+        broker = Broker(self.policy, self.store, backend)
+        request = {"schema": "sjg.request/v1",
+                   "idempotency_key": "wake-1234567890-precondition",
+                   "operation": "pm.issue.done",
+                   "arguments": {"repository": "org", "id": 7, "pr": "alice/acme-product#3"}}
+        self.assertEqual("denied", broker.handle(self.session.session_id, request)["status"])
+        self.assertEqual("denied", broker.handle(self.session.session_id, request)["status"])
+        self.assertEqual(2, len(github.fact_calls))
+        self.assertEqual([], github.calls)
+        state = self.store.connection.execute(
+            "SELECT state FROM broker_request WHERE idempotency_key=?",
+            (request["idempotency_key"],),
+        ).fetchone()[0]
+        self.assertEqual("failed", state)
 
     def test_read_failure_can_retry_with_the_same_key(self):
         backend = FailingBackend(Facts())
@@ -441,6 +517,16 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual("never", command[command.index("--ask-for-approval") + 1])
         self.assertLess(command.index("--ask-for-approval"), command.index("exec"))
         self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", command)
+
+    def test_codex_execpolicy_content_is_sealed(self):
+        source = Path(__file__).resolve().parents[1] / "provider-policy/codex"
+        with tempfile.TemporaryDirectory() as temporary:
+            copied = Path(temporary) / "codex"
+            shutil.copytree(source, copied)
+            validate_codex_config(copied / "config.toml")
+            (copied / "rules/default.rules").write_text("# weakened\n", encoding="utf-8")
+            with self.assertRaisesRegex(ProviderPolicyError, "sealed policy"):
+                validate_codex_config(copied / "config.toml")
 
     def test_workspace_rejects_secret_config_and_symlink_escape(self):
         with tempfile.TemporaryDirectory() as temporary:

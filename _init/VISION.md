@@ -29,7 +29,8 @@ A small governance-gated company; the Human Principal (you) holds the gates (`DE
 <!-- CUSTOMIZE: keep, adapt, or delete these depending on your roster. -->
 - **Policy Reviewer** *(independent review, optional)* — owns the corpus + citation standard and the
   independence boundary; reviews policy-facing output and posts a typed review verdict.
-  Its sign-off is a required input to Commercial Planner's `[DEMO]` acceptance where applicable.
+  Its verdict is advisory evidence for Commercial Planner's `[DEMO]` acceptance; an organization
+  that needs a hard policy gate must add an explicit, deterministic control contract.
   It flags; it never authorizes.
 - **Governance Monitor** *(deterministic service)* — computes complete tri-state findings and
   reconciliation plans from controller-owned state.
@@ -44,7 +45,7 @@ A small governance-gated company; the Human Principal (you) holds the gates (`DE
    objectives.
 3. **Software Implementer builds** and opens PRs; **Commercial Planner** defines acceptance.
 4. **Policy Reviewer** reviews policy-facing output when chartered and posts a review verdict.
-5. **Commercial Planner accepts** the `[DEMO]` — only with that review input where applicable.
+5. **Commercial Planner accepts** the `[DEMO]` and records how applicable policy review informed it.
 6. **The Human Principal authorizes and executes** spending, activates org-shape changes, merges
    PRs, and dispatches deployments. There is no agent path into those capabilities.
 

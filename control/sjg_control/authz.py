@@ -77,6 +77,12 @@ ROLE_CAPABILITIES = {
     },
 }
 
+# These roles may leave non-authorizing review evidence on another canonical role's
+# open pull request. Software delivery remains separate from independent judgment.
+INDEPENDENT_REVIEW_ROLES = frozenset({
+    "project-orchestrator", "commercial-planner", "governance-reviewer", "policy-reviewer",
+})
+
 TERMINAL_STAGES = frozenset({"Done", "Dropped"})
 STAGE_ORDER = {"Todo": 0, "In Progress": 1, "Awaiting Merge": 2, "Demo": 3,
                "Awaiting Deploy": 4}
@@ -237,14 +243,17 @@ def authorize(policy: OrganizationPolicy, session: Session, operation: str,
         raise AuthorizationError("authoritative GitHub facts are incomplete")
 
     if operation == "pm.issue.create":
-        kind = str(arguments.get("kind") or "").lower()
+        raw_kind = str(arguments.get("kind") or "")
+        kind = raw_kind.lower()
+        if raw_kind != kind:
+            raise AuthorizationError("work-item kind must use its canonical lowercase id")
         title = str(arguments.get("title") or "").strip()
         if not title:
             raise AuthorizationError("issue title is required")
         labels = {str(v).lower() for v in arguments.get("labels") or []}
         if kind == "objective" or "objective" in labels or OBJECTIVE_RE.match(title):
             raise AuthorizationError("only the Human Principal creates objectives")
-        allowed_kinds = ({"epic", "feature", "story", "proposal"}
+        allowed_kinds = ({"epic", "proposal"}
                          if session.role == "project-orchestrator"
                          else {"feature", "story", "proposal"})
         if kind not in allowed_kinds:
@@ -330,10 +339,16 @@ def authorize(policy: OrganizationPolicy, session: Session, operation: str,
             if not str(arguments.get("title") or "").strip():
                 raise AuthorizationError("PR title is required")
         else:
-            if facts.pr_open is not True or facts.pr_head_role != session.role:
-                raise AuthorizationError("role may modify only its own open PR")
-        if operation == "pr.review" and str(arguments.get("event") or "COMMENT") == "APPROVE":
-            raise AuthorizationError("agent approval may not satisfy Human branch protection")
+            if facts.pr_open is not True or facts.pr_head_role not in policy.roles:
+                raise AuthorizationError("PR must be open and owned by a canonical agent role")
+            if operation == "pr.update" and facts.pr_head_role != session.role:
+                raise AuthorizationError("role may update only its own open PR")
+            if operation == "pr.review":
+                event = str(arguments.get("event") or "COMMENT")
+                if session.role not in INDEPENDENT_REVIEW_ROLES or facts.pr_head_role == session.role:
+                    raise AuthorizationError("PR review must be independent of the authoring role")
+                if event not in {"COMMENT", "REQUEST_CHANGES"}:
+                    raise AuthorizationError("agent review may only comment or request changes")
         if operation in {"pr.comment", "pr.review"} and not str(arguments.get("body") or "").strip():
             raise AuthorizationError("PR comment or review body is required")
         if operation == "pr.update" and not any(

@@ -15,8 +15,9 @@ The Human Principal owns consequences and exclusively ratifies:
 - clearing the portfolio halt.
 
 The Portfolio Orchestrator may prioritize, research, plan, allocate already-ratified capacity,
-dispatch project objectives, and recommend a gate action. It cannot merge its own authority
-change, spend, deploy, publish, or perform a human-only action.
+submit typed objective recommendations to the Human Principal, and recommend a gate action. It
+cannot create or dispatch a project objective, merge its own authority change, spend, deploy,
+publish, or perform a human-only action.
 
 ## Agent-native operating shape
 
@@ -25,7 +26,8 @@ Project cells are independent loops, not departments in a hierarchy. Each has a
 budget envelope, and a local halt. The Portfolio Orchestrator communicates with a project cell
 through two typed artifacts:
 
-1. an objective dispatch containing scope, acceptance evidence, budget, and priority;
+1. an objective recommendation containing scope, acceptance evidence, budget, and priority,
+   which grants nothing until the Human Principal accepts it and creates the project objective;
 2. a result report containing delivered evidence, remaining risk, usage, and gate requests.
 
 This isolates failures: a stalled or over-budget project cell cannot consume another cell's

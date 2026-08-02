@@ -21,6 +21,7 @@ source_roots:
   - FIELD-NOTES.md
   - role-terminology.md
   - delegation-charter.md
+  - docs/CONTROL-PLANE.md
 rules:
   exclude_ignored: true
   reject_symlinks: true

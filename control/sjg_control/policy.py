@@ -209,12 +209,9 @@ def compile_policy(data: dict[str, Any], *, source_commit: str) -> OrganizationP
     expected_global = len(roles) + sum(role.max_workers_concurrent for role in roles.values())
     if global_max_agents != expected_global:
         raise PolicyError("limits.globalMaxAgents must equal parents plus concurrent worker caps")
-    workflows = _exact_keys(data.get("workflows"), {"hostedExecution", "principalActor"},
-                            "workflows")
+    workflows = _exact_keys(data.get("workflows"), {"hostedExecution"}, "workflows")
     if workflows.get("hostedExecution") != "manual-only":
         raise PolicyError("workflows.hostedExecution must be manual-only")
-    if workflows.get("principalActor") != principal:
-        raise PolicyError("workflows.principalActor must equal authority.principalGitHub")
     digest_input = {
         "source_commit": source_commit,
         "org_id": org_id,

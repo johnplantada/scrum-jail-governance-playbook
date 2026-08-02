@@ -35,12 +35,12 @@ portfolio_orchestrator:
     - create_project_objective
 
 governance:
-  charter: "change the durable role or authority shape (decisions.yaml type: charter)"
-  sunset: "remove a role or service (type: sunset)"
-  fund: "spend up to a stated ceiling (type: spend)"
+  charter: "ratify a durable role/authority proposal; effect requires control activation"
+  sunset: "ratify role/service removal; effect requires control activation"
+  fund: "ratify a spending ceiling; payment remains a separate Human execution"
   ship: "production deploy (the Human Principal's manual workflow_dispatch)"
   halt: "whole-cell stop — supervisor-owned; only an authenticated operator clears it"
-  promote: "raise an agent role's model profile (type: promote)"
+  promote: "ratify a model-profile change; effect requires control activation"
 
 limits:
   # Every parent role plus its max_concurrent worker fan-out. The supervisor enforces this

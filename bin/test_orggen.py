@@ -83,9 +83,12 @@ class StampContract(unittest.TestCase):
                              {agent["id"] for agent in organization["agents"]})
             self.assertEqual("1.0.0", organization["controlRelease"]["version"])
             self.assertRegex(organization["controlRelease"]["sourceTreeSha256"], r"^[0-9a-f]{64}$")
+            self.assertEqual({"hostedExecution": "manual-only"}, organization["workflows"])
             provenance = json.loads((target / "playbook/SOURCE.json").read_text())
-            self.assertFalse(provenance["releaseQualified"])
+            self.assertEqual(provenance["sourceState"] == "clean",
+                             provenance["releaseQualified"])
             self.assertNotEqual("", provenance["payloadTreeSha256"])
+            self.assertTrue((target / "playbook/docs/CONTROL-PLANE.md").is_file())
             self.assertFalse((target / ".codex/config.toml").exists())
             self.assertFalse((target / ".claude/settings.json").exists())
             self.assertTrue((target / "scripts/worker-run").stat().st_mode & 0o111)

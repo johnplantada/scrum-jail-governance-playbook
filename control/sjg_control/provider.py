@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
+import hashlib
 import json
 import os
 import re
@@ -23,6 +24,7 @@ PROVIDER_SECRET_KEYS = frozenset({
 })
 ENV_ALLOWLIST = frozenset({"LANG", "LC_ALL", "TERM"})
 ADDITION_ALLOWLIST = frozenset({"SJG_WAKE_SOCKET", "SJG_SESSION_ID", "SJG_WAKE_ID", "AGENT_NAME"})
+CODEX_EXEC_POLICY_SHA256 = "e43bd0521ddf78cec271de2f07638258f3ac4703dce852458d244b05df7b0a3c"
 
 
 class ProviderPolicyError(RuntimeError):
@@ -282,6 +284,8 @@ def validate_codex_config(path: str | Path) -> dict[str, object]:
     rules = Path(path).parent / "rules" / "default.rules"
     if not rules.is_file() or rules.is_symlink():
         raise ProviderPolicyError("Codex execpolicy rules are absent or unsafe")
+    if hashlib.sha256(rules.read_bytes()).hexdigest() != CODEX_EXEC_POLICY_SHA256:
+        raise ProviderPolicyError("Codex execpolicy rules differ from the sealed policy")
     return data
 
 

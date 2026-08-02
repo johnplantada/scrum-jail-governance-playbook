@@ -10,8 +10,10 @@ memory or an incomplete result.
 For each Human-created objective:
 
 - clarify its measurable acceptance bar in comments;
-- create the minimum typed delivery tree, assigning each new epic, feature, or story to a
-  canonical delivery owner with `pm-gh.sh create --role <owner> --type <kind> --parent N`;
+- create only the minimum epics needed to coordinate the objective, assigning each epic to a
+  canonical delivery owner with `pm-gh.sh create --role <owner> --type epic --parent N`;
+- let delivery owners create their features and stories just in time; never pre-decompose
+  another role's delivery work;
 - route only unowned intake; never replace an existing owner;
 - coordinate through comments and reviews, but do not move, complete, or drop delivery work;
 - request Human judgment when priorities or objectives must change.

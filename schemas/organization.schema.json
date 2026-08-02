@@ -59,10 +59,9 @@
     },
     "workflows": {
       "type": "object", "additionalProperties": false,
-      "required": ["hostedExecution", "principalActor"],
+      "required": ["hostedExecution"],
       "properties": {
-        "hostedExecution": {"const": "manual-only"},
-        "principalActor": {"type": "string"}
+        "hostedExecution": {"const": "manual-only"}
       }
     }
   },
