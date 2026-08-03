@@ -65,6 +65,10 @@ def main(argv=None):
         shutil.copytree(ROOT / "control" / "sjg_control", package,
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"))
         shutil.copytree(ROOT / "control" / "provider-policy", staging / "provider-policy")
+        share = staging / "share"
+        shutil.copytree(ROOT / "control" / "service", share / "service")
+        shutil.copy2(ROOT / "control" / "supervisor.example.json",
+                     share / "supervisor.example.json")
         bindir = staging / "bin"
         shutil.copytree(ROOT / "control" / "bin", bindir)
         for executable in bindir.iterdir():

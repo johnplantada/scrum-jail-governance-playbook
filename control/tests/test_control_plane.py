@@ -10,7 +10,8 @@ from sjg_control.authz import AuthorizationError, Facts, Session, authorize
 from sjg_control.broker import Broker
 from sjg_control.control_backend import ControlBackend
 from sjg_control.policy import PolicyError, compile_policy
-from sjg_control.provider import (ProviderPolicyError, load_claude_settings,
+from sjg_control.provider import (CODEX_READONLY_PROFILE, ProviderPolicyError,
+                                  load_claude_settings, materialize_codex_policy,
                                   materialize_claude_wake_settings, parent_command,
                                   parse_auth_evidence, read_subscription_auth,
                                   sanitized_environment,
@@ -486,7 +487,8 @@ class ProviderTests(unittest.TestCase):
                                      "GH_TOKEN": "secret", "UNRELATED": "x"},
                                     managed_home="/sealed/home")
         self.assertEqual({"PATH": "/usr/bin:/bin", "SHELL": "/bin/sh",
-                          "HOME": "/sealed/home"}, env)
+                          "HOME": "/sealed/home",
+                          "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"}, env)
         with self.assertRaises(ProviderPolicyError):
             sanitized_environment({}, managed_home="/sealed/home",
                                   additions={"CLAUDE_CONFIG_DIR": "/workspace/override"})
@@ -505,15 +507,23 @@ class ProviderTests(unittest.TestCase):
                      "--disallowedTools"):
             self.assertIn(flag, command)
         self.assertNotIn("--dangerously-skip-permissions", command)
+        self.assertEqual("", command[command.index("--setting-sources") + 1])
 
     def test_codex_launch_uses_only_the_sealed_profile_and_fixed_sandbox(self):
-        root = Path(__file__).resolve().parents[1] / "provider-policy/codex"
-        with tempfile.TemporaryDirectory() as workspace:
+        source = Path(__file__).resolve().parents[1] / "provider-policy/codex"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            managed = materialize_codex_policy(source, root / "home")
             command = parent_command("codex-cli", "/usr/bin/codex", model="luna",
-                                     workspace=workspace, managed_root=str(root))
+                                     workspace=str(workspace), managed_root=str(managed),
+                                     wake_socket=str(root / "wake.sock"))
         self.assertIn("--strict-config", command)
         self.assertIn("--ephemeral", command)
-        self.assertEqual("workspace-write", command[command.index("--sandbox") + 1])
+        self.assertNotIn("--sandbox", command)
+        self.assertIn('default_permissions="scrum-jail-parent"', command)
+        self.assertTrue(any("unix_sockets" in value for value in command))
         self.assertEqual("never", command[command.index("--ask-for-approval") + 1])
         self.assertLess(command.index("--ask-for-approval"), command.index("exec"))
         self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", command)
@@ -543,13 +553,18 @@ class ProviderTests(unittest.TestCase):
 
     def test_named_worker_launch_is_nonrecursive_and_profile_scoped(self):
         provider_root = Path(__file__).resolve().parents[1] / "provider-policy"
-        with tempfile.TemporaryDirectory() as workspace:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            codex_root = materialize_codex_policy(provider_root / "codex", root / "home")
             readonly = worker_command(
-                "codex-cli", "/usr/bin/codex", model="luna", workspace=workspace,
-                managed_root=str(provider_root / "codex"), worker_type="researcher")
-            self.assertEqual("read-only", readonly[readonly.index("--sandbox") + 1])
+                "codex-cli", "/usr/bin/codex", model="luna", workspace=str(workspace),
+                managed_root=str(codex_root), worker_type="researcher")
+            self.assertIn(f'default_permissions="{CODEX_READONLY_PROFILE}"', readonly)
+            self.assertNotIn("--sandbox", readonly)
             implementer = worker_command(
-                "claude-cli", "/usr/bin/claude", model="luna", workspace=workspace,
+                "claude-cli", "/usr/bin/claude", model="luna", workspace=str(workspace),
                 managed_root=str(provider_root / "claude"), worker_type="implementer")
             self.assertEqual("Read,Glob,Grep,Edit,Write",
                              implementer[implementer.index("--tools") + 1])
@@ -561,10 +576,13 @@ class ProviderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             generated = materialize_claude_wake_settings(
                 root / "parent-settings.json", Path(temporary) / "wake.json",
-                wake_socket="/private/run/sjg/wake.sock")
+                wake_socket="/private/run/sjg/wake.sock", workspace="/workspace",
+                deny_read_roots=("/other-workspaces",))
             data = load_claude_settings(generated)
             self.assertEqual(["/private/run/sjg/wake.sock"],
                              data["sandbox"]["network"]["allowUnixSockets"])
+            self.assertEqual(["/workspace"], data["sandbox"]["filesystem"]["allowRead"])
+            self.assertIn("/other-workspaces", data["sandbox"]["filesystem"]["denyRead"])
             data["sandbox"]["allowUnsandboxedCommands"] = True
             with self.assertRaises(ProviderPolicyError):
                 from sjg_control.provider import validate_claude_settings

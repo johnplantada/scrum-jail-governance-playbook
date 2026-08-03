@@ -11,6 +11,7 @@
     "autoAllowBashIfSandboxed": true,
     "allowUnsandboxedCommands": false,
     "filesystem": {
+      "allowRead": [],
       "denyRead": [".env", "**/.env", "~/.ssh", "~/.aws", "~/.config/gh", "~/.claude", "~/.config/claude", "~/Library/Application Support/Claude"],
       "denyWrite": ["~/.ssh", "~/.aws", "~/.config/gh", "~/.claude", "~/.config/claude", "~/Library/Application Support/Claude"]
     },

@@ -26,34 +26,71 @@ uses standard-library protocols and SQLite rather than an agent framework.
 
 ## Host integration contract
 
-No privileged supervisor daemon is included in this release. The modules below are a
-reference enforcement core, and the generated clients deliberately fail closed until a
-separately reviewed host integration supplies the service lifecycle described here.
+`sjg-supervisor` is the 1.0 single-host integration. It owns process lifecycle, OS-user
+separation, immutable release binding, provider homes, the GitHub service credential, five
+complete source adapters, wake/admin sockets, mutable state, shadow/live execution, and
+operation-specific ambiguous-write verification. Generated repositories do not contain a
+service credential or a provider launch path.
 
-The host supervisor owns process lifecycle, OS users, immutable release mounts, provider
-homes, GitHub App credentials, source adapters, wake sockets, and mutable state directories.
-Generated repositories do not contain a service credential or a provider launch path.
+The supervisor configuration is an exact-field JSON document. Every path is absolute,
+organization and wake rules are digest-bound, each role has only its policy-declared
+workspaces and model, provider versions are an explicit allowlist, and operator/agent UIDs
+must differ. Authority, credentials, state, sockets, scratch, and provider homes must remain
+outside agent workspaces. The shipped `share/supervisor.example.json` and service templates
+are reviewed starting points, not self-installing authority.
 
-Before creating a wake, host integration must reserve both organization and role token
-buckets, persist the delivery lease, create a server-side session, and create its socket with
-an authenticated peer UID. It must revoke the session and settle or mark the reservation
-uncertain on every exit path.
+Before creating a wake, the supervisor reserves both organization and role token buckets,
+persists the delivery lease, creates a server-side session, and creates its socket with an
+authenticated peer UID/GID. It revokes the session and settles or marks the reservation
+uncertain on every exit path. Parent wakes receive only their own unguessable socket path;
+workers receive no broker socket.
 
-An expired database row is not proof that its OS process has stopped. Active wake and worker
-rows continue to consume capacity until the host terminates the entire process group. It must
-then call the expired-session reaper, which fails active workers, retains any unknown budget
-reservation as uncertain, and only then permits a replacement wake.
+An expired database row is not proof that its OS process has stopped. The supervisor records
+PID, process group, and a PID-reuse-resistant birth identity before marking a wake running.
+Recovery terminates the recorded process group, fails active workers, retains unknown token
+usage as uncertain, and only then permits replacement capacity. A changed process identity is
+quarantined for Human inspection rather than killed.
 
 Before activation, verify the installed `MANIFEST.json` and match both `version` and
 `sourceTreeSha256` to `organization.yaml`. Before starting a provider, verify exact supported
 CLI versions, parse machine-readable auth status, validate settings, use an absolute binary,
 and construct an allowlisted environment with a supervisor-owned home and fixed trusted
-`PATH`/`SHELL`. For Codex, the validated `config.toml` and `rules/` must be installed as the
-root-protected `.codex` layer of that exact managed home; do not rely on the invoking user's
-home or an ambient `CODEX_HOME`. Keep mutable subscription state inaccessible to agent
-workspaces while preserving the CLI's first-party login. Commissioning must prove with a
-sentinel read test that model tool subprocesses cannot read provider auth storage; a valid
-login-status response alone is insufficient.
+`PATH`/`SHELL`. For Codex, `commission-provider` renders the sealed named-permissions template
+with the exact managed-home path and installs its config/rules as that home's `.codex` layer.
+The parent tool filesystem profile writes only the commissioned workspace, reads only the
+minimal OS surface plus the immutable control release needed by its client, denies reads of
+`.codex`, denies network, and adds only the current wake socket at launch. Workers do not
+receive that socket. Claude uses sealed native filesystem/network profiles and is supported
+for 1.0 only on macOS because Linux cannot express the required exact Unix-socket allowance.
+Claude launches with user/project/local setting sources and auto-memory disabled; managed
+host policy may still tighten the boundary. Do not rely on an invoking user's home or ambient
+config.
+
+Commissioning creates a random harmless sentinel in provider auth storage. `check` first
+proves the agent OS identity can read it without a sandbox, proves the provider sandbox is
+healthy, then requires the same read to be denied inside the provider tool boundary. Codex
+uses its deterministic sandbox command; Claude requires an explicit denied `Read` tool result.
+Readable contents, an unavailable sandbox, an unattempted probe, unknown output, or an
+unsupported CLI version all fail closed. Service startup repeats this commissioning gate.
+
+## Runtime entrypoints
+
+- `sjg-supervisor commission-provider` installs sealed provider policy and rotates the harmless
+  sentinel without modifying subscription auth.
+- `sjg-supervisor check` validates release binding, configuration, provider auth/version,
+  sandbox isolation, and state visibility.
+- `sjg-supervisor preview` polls and routes against a SQLite backup; live checkpoints,
+  deliveries, budgets, sessions, and GitHub state are untouched. Shadow mode also rejects
+  manual wakes and live governance sync.
+- `sjg-supervisor serve` recovers durable state before the provider gate, opens the
+  UID-authenticated admin socket, and schedules polling. Shutdown terminates/reconciles active
+  process groups before exit. `tick`, `recover`, and `status` are bounded operator diagnostics.
+- `sjg-admin` exposes the closed operator protocol. `sjgctl` remains the role-bound agent
+  protocol and has no operator operations.
+
+Ambiguous mutations remain `verify_pending` until the fixed verifier proves the exact
+idempotency marker or complete remote state PRESENT, ABSENT, or CONFLICT. UNKNOWN never
+becomes a blind retry. `monitor sync` resolves only proved records.
 
 ## Protocol evolution
 

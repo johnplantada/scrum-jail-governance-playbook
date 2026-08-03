@@ -1,7 +1,7 @@
 # Scrum Jail Governance Playbook 1.0
 
 A clean-break generator and trusted control-plane reference for bounded, subscription-
-authenticated Codex CLI and Claude CLI organizations.
+authenticated Codex CLI organizations and, on macOS, Claude CLI organizations.
 
 The central security rule is simple: the generated organization is untrusted data and
 workspace code. It contains mandates, thin clients, issue forms, workflow templates, and
@@ -22,7 +22,8 @@ spending authorization/execution, repository settings, and governance activation
 ## Repository layout
 
 - `control/` — trusted policy compiler, authorization broker, GitHub adapter, durable
-  delivery/reconciliation state, provider policy, and bounded named-worker supervisor.
+  delivery/reconciliation state, provider policy, privileged host supervisor, and bounded
+  named-worker supervisor.
 - `bin/orggen` — atomic organization generator with source/payload provenance.
 - `bin/sjg-install` — Human/operator installation into an immutable version directory.
 - `bin/sjg-activate` — Human-only, organization-bound atomic release activation.

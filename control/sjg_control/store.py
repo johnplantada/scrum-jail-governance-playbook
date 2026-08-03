@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Iterator
 import datetime as dt
@@ -35,6 +34,7 @@ CREATE TABLE IF NOT EXISTS broker_request (
   session_id TEXT NOT NULL REFERENCES wake_session(session_id),
   operation TEXT NOT NULL,
   arguments_hash TEXT NOT NULL,
+  arguments_json TEXT NOT NULL,
   state TEXT NOT NULL CHECK (state IN ('reserved','applying','verify_pending','succeeded','failed')),
   response_json TEXT,
   created_at TEXT NOT NULL,
@@ -153,6 +153,42 @@ CREATE TABLE IF NOT EXISTS reconcile_operation (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS supervisor_state (
+  key TEXT PRIMARY KEY,
+  value_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS wake_runtime (
+  wake_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL UNIQUE REFERENCES wake_session(session_id),
+  delivery_id TEXT REFERENCES delivery(delivery_id),
+  reservation_id TEXT NOT NULL UNIQUE REFERENCES budget_reservation(reservation_id),
+  role TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  socket_path TEXT NOT NULL UNIQUE,
+  state TEXT NOT NULL CHECK (state IN ('prepared','running','succeeded','failed','uncertain','terminated')),
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  output_sha256 TEXT,
+  error_detail TEXT
+);
+
+CREATE TABLE IF NOT EXISTS process_runtime (
+  process_key TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL REFERENCES wake_session(session_id),
+  worker_attempt_id TEXT REFERENCES worker_attempt(attempt_id),
+  kind TEXT NOT NULL CHECK (kind IN ('parent','worker')),
+  pid INTEGER NOT NULL,
+  pgid INTEGER NOT NULL,
+  birth_token TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('running','exited','terminated','uncertain')),
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  exit_code INTEGER,
+  UNIQUE(pid,birth_token)
+);
+
 CREATE TABLE IF NOT EXISTS audit_entry (
   sequence INTEGER PRIMARY KEY AUTOINCREMENT,
   recorded_at TEXT NOT NULL,
@@ -182,6 +218,11 @@ class Store:
         self.connection = sqlite3.connect(self.path, timeout=10, isolation_level=None)
         self.connection.row_factory = sqlite3.Row
         self.connection.executescript(SCHEMA)
+        broker_fields = {row[1] for row in self.connection.execute("PRAGMA table_info(broker_request)")}
+        if "arguments_json" not in broker_fields:
+            self.connection.execute(
+                "ALTER TABLE broker_request ADD COLUMN arguments_json TEXT NOT NULL DEFAULT '{}'"
+            )
 
     @contextmanager
     def immediate(self) -> Iterator[sqlite3.Connection]:
@@ -264,6 +305,53 @@ class Store:
             if cursor.rowcount != 1:
                 raise StateError("wake session is absent or inactive")
 
+    def finish_session(self, session_id: str) -> None:
+        """Finish a normally exited wake after every worker and reservation is settled."""
+        with self.immediate() as db:
+            active_workers = db.execute(
+                "SELECT count(*) FROM worker_attempt WHERE session_id=? "
+                "AND state IN ('accepted','running')", (session_id,)
+            ).fetchone()[0]
+            active_budget = db.execute(
+                "SELECT count(*) FROM budget_reservation WHERE session_id=? AND state='active'",
+                (session_id,),
+            ).fetchone()[0]
+            if active_workers or active_budget:
+                raise StateError("cannot finish a wake with active workers or budget")
+            cursor = db.execute(
+                "UPDATE wake_session SET state='finished' WHERE session_id=? AND state='active'",
+                (session_id,),
+            )
+            if cursor.rowcount != 1:
+                raise StateError("wake session is absent or inactive")
+
+    def force_terminate_session(self, session_id: str, *, expired: bool = False) -> None:
+        """Close host-proved-dead process state without releasing unknown provider usage."""
+        with self.immediate() as db:
+            session = db.execute(
+                "SELECT state FROM wake_session WHERE session_id=?", (session_id,)
+            ).fetchone()
+            if session is None or session["state"] != "active":
+                raise StateError("wake session is absent or inactive")
+            now = utcnow()
+            db.execute(
+                "UPDATE worker_attempt SET state='failed',finished_at=? "
+                "WHERE session_id=? AND state IN ('accepted','running')", (now, session_id),
+            )
+            db.execute(
+                "UPDATE budget_reservation SET state='uncertain' "
+                "WHERE session_id=? AND state='active'", (session_id,),
+            )
+            db.execute(
+                "UPDATE wake_session SET state=? WHERE session_id=? AND state='active'",
+                ("expired" if expired else "revoked", session_id),
+            )
+            db.execute(
+                "UPDATE wake_runtime SET state='terminated',finished_at=?,"
+                "error_detail=COALESCE(error_detail,'terminated by supervisor') "
+                "WHERE session_id=? AND state IN ('prepared','running')", (now, session_id),
+            )
+
     def reap_expired_session(self, session_id: str) -> None:
         """Recover an expired wake only after the host has terminated its process group."""
         now = utcnow()
@@ -288,19 +376,23 @@ class Store:
             )
 
     def reserve_request(self, session_id: str, key: str, operation: str,
-                        arguments_hash: str) -> dict[str, Any] | None:
+                        arguments_hash: str, arguments: dict[str, Any]) -> dict[str, Any] | None:
         now = utcnow()
+        canonical_arguments = json.dumps(arguments, sort_keys=True, separators=(",", ":"))
         with self.immediate() as db:
             row = db.execute("SELECT * FROM broker_request WHERE idempotency_key=?", (key,)).fetchone()
             if row:
-                if (row["session_id"], row["operation"], row["arguments_hash"]) != (
-                        session_id, operation, arguments_hash):
+                if (row["session_id"], row["operation"], row["arguments_hash"],
+                        row["arguments_json"]) != (
+                        session_id, operation, arguments_hash, canonical_arguments):
                     raise StateError("idempotency key reused with different request")
                 return json.loads(row["response_json"]) if row["response_json"] else {
                     "status": "indeterminate", "error": "request is already in progress"}
             db.execute(
-                "INSERT INTO broker_request VALUES (?,?,?,?,?,?,?,?)",
-                (key, session_id, operation, arguments_hash, "reserved", None, now, now),
+                "INSERT INTO broker_request(idempotency_key,session_id,operation,arguments_hash,"
+                "arguments_json,state,response_json,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,'reserved',NULL,?,?)",
+                (key, session_id, operation, arguments_hash, canonical_arguments, now, now),
             )
         return None
 
@@ -393,6 +485,259 @@ class Store:
              session.policy_digest if session else None, operation, request_hash, decision,
              json.dumps(detail, sort_keys=True)),
         )
+
+    def supervisor_value(self, key: str, default: Any = None) -> Any:
+        row = self.connection.execute(
+            "SELECT value_json FROM supervisor_state WHERE key=?", (key,)
+        ).fetchone()
+        return default if row is None else json.loads(row["value_json"])
+
+    def set_supervisor_value(self, key: str, value: Any) -> None:
+        if not key or len(key) > 100:
+            raise StateError("supervisor-state key is invalid")
+        self.connection.execute(
+            "INSERT INTO supervisor_state(key,value_json,updated_at) VALUES (?,?,?) "
+            "ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at",
+            (key, json.dumps(value, sort_keys=True), utcnow()),
+        )
+
+    def unrouted_events(self, *, limit: int = 500) -> list[sqlite3.Row]:
+        if not 1 <= limit <= 5000:
+            raise StateError("event routing batch limit is invalid")
+        return list(self.connection.execute(
+            "SELECT * FROM observed_event WHERE enrichment_state='pending' "
+            "ORDER BY occurred_at,event_id LIMIT ?", (limit,),
+        ))
+
+    def finish_event_routing(self, event_id: str, role: str | None) -> None:
+        with self.immediate() as db:
+            row = db.execute(
+                "SELECT enrichment_state FROM observed_event WHERE event_id=?", (event_id,)
+            ).fetchone()
+            if row is None or row["enrichment_state"] != "pending":
+                raise StateError("event is absent or already routed")
+            if role is not None:
+                db.execute(
+                    "INSERT INTO route_target(event_id,role,state) VALUES (?,?,'pending')",
+                    (event_id, role),
+                )
+            db.execute(
+                "UPDATE observed_event SET enrichment_state=? WHERE event_id=?",
+                ("routed" if role is not None else "ignored", event_id),
+            )
+
+    def pending_routes(self, role: str, *, limit: int = 50) -> list[sqlite3.Row]:
+        """Return unassigned routes oldest-first so a crash cannot strand routed events."""
+        if not role or not 1 <= limit <= 5000:
+            raise StateError("pending-route batch limit is invalid")
+        return list(self.connection.execute(
+            "SELECT rt.event_id,rt.role,oe.occurred_at FROM route_target rt "
+            "JOIN observed_event oe ON oe.event_id=rt.event_id "
+            "WHERE rt.state='pending' AND rt.delivery_id IS NULL AND rt.role=? "
+            "ORDER BY oe.occurred_at,rt.event_id LIMIT ?", (role, limit),
+        ))
+
+    def delivery_events(self, delivery_id: str) -> list[dict[str, Any]]:
+        rows = self.connection.execute(
+            "SELECT oe.* FROM delivery_event de JOIN observed_event oe ON oe.event_id=de.event_id "
+            "WHERE de.delivery_id=? ORDER BY oe.occurred_at,oe.event_id", (delivery_id,),
+        )
+        return [{**dict(row), "payload": json.loads(row["payload_json"])} for row in rows]
+
+    def prepare_wake(self, session: Session, *, delivery_id: str | None,
+                     reservation_id: str, socket_path: str, reason: str) -> None:
+        if not reason or not Path(socket_path).is_absolute():
+            raise StateError("wake runtime requires a reason and absolute socket path")
+        self.connection.execute(
+            "INSERT INTO wake_runtime(wake_id,session_id,delivery_id,reservation_id,role,reason,"
+            "socket_path,state,started_at) VALUES (?,?,?,?,?,?,?,'prepared',?)",
+            (session.wake_id, session.session_id, delivery_id, reservation_id, session.role,
+             reason, socket_path, utcnow()),
+        )
+
+    def mark_wake_running(self, wake_id: str) -> None:
+        cursor = self.connection.execute(
+            "UPDATE wake_runtime SET state='running' WHERE wake_id=? AND state='prepared'",
+            (wake_id,),
+        )
+        if cursor.rowcount != 1:
+            raise StateError("wake runtime is not prepared")
+
+    def finish_wake(self, wake_id: str, *, state: str, output_sha256: str | None = None,
+                    error: str | None = None) -> None:
+        if state not in {"succeeded", "failed", "uncertain", "terminated"}:
+            raise StateError("wake runtime terminal state is invalid")
+        cursor = self.connection.execute(
+            "UPDATE wake_runtime SET state=?,finished_at=?,output_sha256=?,error_detail=? "
+            "WHERE wake_id=? AND state IN ('prepared','running')",
+            (state, utcnow(), output_sha256, error, wake_id),
+        )
+        if cursor.rowcount != 1:
+            raise StateError("wake runtime is not active")
+
+    def record_process(self, *, process_key: str, session_id: str,
+                       worker_attempt_id: str | None, kind: str, pid: int, pgid: int,
+                       birth_token: str) -> None:
+        if kind not in {"parent", "worker"} or pid <= 0 or pgid <= 0 or not birth_token:
+            raise StateError("process runtime identity is invalid")
+        self.connection.execute(
+            "INSERT INTO process_runtime(process_key,session_id,worker_attempt_id,kind,pid,pgid,"
+            "birth_token,state,started_at) VALUES (?,?,?,?,?,?,?,'running',?)",
+            (process_key, session_id, worker_attempt_id, kind, pid, pgid, birth_token, utcnow()),
+        )
+
+    def finish_process(self, process_key: str, *, state: str, exit_code: int | None) -> None:
+        if state not in {"exited", "terminated", "uncertain"}:
+            raise StateError("process runtime terminal state is invalid")
+        cursor = self.connection.execute(
+            "UPDATE process_runtime SET state=?,finished_at=?,exit_code=? "
+            "WHERE process_key=? AND state='running'",
+            (state, utcnow(), exit_code, process_key),
+        )
+        if cursor.rowcount != 1:
+            raise StateError("process runtime is absent or inactive")
+
+    def active_processes(self, session_id: str | None = None) -> list[sqlite3.Row]:
+        if session_id is None:
+            return list(self.connection.execute(
+                "SELECT * FROM process_runtime WHERE state='running' ORDER BY kind DESC,started_at"
+            ))
+        return list(self.connection.execute(
+            "SELECT * FROM process_runtime WHERE state='running' AND session_id=? "
+            "ORDER BY kind DESC,started_at", (session_id,),
+        ))
+
+    def active_wakes(self) -> list[sqlite3.Row]:
+        return list(self.connection.execute(
+            "SELECT wr.*,ws.expires_at FROM wake_runtime wr JOIN wake_session ws "
+            "ON ws.session_id=wr.session_id WHERE wr.state IN ('prepared','running') "
+            "ORDER BY wr.started_at"
+        ))
+
+    def orphan_sessions(self) -> list[sqlite3.Row]:
+        """Return active sessions that crashed before their wake runtime was persisted."""
+        return list(self.connection.execute(
+            "SELECT ws.* FROM wake_session ws LEFT JOIN wake_runtime wr "
+            "ON wr.session_id=ws.session_id WHERE ws.state='active' AND wr.session_id IS NULL "
+            "ORDER BY ws.issued_at"
+        ))
+
+    @staticmethod
+    def _release_reservation_for(db: sqlite3.Connection, session_id: str) -> None:
+        reservation = db.execute(
+            "SELECT * FROM budget_reservation WHERE session_id=?", (session_id,)
+        ).fetchone()
+        if reservation is None:
+            return
+        if reservation["state"] != "active":
+            raise StateError("unstarted session budget is not active")
+        session = db.execute(
+            "SELECT org_id,role FROM wake_session WHERE session_id=?", (session_id,)
+        ).fetchone()
+        for scope, subject in (("org", session["org_id"]), ("role", session["role"])):
+            cursor = db.execute(
+                "UPDATE budget_bucket SET reserved_tokens=reserved_tokens-? "
+                "WHERE scope=? AND subject=? AND epoch=? AND reserved_tokens>=?",
+                (reservation["reserved_tokens"], scope, subject, reservation["epoch"],
+                 reservation["reserved_tokens"]),
+            )
+            if cursor.rowcount != 1:
+                raise StateError("unstarted session budget bucket is inconsistent")
+        db.execute(
+            "UPDATE budget_reservation SET state='released' WHERE reservation_id=?",
+            (reservation["reservation_id"],),
+        )
+
+    @staticmethod
+    def _retry_leased_delivery(db: sqlite3.Connection, delivery_id: str,
+                               *, eligible_at: str, error: str) -> None:
+        delivery = db.execute(
+            "SELECT state FROM delivery WHERE delivery_id=?", (delivery_id,)
+        ).fetchone()
+        if delivery is None or delivery["state"] != "leased":
+            raise StateError("unstarted delivery is not safely leased")
+        db.execute(
+            "UPDATE delivery SET state='retry_wait',eligible_at=?,lease_owner=NULL,"
+            "lease_until=NULL,last_error=? WHERE delivery_id=?",
+            (eligible_at, error, delivery_id),
+        )
+        db.execute(
+            "UPDATE route_target SET state='queued' WHERE delivery_id=?", (delivery_id,),
+        )
+
+    def recover_orphan_session(self, session_id: str, *, delivery_id: str | None = None,
+                               eligible_at: str | None = None,
+                               error: str = "supervisor stopped before wake preparation") -> None:
+        """Atomically release a session proved to have stopped before wake preparation."""
+        with self.immediate() as db:
+            session = db.execute(
+                "SELECT state FROM wake_session WHERE session_id=?", (session_id,)
+            ).fetchone()
+            wake_count = db.execute(
+                "SELECT count(*) FROM wake_runtime WHERE session_id=?", (session_id,)
+            ).fetchone()[0]
+            process_count = db.execute(
+                "SELECT count(*) FROM process_runtime WHERE session_id=?", (session_id,)
+            ).fetchone()[0]
+            worker_count = db.execute(
+                "SELECT count(*) FROM worker_attempt WHERE session_id=?", (session_id,)
+            ).fetchone()[0]
+            if (session is None or session["state"] != "active" or wake_count
+                    or process_count or worker_count):
+                raise StateError("session is not a recoverable pre-wake orphan")
+            self._release_reservation_for(db, session_id)
+            if delivery_id is not None:
+                if eligible_at is None:
+                    raise StateError("orphan delivery recovery requires an eligibility time")
+                self._retry_leased_delivery(
+                    db, delivery_id, eligible_at=eligible_at, error=error)
+            db.execute(
+                "UPDATE wake_session SET state='revoked' WHERE session_id=? AND state='active'",
+                (session_id,),
+            )
+
+    def recover_prepared_wake(self, wake_id: str, *, eligible_at: str, error: str) -> None:
+        """Atomically release a wake proved never to have created a provider process."""
+        with self.immediate() as db:
+            wake = db.execute(
+                "SELECT * FROM wake_runtime WHERE wake_id=?", (wake_id,)
+            ).fetchone()
+            if wake is None or wake["state"] != "prepared":
+                raise StateError("wake is not prepared for safe recovery")
+            session_id = str(wake["session_id"])
+            session = db.execute(
+                "SELECT state FROM wake_session WHERE session_id=?", (session_id,)
+            ).fetchone()
+            process_count = db.execute(
+                "SELECT count(*) FROM process_runtime WHERE session_id=?", (session_id,)
+            ).fetchone()[0]
+            worker_count = db.execute(
+                "SELECT count(*) FROM worker_attempt WHERE session_id=?", (session_id,)
+            ).fetchone()[0]
+            if (session is None or session["state"] != "active" or process_count or worker_count):
+                raise StateError("prepared wake is not proved process-free")
+            self._release_reservation_for(db, session_id)
+            if wake["delivery_id"]:
+                self._retry_leased_delivery(
+                    db, str(wake["delivery_id"]), eligible_at=eligible_at, error=error)
+            db.execute(
+                "UPDATE wake_runtime SET state='failed',finished_at=?,error_detail=? WHERE wake_id=?",
+                (utcnow(), error, wake_id),
+            )
+            db.execute(
+                "UPDATE wake_session SET state='revoked' WHERE session_id=? AND state='active'",
+                (session_id,),
+            )
+
+    def pending_reconciliations(self) -> list[sqlite3.Row]:
+        return list(self.connection.execute(
+            "SELECT * FROM reconcile_operation WHERE state='verify_pending' ORDER BY created_at,operation_id"
+        ))
+
+    def pending_broker_verifications(self) -> list[sqlite3.Row]:
+        return list(self.connection.execute(
+            "SELECT * FROM broker_request WHERE state='verify_pending' ORDER BY created_at,idempotency_key"
+        ))
 
     def checkpoint(self, source_id: str, *, initial_watermark: str) -> sqlite3.Row:
         self.connection.execute(
@@ -760,6 +1105,20 @@ class Store:
                 raise StateError("delivery is not budget-held")
             db.execute(
                 "UPDATE route_target SET state='queued' WHERE delivery_id=?", (delivery_id,)
+            )
+
+    def force_delivery_uncertain(self, delivery_id: str, *, error: str) -> None:
+        """Quarantine a delivery only after the host has stopped its process groups."""
+        with self.immediate() as db:
+            cursor = db.execute(
+                "UPDATE delivery SET state='uncertain',lease_owner=NULL,lease_until=NULL,last_error=? "
+                "WHERE delivery_id=? AND state IN ('leased','running')", (error, delivery_id),
+            )
+            if cursor.rowcount != 1:
+                raise StateError("delivery is absent or not active")
+            db.execute(
+                "UPDATE route_target SET state='manual_review' WHERE delivery_id=?",
+                (delivery_id,),
             )
 
     def reserve_reconcile(self, *, idempotency_key: str, source_key: str, operation: str,

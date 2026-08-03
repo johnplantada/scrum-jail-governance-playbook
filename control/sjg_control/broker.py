@@ -48,7 +48,7 @@ class Broker:
             facts = (Facts() if operation in READ_OPERATIONS | REPOSITORY_OPERATIONS | WORKER_OPERATIONS
                      else self.backend.facts(operation, arguments))
             authorize(self.policy, session, operation, arguments, facts)
-            prior = self.store.reserve_request(session_id, key, operation, digest)
+            prior = self.store.reserve_request(session_id, key, operation, digest, arguments)
             if prior is not None:
                 return prior
             self.store.mark_request_applying(key)

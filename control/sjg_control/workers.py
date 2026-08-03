@@ -14,7 +14,7 @@ import uuid
 
 from .authz import Session
 from .policy import OrganizationPolicy
-from .store import Store, StateError
+from .store import Store
 
 
 class WorkerError(RuntimeError):
@@ -256,7 +256,8 @@ class WorkerSupervisor:
     def __init__(self, policy: OrganizationPolicy, store: Store, launcher: Launcher,
                  *, luna_models: dict[str, str], scratch_root: str | Path,
                  timeout_seconds: int = 900, max_patch_bytes: int = 2 * 1024 * 1024,
-                 max_output_bytes: int = 256 * 1024):
+                 max_output_bytes: int = 256 * 1024,
+                 worker_uid: int | None = None, worker_gid: int | None = None):
         self.policy = policy
         self.store = store
         self.launcher = launcher
@@ -265,6 +266,8 @@ class WorkerSupervisor:
         self.timeout_seconds = timeout_seconds
         self.max_patch_bytes = max_patch_bytes
         self.max_output_bytes = max_output_bytes
+        self.worker_uid = worker_uid
+        self.worker_gid = worker_gid
 
     def run(self, session: Session, arguments: dict[str, Any], *, parent_workspace: str | Path) -> WorkerResult:
         bound_session = self.store.session(session.session_id)
@@ -300,6 +303,13 @@ class WorkerSupervisor:
         try:
             for relative in sorted(set(read_paths) | set(write_paths)):
                 _copy_scoped_input(parent, relative, scratch / relative)
+            if self.worker_uid is not None and self.worker_gid is not None:
+                for path in [scratch, *sorted(scratch.rglob("*"))]:
+                    if path.is_symlink():
+                        raise WorkerError("worker scratch contains a symlink before launch")
+                    os.chown(path, self.worker_uid, self.worker_gid)
+                    if path.is_dir():
+                        os.chmod(path, 0o700)
             before = snapshot_tree(scratch)
             self.store.connection.execute(
                 "UPDATE worker_attempt SET state='running' WHERE attempt_id=?", (attempt,))

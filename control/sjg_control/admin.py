@@ -46,7 +46,8 @@ def main(argv: list[str] | None = None) -> int:
     elif ns.area == "runner":
         operation, arguments = f"runner.{ns.command}", {}
     elif ns.area == "monitor":
-        operation, arguments = f"monitor.{ns.command}", {"dry_run": ns.dry_run}
+        operation = f"monitor.{ns.command}"
+        arguments = {"dry_run": True if ns.command == "audit" else ns.dry_run}
     elif ns.area == "wake":
         operation, arguments = "wake.run", {"role": ns.role, "reason": ns.reason, "note": ns.note}
     else:

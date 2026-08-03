@@ -49,16 +49,20 @@ uncertainty, and dead letter are explicit states.
 
 Governance observations are `TRUE`, `FALSE`, or `UNKNOWN`. Any incomplete input becomes
 `UNKNOWN`, and planning returns no mutation. Creates, moves, and closes use stable source
-markers, preconditions, idempotency keys, and a write-ahead journal. This release intentionally
-leaves an ambiguous write in `verify_pending`; the commissioned host must supply complete,
-operation-specific marker verification before reconciliation writes are enabled. It may never
-blindly retry an ambiguous write.
+markers, preconditions, idempotency keys, and a write-ahead journal. Ambiguous broker and
+reconciliation writes remain in `verify_pending` until the supervisor's operation-specific
+verifier proves the exact marker or complete remote state PRESENT, ABSENT, or CONFLICT.
+UNKNOWN never causes a blind retry.
 
 ## Providers and workers
 
 Authentication must prove first-party ChatGPT/Codex or Claude subscription authentication with
 no provider API key. Provider executable paths, versions, models, auth homes,
 settings, and environment are supervisor-owned. Workspace provider configuration is absent.
+Commissioning also proves that a normally readable auth-storage sentinel is denied to provider
+tool subprocesses; authentication status alone is not sufficient.
+Claude's 1.0 path-scoped socket profile is macOS-only; Linux hosts use Codex rather than
+widening Claude to all Unix sockets.
 
 Named Luna workers are a small internal protocol, not native provider subagents. The
 controller chooses worker type, model, tools, timeout, scratch directory, and declared path

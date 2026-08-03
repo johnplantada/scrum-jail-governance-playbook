@@ -62,6 +62,24 @@ class RoleInputContract(unittest.TestCase):
                 orggen.REPO = prior
 
 
+class GoldenWorkflowContract(unittest.TestCase):
+    def test_golden_verification_is_manual_read_only_and_credentialless(self):
+        workflow = yaml.load(
+            (ROOT / ".github/workflows/verify.yml").read_text(encoding="utf-8"),
+            Loader=yaml.BaseLoader)
+        self.assertEqual({"workflow_dispatch": ""}, workflow["on"])
+        self.assertEqual({"contents": "read"}, workflow["permissions"])
+        steps = workflow["jobs"]["verify"]["steps"]
+        checkout = next(step for step in steps if str(step.get("uses", "")).startswith(
+            "actions/checkout@"))
+        self.assertEqual("false", checkout["with"]["persist-credentials"])
+        for step in steps:
+            if "uses" in step:
+                self.assertRegex(step["uses"], r"^[^@]+@[0-9a-f]{40}$")
+        self.assertTrue(any("pip install -r control/requirements.txt" in step.get("run", "")
+                            for step in steps))
+
+
 class StampContract(unittest.TestCase):
     def stamp(self, parent: Path, *extra: str) -> subprocess.CompletedProcess[str]:
         target = parent / "generated-org"
@@ -183,6 +201,10 @@ class StampContract(unittest.TestCase):
             self.assertEqual("releases/1.0.0", (prefix / "current").readlink().as_posix())
             self.assertTrue((prefix / "current/bin/sjgctl").exists())
             self.assertEqual(0o555, (prefix / "current/bin/sjgctl").stat().st_mode & 0o777)
+            self.assertTrue((prefix / "current/bin/sjg-supervisor").exists())
+            self.assertTrue((prefix / "current/share/supervisor.example.json").is_file())
+            self.assertTrue((prefix / "current/share/service/scrum-jail-supervisor.service").is_file())
+            self.assertTrue((prefix / "current/share/service/dev.scrum-jail.supervisor.plist").is_file())
 
     def test_activation_rejects_an_unlisted_release_file(self):
         with tempfile.TemporaryDirectory() as tmp:

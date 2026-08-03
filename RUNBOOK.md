@@ -49,20 +49,45 @@ release and organization repositories. The service identity may read the active 
 must not write it. Agent processes may write only commissioned workspaces and their own
 scratch paths.
 
+Copy `current/share/supervisor.example.json` to an administrator-owned configuration path.
+Replace every example path, UID/GID, model/version, token reservation, Project identity, and
+the all-zero wake-rules digest. The workspaces and model maps must contain every and only the
+roles/repositories in `organization.yaml`. Create distinct operator and agent OS identities;
+the supervisor runs as root and drops every provider process to the configured agent UID/GID.
+Review the matching service template under `current/share/service/` against those exact paths.
+
 ## 4. Commission provider sessions
 
-Choose Codex CLI or Claude CLI in supervisor-owned configuration and use absolute executable
-paths. Log the service identity into the selected first-party subscription/OAuth session.
+Choose Codex CLI or Claude CLI in the root-owned supervisor configuration and use absolute
+executable paths. The provider managed home must be owned by the configured agent UID. Log
+that agent identity into the selected first-party subscription/OAuth session.
+Claude is supported for 1.0 only on macOS: its native sandbox can allow one exact Unix-socket
+path there. Linux commissioning rejects Claude rather than enabling arbitrary Unix sockets;
+use Codex on Linux.
 Do not set provider API keys, alternate base URLs, Bedrock, Vertex, or Foundry flags.
 Use a fixed administrator-reviewed `PATH` and shell; never inherit either from a wake or
-workspace. For Codex, place the validated installed policy at the managed home's `.codex`
-config/rules location so the same home supplies both sealed policy and first-party login.
-Before enabling wakes, place a harmless sentinel beside the provider auth state and prove a
-sandboxed tool subprocess cannot read it. Treat a readable sentinel as a commissioning
-failure even when subscription status is healthy.
+workspace. Install the sealed settings and harmless random sentinel without changing auth:
 
-Run the read-only supervisor authentication check. Unknown status output or an unexpected
-CLI version fails closed. Codex uses an installed config/rules layer with no process network,
+```sh
+sudo /usr/local/libexec/scrum-jail/current/bin/sjg-supervisor \
+  --config /etc/scrum-jail/supervisor.json commission-provider
+```
+
+For Codex this renders the exact managed-home read denial and immutable control-release read
+path into `.codex/config.toml`; for Claude it installs the three exact settings profiles
+outside the workspace.
+
+Run the full commissioning check:
+
+```sh
+sudo /usr/local/libexec/scrum-jail/current/bin/sjg-supervisor \
+  --config /etc/scrum-jail/supervisor.json check
+```
+
+It verifies release/config binding, exact subscription status/version, proves the sentinel is
+readable by the unsandboxed agent identity, proves the sandbox is operational, then requires
+the sandboxed read to fail. Any unknown output fails closed. Codex uses an installed
+config/rules layer with no process network,
 no project trust, no multi-agent tools, and forbidden direct network/GitHub/provider command
 forms. Claude uses validated settings plus redundant sealed command-line restrictions;
 sandbox unavailability, excluded commands, unsandboxed retry, bypass mode, auto mode,
@@ -90,23 +115,32 @@ Do not run live GitHub mutation or spend/deploy smoke tests during ordinary veri
 
 ## 6. Start in observation mode
 
-The playbook ships the enforcement core and clients, not a turnkey privileged service
-daemon. Before this step, implement the host integration contract in
-`docs/CONTROL-PLANE.md` under a separate OS identity; provide its own reviewed service
-entrypoint, source adapters, GitHub App credential loader, provider launcher, and admin/wake
-socket lifecycle. Do not point the generated clients at an ad-hoc wrapper around `gh` or a
-provider CLI.
+Keep `mode` set to `shadow`. Run an explicit preview before loading the reviewed systemd or
+launchd service:
+
+```sh
+sudo /usr/local/libexec/scrum-jail/current/bin/sjg-supervisor \
+  --config /etc/scrum-jail/supervisor.json preview
+```
+
+Preview polls and routes against a SQLite backup; it does not advance live checkpoints,
+create live deliveries/sessions/budget holds, launch a provider, or mutate GitHub.
+While the root-owned configuration remains in `shadow`, manual wakes and non-dry-run
+governance sync are rejected as well.
 
 Start that commissioned supervisor with source polling in preview mode. Each of the five sources
 has an independent checkpoint: org issues, org comments, product issues, product comments,
 and product workflow runs. Confirm complete pagination, routing, duplicate suppression,
 leases, retry waits, budget holds, and dead-letter visibility before enabling wakes.
 
-Then run the deterministic governance audit in dry-run mode. Incomplete observations must
-produce no planned mutation. Enable reconciliation writes only after stable source markers,
-preconditions, idempotency keys, and a separately reviewed, operation-specific marker verifier
-are visible. The reference core records ambiguous results as `verify_pending` but does not ship
-that host verifier; until it exists, keep reconciliation writes disabled.
+Then run `sjg-admin monitor audit --dry-run` through the authenticated operator socket.
+Incomplete observations must produce no planned mutation. The shipped verifier resolves
+ambiguous writes only from complete operation-specific markers or exact remote state;
+UNKNOWN remains pending and is never retried blindly.
+
+After the Human Principal reviews preview output and service status, stop the service, change
+the root-owned config to `"mode": "live"`, rerun `check`, and restart. This explicit edit is
+the live-enablement boundary; no agent operation can perform it.
 
 ## 7. Inject work
 
@@ -128,3 +162,6 @@ execution have effect.
 - On a dead letter, preserve event, route, attempts, and error; require explicit Human replay.
 - Upgrades are install-new, verify, Human activate, and restart. Never self-fetch authority
   code from a generated organization.
+- Service startup recovers orphaned process groups before checking provider login, so expired
+  auth cannot block containment. Shutdown performs the same process-first recovery before the
+  supervisor exits.
