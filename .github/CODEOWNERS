@@ -1,0 +1,4 @@
+# The golden governance release changes authority code for every generated organization.
+# Require the Human Principal to review every path before merge. This becomes binding only
+# when the main-branch ruleset requires pull requests and Code Owner approval.
+* @johnplantada
