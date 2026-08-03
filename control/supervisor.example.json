@@ -1,0 +1,66 @@
+{
+  "organization": "/srv/scrum-jail/organization/organization.yaml",
+  "wakeRules": "/srv/scrum-jail/organization/wake-rules.yaml",
+  "wakeRulesSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "stateDatabase": "/var/lib/scrum-jail/state/control.sqlite",
+  "adminSocket": "/run/scrum-jail/admin/supervisor.sock",
+  "wakeSocketDirectory": "/run/scrum-jail/wakes",
+  "scratchDirectory": "/var/lib/scrum-jail/scratch",
+  "workspaces": {
+    "project-orchestrator": {
+      "org": "/srv/scrum-jail/workspaces/project-orchestrator/org"
+    },
+    "commercial-planner": {
+      "org": "/srv/scrum-jail/workspaces/commercial-planner/org"
+    },
+    "software-implementer": {
+      "org": "/srv/scrum-jail/workspaces/software-implementer/org",
+      "product": "/srv/scrum-jail/workspaces/software-implementer/product"
+    },
+    "governance-reviewer": {
+      "org": "/srv/scrum-jail/workspaces/governance-reviewer/org"
+    }
+  },
+  "github": {
+    "executable": "/usr/bin/gh",
+    "tokenFile": "/var/lib/scrum-jail/credentials/github-token",
+    "home": "/var/lib/scrum-jail/github-home",
+    "projectOwner": null,
+    "projectNumber": null
+  },
+  "provider": {
+    "kind": "codex-cli",
+    "executable": "/usr/local/bin/codex",
+    "managedHome": "/var/lib/scrum-jail/provider-home",
+    "policyRoot": "/var/lib/scrum-jail/provider-home/.codex",
+    "allowedVersions": [
+      "0.146.0"
+    ],
+    "roleModels": {
+      "project-orchestrator": "gpt-5.4",
+      "commercial-planner": "gpt-5.4",
+      "software-implementer": "gpt-5.4",
+      "governance-reviewer": "gpt-5.4"
+    },
+    "workerModels": {
+      "researcher": "gpt-5.4-mini",
+      "drafter": "gpt-5.4-mini",
+      "implementer": "gpt-5.4"
+    },
+    "timeoutSeconds": 3600
+  },
+  "operatorUid": 1001,
+  "agentUid": 1002,
+  "agentGid": 1002,
+  "mode": "shadow",
+  "pollIntervalSeconds": 60,
+  "sessionTtlSeconds": 7200,
+  "deliveryLeaseSeconds": 7200,
+  "roleTokenReservations": {
+    "project-orchestrator": 50000,
+    "commercial-planner": 50000,
+    "software-implementer": 50000,
+    "governance-reviewer": 25000
+  },
+  "initialWatermark": "2026-01-01T00:00:00Z"
+}

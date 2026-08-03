@@ -2,7 +2,9 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help test halt resume blockers warden dashboard tick preview logs install-hooks sync-playbook check-playbook
+.PHONY: help test halt resume blockers governance-monitor governance-monitor-sync tick preview logs install-hooks check-playbook
+
+PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -13,9 +15,9 @@ tick: ## Run one runner tick (poll GitHub → route → wake, per RUNNER_MODE)
 	@./scripts/runner-watch.sh
 
 preview: ## Dry-run a tick: show would-be wakes without firing or advancing the cursor
-	@set -a; [ -f .env ] && . ./.env; set +a; PYTHONPATH=scripts python3 scripts/runner.py preview
+	@PYTHONPATH=scripts $(PYTHON) scripts/runner.py preview
 
-logs: ## Follow every org log in one colored feed (runner · agents · offload · subagents · ops)
+logs: ## Follow every org log in one colored feed (runner · parent agents · named workers · ops)
 	@./scripts/watch.sh
 
 ## ── Kill switch ──────────────────────────────────────────────────────────
@@ -26,44 +28,27 @@ resume: ## Clear the kill switch
 	@./scripts/resume.sh
 
 ## ── Org status ───────────────────────────────────────────────────────────
-blockers: ## Show the open human-task ledger (what only the Chairman can clear)
-	@python3 scripts/blockers.py open
+blockers: ## Show the open human-task ledger (what only the Human Principal can clear)
+	@$(PYTHON) scripts/blockers.py open
 
-warden: ## Read-only warden report: Chairman-queue drift + hygiene findings
-	@set -a; [ -f .env ] && . ./.env; set +a; PYTHONPATH=scripts python3 scripts/warden.py audit
+governance-monitor: ## Read-only Human Principal queue drift + governance findings
+	@PYTHONPATH=scripts $(PYTHON) scripts/governance_monitor.py audit
 
-dashboard: ## Serve the local spend dashboard on http://127.0.0.1:8737 (chat needs the .venv)
-	@if [ -x .venv/bin/python ]; then .venv/bin/python scripts/cost_dashboard.py; \
-	else python3 scripts/cost_dashboard.py; fi
+governance-monitor-sync: ## Run one deterministic Human Principal queue reconciliation
+	@./scripts/governance-monitor-sync.sh
 
 ## ── Tests (same suite CI runs) ────────────────────────────────────────────
 test: ## Python unit tests + constitution lint + blocker-runbook lint + decisions-ledger check
-	@set -e; for t in scripts/test_*.py; do echo "→ $$t"; PYTHONPATH=scripts python3 "$$t"; done
-	@python3 scripts/lint_constitution.py
-	@python3 scripts/blockers.py lint
-	@python3 scripts/decisions.py check
+	@set -e; for t in scripts/test_*.py; do echo "→ $$t"; PYTHONPATH=scripts $(PYTHON) "$$t"; done
+	@$(PYTHON) scripts/lint_constitution.py
+	@$(PYTHON) scripts/blockers.py lint
+	@$(PYTHON) scripts/decisions.py check
+	@$(PYTHON) scripts/verify-provenance.py
 
 install-hooks: ## Wire the guard hooks (pre-commit + the pre-push CI suite) for every worktree
 	@git config core.hooksPath scripts/hooks
 	@echo "✓ core.hooksPath = scripts/hooks — pre-commit + pre-push now cover this checkout and every linked worktree"
 
-## ── Governance playbook (vendored from the golden) ─────────────────────────
-# playbook/ is a vendored snapshot of the scrum-jail-governance-playbook golden. These targets
-# keep it honest: sync pulls the golden's root docs in + pins the source commit; check fails on
-# drift. Business-specific files (DEPLOY-RUNBOOK.md, templates/) are NOT synced.
-GOLDEN_REPO ?= $(HOME)/codebase/scrum-jail-governance-playbook
-PLAYBOOK_VENDORED := patterns.md safe.md blocker-ledger.md authorization-gate.md envelopes.yaml README.md RUNBOOK.md org-chart.yaml FIELD-NOTES.md
-
-sync-playbook: ## Pull the golden's governance docs into playbook/ + pin the source (GOLDEN_REPO=...)
-	@test -d "$(GOLDEN_REPO)" || { echo "GOLDEN_REPO not found: $(GOLDEN_REPO)"; exit 1; }
-	@for f in $(PLAYBOOK_VENDORED); do cp "$(GOLDEN_REPO)/$$f" "playbook/$$f"; done
-	@printf '# Vendored snapshot\n\nplaybook/ mirrors the governance golden. Do not hand-edit the\nvendored docs — change them in the golden and re-run `make sync-playbook`.\n\nSource: scrum-jail-governance-playbook @ %s\nVendored files: $(PLAYBOOK_VENDORED)\n' \
-		"$$(git -C "$(GOLDEN_REPO)" rev-parse --short HEAD 2>/dev/null || echo unknown)" > playbook/SOURCE.md
-	@echo "✓ synced $(words $(PLAYBOOK_VENDORED)) docs from $(GOLDEN_REPO) → playbook/ (pinned in playbook/SOURCE.md)"
-
-check-playbook: ## Fail if playbook/ has drifted from the golden (GOLDEN_REPO=...)
-	@test -d "$(GOLDEN_REPO)" || { echo "GOLDEN_REPO not found ($(GOLDEN_REPO)) — skipping drift check"; exit 0; }
-	@drift=0; for f in $(PLAYBOOK_VENDORED); do \
-		diff -q "$(GOLDEN_REPO)/$$f" "playbook/$$f" >/dev/null 2>&1 || { echo "DRIFT: playbook/$$f ≠ golden"; drift=1; }; \
-	done; \
-	if [ "$$drift" = 1 ]; then echo "→ run: make sync-playbook"; exit 1; else echo "✓ playbook/ matches the golden ($(words $(PLAYBOOK_VENDORED)) docs)"; fi
+## ── Stamped provenance ─────────────────────────────────────────────────────
+check-playbook: ## Verify every stamped security-bearing file against SOURCE.json
+	@$(PYTHON) scripts/verify-provenance.py

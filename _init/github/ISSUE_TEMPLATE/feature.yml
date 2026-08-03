@@ -20,15 +20,17 @@ body:
     validations:
       required: true
   - type: dropdown
-    id: department
+    id: role
     attributes:
-      label: Owning department
+      label: Accountable role
       options:
-{{DEPT_OPTIONS}}
+{{ROLE_OPTIONS}}
     validations:
       required: true
   - type: textarea
     id: acceptance
     attributes:
-      label: Acceptance criteria (optional)
-      description: Leave blank to have the owning agent propose them for your approval.
+      label: Acceptance criteria
+      description: One to three observable outcomes. These are bound into closure evidence.
+    validations:
+      required: true

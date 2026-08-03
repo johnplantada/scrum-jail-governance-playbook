@@ -1,30 +1,24 @@
-# Decisions ledger — Board authorizations as reviewed merges (DESIGN.md).
+# Decisions ledger — agent proposals and Human decision records.
 #
 # An agent proposing a spend, charter, promotion, or sunset opens a PR that appends ONE
-# entry here. .github/CODEOWNERS routes the PR to the Chairman; **the Chairman's merge IS
-# the authorization** — the diff is exactly what was approved, and `git log decisions.yaml`
-# is the complete, tamper-evident decision history of the company. Nothing here takes
-# effect until it is on main.
+# entry here. CODEOWNERS routes the PR to the Human Principal. A merge records the Human
+# decision, but executes no spend and activates no governance by itself.
 #
-# This is the ONLY authorization path for money and org-shape changes in this org —
-# there is no fallback path. CI validates this file with `scripts/decisions.py check`
-# (unique ids, required fields).
+# Spending remains a separate Human-only execution. Governance changes require a reviewed,
+# matching control release and explicit Human activation. CI validates only record shape.
 #
 # Entry schema (all fields required unless noted):
 #   id:               kebab-case-slug, unique forever
 #   type:             spend | charter | promote | sunset
-#   dept:             proposing department
+#   role:             proposing canonical agent role
 #   what:             the decision, concretely — what will exist/change/be spent
 #   why:              expected value — what it unblocks or which metric it moves
 #   cost_usd:         number (0 for pure org-shape decisions)
-#   chairman_minutes: human time the decision commits beyond the merge itself
+#   principal_minutes: human time the decision commits beyond the merge itself
 #   reversibility:    one-way | reversible — plus how to undo it if reversible
 #   unblocks:         [work items / issues]
 #   proposed:         YYYY-MM-DD
-#   payload:          (charter/promote/sunset only) the same yaml the registrar would
-#                     parse from a [CHARTER]/[PROMOTE]/[SUNSET] post — kept so execution
-#                     stays mechanical whichever path authorized it
+#   payload:          charter/promote/sunset desired-state change for Human review
 
-# No decisions yet — a fresh org. The first entry will be the Chairman's first merged
-# [SPEND] or [CHARTER] proposal PR (invoke the board-proposals skill to open one).
+# No decisions yet — a fresh organization.
 decisions: []

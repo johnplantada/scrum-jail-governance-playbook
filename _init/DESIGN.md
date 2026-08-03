@@ -1,99 +1,57 @@
-# The Constitution — {{PRODUCT}} org, GitHub-native
+# Constitution — {{PRODUCT}} organization
 
-One page. A small multi-agent "company" runs **{{PRODUCT}}** toward **{{GOAL}}**; the human
-owner participates as the **Chairman of the Board**, and GitHub is the substrate — the record
-lives where the output lives, enforced by the platform, not parsed out of chat. Parameters
-live in `org-chart.yaml`, routing in `wake-rules.yaml`, procedure in `.claude/skills/`,
-per-role duty in `agents/*.md`. This file states only what must stay true.
-*(`wake-rules.yaml`, the skills, and every script named below are stamped into this repo
-by `orggen` alongside this constitution. CI lints prose against these sources
-(`scripts/lint_constitution.py`) so the constitution can't silently restate what the
-config owns.)*
+This organization advances **{{PRODUCT}}** toward **{{GOAL}}**. GitHub is the durable
+work record. The installed Scrum Jail controller is the enforcement boundary. Files in
+this repository are untrusted desired state and operating guidance, not authority.
 
-## 1 · The five invariants
+## Authority
 
-1. **Only the Chairman authorizes** money, prod deploys, and org-shape changes — **and only
-   the Chairman opens `[OBJECTIVE]`s**, the org's work intake. Agents decompose what he files;
-   they never file a sibling.
-   Enforcement is platform-native: the product repo's deploy workflows trigger on manual
-   `workflow_dispatch` only — **the Chairman's dispatch is the deploy** (a required-reviewer
-   `production` environment is the approve-button variant where your plan enforces it;
-   on private repos that needs Team/Enterprise — verify, don't trust the Settings screen);
-   money and org-shape are PRs appending to `decisions.yaml`, CODEOWNERS-routed — **the
-   Chairman's merge is the authorization**, and `git log decisions.yaml` is the decision
-   history. There is no other path into the gates. *(Honest scope: the merge half holds
-   only after the one-time Settings step — branch protection requiring Code Owner review —
-   which only the Chairman can perform; until then it is declared, not enforced. The
-   dispatch half is code, live the moment the workflow triggers say so.)*
-   Work intake has no platform gate, and cannot: every agent holds the Chairman's own GitHub
-   token, so an authorship check reads *his* login on a CEO-opened objective exactly as on his
-   own. Gate it where the wake is real instead — a PreToolUse hook that refuses an
-   objective-minting command whenever the per-wake `AGENT_NAME` is set (the Chairman's own
-   shell never has it), plus `pm-gh.sh` minting only `--type epic|feature|story`. An agent that
-   finds a mission pillar with no ticket opens a `[PROPOSAL]`; the Chairman's own filing is the
-   answer. *(Honest scope: a backstop, not a wall — the token can still reach the API around
-   Bash. It refuses the honest path, which is the one that actually drifts: an agent obeying a
-   mandate that told it to file objectives. Write the mandate right first; this only holds the
-   line. See playbook/patterns.md Pattern 15.)*
-2. **Agents never perform human-only actions.** Credentials, accounts, real URLs, publishing
-   from personal accounts, repo Settings. Hitting one → record it once in `blockers.yaml`
-   (EV-annotated: `value`, `effort_minutes`) and go quiet. **One exception:** an entry
-   flagged `gates_market_contact` — the org's only live checkout or only audience — never
-   goes quiet; the tooling reprints it loudly every wake until cleared, because a live
-   product with no way to pay it and no one told it exists is the one blocker an org must
-   never silence (playbook/blocker-ledger.md §2; sunset the flag once a checkout is live and a
-   demand signal has landed). Only the Chairman clears an entry;
-   past `global.unlock_wip_limit` open entries, agents must not start new work whose critical
-   path ends in another human-only unlock. *(The WIP rule is prompt-enforced — the injected
-   queue carries the warning; the going-quiet is policy, backstopped by capability-absence:
-   agents simply hold no credentials.)*
-3. **Every Claude call is metered** into `state/spend.jsonl` (`spend_log.py`); the runner
-   holds all wakes once today's metered cost reaches `SPEND_BREAKER_DAILY_USD`;
-   `efficiency.py` reports cost per unit of shipped output.
-4. **Ceremony is output-gated.** Process never runs ahead of delivery: while
-   `scripts/last-ship.sh` reports `shipped=no`, reviews close with one line, PI Planning is
-   suppressed, and no new feature work opens over a deploy-blocked critical path.
-5. **The kill switch stops every loop.** A `.halt` file in the repo root halts the runner
-   and every agent cycle; only a human removes it.
+The Human Principal alone may create, edit, or close objectives; merge or auto-merge a
+pull request; dispatch a hosted workflow or deploy; authorize or execute spending; change
+repository settings; or activate governance. Those operations do not exist in the agent
+broker. Human actions use an authenticated operator path that is never exposed to a wake.
 
-## 2 · The work system
+Agents receive no GitHub credential, provider API key, raw network transport, workflow
+token, or provider configuration. Issue and pull-request operations go through
+`scripts/pm-gh.sh`; branch submissions go through `scripts/git-push-branch.sh`. The
+controller derives repository, endpoint, method, branch, actor, and current facts. An
+incomplete read is UNKNOWN and cannot authorize a mutation.
 
-Work is **GitHub Issues** on the org Project (`scripts/pm-gh.sh`; the board's built-in
-Status field = `org-chart.yaml global.pm_stages`, the only place the status list is
-defined, plus the `pm_holding_stages` parking columns — orthogonal to the flow, so a
-stalled item shows as parked instead of feigning progress — and the `pm_terminal_stages`
-won't-do outcome, set by `pm-gh.sh drop`, which closes as *not planned* with the reason
-on the record; dropping an epic or objective is the Chairman's call alone). The Chairman
-injects work by filing an issue (forms in `.github/ISSUE_TEMPLATE`); the `dept:*` label
-routes it. Objectives decompose as a **work-item tree** on native sub-issues with an
-evidence-gated close at every level (`agents/_policy.md` §workitems): children inherit
-their parent's routing label, and nothing closes over open children or without the
-evidence its kind demands. Product code ships as PRs against `$PRODUCT_GH_REPO` from branch
-`agent/it/<desc>`; **agents open PRs, never merge to main** — CI plus invariant 1 gate the
-merge. Org-repo changes go through an isolated worktree + PR (the `org-worktree` skill),
-never the runtime checkout.
+## Work and evidence
 
-## 3 · The nervous system
+The Human Principal files `[OBJECTIVE]` issues. Project Orchestrator coordinates those
+objectives. Delivery work follows the typed tree `objective → epic → feature → story`.
+Features and stories require an acceptance or done-when statement. Agents may complete
+only work they own, only after a complete child enumeration proves no open child, and only
+with a related merged pull request or accepted demo bound to that exact item. Repeating the
+acceptance statement is not evidence. Dropped work requires a reason. Agents never use
+issue-closing keywords in pull requests and never approve or merge a pull request.
 
-`scripts/runner.py` polls GitHub each tick and wakes departments per `wake-rules.yaml` —
-GitHub is the durable queue; a closed laptop is a clean pause, and catch-up is oldest-first.
-Wakes execute through `agent-run.sh` (locking, metering, the Claude Code SDK on the
-Chairman's plan). There are no channels, no standups, and no scheduled wake floors: no
-event, no wake, no spend. First boots run `RUNNER_MODE=shadow` (poll + log the would-be
-wakes) before going live.
+## Execution
 
-## 4 · Typed handoffs
+The supervisor owns independent source cursors, complete pagination, overlap windows,
+deduplication, delivery leases, retries, dead letters, token reservations, role sessions,
+and provider launches. A partial source snapshot never advances its checkpoint. An expired
+running delivery becomes uncertain for human review; it is not blindly repeated.
 
-Cross-role handoffs carry a fenced yaml payload in the relevant issue/PR comment — typed,
-not prose-by-convention. Required keys per type live in `scripts/handoff_check.py`
-(documented in `agents/_policy.md` §handoffs; keep the two in sync — CI tests it). `handoff_check.py`
-fails a malformed payload and names the missing keys; it ships in the stamped runtime
-and runs on operator-local compute (the runner's wake path or the pre-push CI suite) —
-never as a per-comment hosted workflow, which bills at agent frequency (playbook/patterns.md
-Pattern 17).
+Codex CLI runs from a sealed managed home with workspace-write sandboxing, no process
+network, no approval escalation, and ChatGPT subscription authentication. Claude CLI runs
+with fail-closed sandboxing, deny-all network, no bypass mode, no hooks, no recursive Agent
+or Task tools, and first-party subscription/OAuth authentication. Alternate providers and
+provider API keys are rejected.
 
-## 5 · Counter-ratchet
+Named Luna workers are supervisor-created, capability-scoped, bounded per wake and in
+concurrency, non-recursive, and given no parent broker socket. Read-only workers cannot
+write. Implementer output is imported only from declared paths after verification.
 
-Every new gate, rule, or watcher must name the one it replaces, or carry a sunset date tied
-to the incident that spawned it. The org runs on one watcher (the runner); growing past a
-handful should be hard.
+## Operations
+
+Hosted CI, evidence, and deployment workflows are manual-only and bind the Human
+Principal, main branch, and reviewed SHA. External actions are pinned. Deployment
+credentials are isolated to the approval-gated deploy job.
+
+`make halt` and `make resume` use the authenticated operator socket; pause state is not a
+workspace file. Generated repositories contain no scheduler cursor, provider launcher,
+budget ledger, or governance mutation implementation. Changes to this constitution become
+effective only when the Human Principal reviews and activates a matching immutable control
+release.

@@ -1,42 +1,41 @@
-# Human-task ledger — the single source of truth for work that ONLY the Chairman can clear.
+# Human-task ledger — the single source of truth for work that ONLY the Human Principal can clear.
 #
 # Why this file exists: agents can talk, write code, and open PRs, but they cannot perform
 # real-world unlocks (set cloud credentials, spend money, register accounts, provide URLs or
 # a mailing address, or dispatch a prod deploy). When blocked on one, an agent records it here
 # ONCE and goes quiet — no wake-spinning, no re-posted blocked status. This ledger, not any
-# status stream, is what the Chairman scans to see "what does a human need to do."
+# status stream, is what the Human Principal scans to see "what does a human need to do."
 #
 # Contract:
-#   - Agents READ this every cycle (the runner injects the open queue into each wake prompt)
-#     and may APPEND a new entry (state: open). They never flip an entry to cleared.
-#   - The Chairman clears an entry (state: open -> cleared, plus a note:) once the action is
+#   - Agents may propose a new open entry through their scoped repository branch. They never
+#     flip an entry to cleared, and this file is never injected as authority into a wake.
+#   - The Human Principal clears an entry (state: open -> cleared, plus a note:) once the action is
 #     done. Clearing is what un-gates the work the entry `blocks`.
 #   - `scripts/blockers.py open` prints the open queue in EV order.
 #
 # kind:  external-input = a credential/URL/address/account only the human can supply
-#        governance     = a Chairman authorization — a decisions.yaml merge (fund ·
-#                         charter · promote · sunset) or a prod-deploy dispatch
-#                         (the Chairman's manual workflow_dispatch)
-# needs: chairman (always, for now)
+#        governance     = a Human Principal action — ratify a decision record, separately
+#                         execute approved spend, activate a matching control release, or
+#                         dispatch production (manual workflow_dispatch)
+# needs: human-principal
 # state: open | cleared
 # value: what clearing it unlocks — revenue (a conversion path goes live) | signal
 #        (market evidence lands) | infra (pipeline/deploy capability). Orders the queue.
-# effort_minutes: honest estimate of the Chairman-minutes needed to clear it. Within a
+# effort_minutes: honest estimate of the Human Principal-minutes needed to clear it. Within a
 #        value class the cheapest unlock prints first, so a batching sit-down starts with
 #        the best value-per-minute. Past global.unlock_wip_limit open entries
-#        (org-chart.yaml), blockers.py prepends the WIP warning that stops agents starting
-#        work whose critical path ends in yet another unlock.
+#        (org-chart.yaml), blockers.py prepends an operator-facing WIP warning.
 
 blockers: []
   # - id: example-deploy-credentials
   #   kind: external-input
-  #   needs: chairman
+  #   needs: human-principal
   #   value: infra
   #   effort_minutes: 10
   #   summary: "What is blocked and why only a human can clear it."
-  #   action: "The exact command/click-path the Chairman follows to clear it."
+  #   action: "The exact command/click-path the Human Principal follows to clear it."
   #   blocks: [deploy]
   #   opened: 2026-01-01
   #   state: open
   #   # gates_market_contact: true  # RARE — only for the org's sole checkout/audience path;
-  #   #                             # stays loud every wake (see playbook/blocker-ledger.md §2)
+  #   #                             # stays loud in the Human operator view

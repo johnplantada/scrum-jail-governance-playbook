@@ -1,0 +1,58 @@
+# This is a sealed template. sjg-supervisor commission-provider replaces the absolute
+# /__SJG_MANAGED_HOME__ placeholder and installs the result as managedHome/.codex/config.toml.
+# The generated project remains untrusted and cannot override this user-level config.
+approval_policy = "never"
+allow_login_shell = false
+web_search = "disabled"
+default_permissions = "scrum-jail-parent"
+
+[permissions.scrum-jail-parent.filesystem]
+":minimal" = "read"
+":workspace_roots" = { "." = "write" }
+"/__SJG_MANAGED_HOME__/.codex" = "deny"
+"/__SJG_CONTROL_ROOT__" = "read"
+
+[permissions.scrum-jail-parent.network]
+enabled = false
+allow_local_binding = false
+dangerously_allow_all_unix_sockets = false
+
+[permissions.scrum-jail-worker-readonly.filesystem]
+":minimal" = "read"
+":workspace_roots" = { "." = "read" }
+"/__SJG_MANAGED_HOME__/.codex" = "deny"
+
+[permissions.scrum-jail-worker-readonly.network]
+enabled = false
+allow_local_binding = false
+dangerously_allow_all_unix_sockets = false
+
+[permissions.scrum-jail-worker-implementer.filesystem]
+":minimal" = "read"
+":workspace_roots" = { "." = "write" }
+"/__SJG_MANAGED_HOME__/.codex" = "deny"
+
+[permissions.scrum-jail-worker-implementer.network]
+enabled = false
+allow_local_binding = false
+dangerously_allow_all_unix_sockets = false
+
+[history]
+persistence = "none"
+
+[features]
+multi_agent = false
+apps = false
+remote_plugin = false
+hooks = false
+memories = false
+goals = false
+network_proxy = false
+
+[tools]
+web_search = false
+
+[shell_environment_policy]
+inherit = "none"
+ignore_default_excludes = false
+experimental_use_profile = false

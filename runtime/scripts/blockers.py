@@ -1,29 +1,23 @@
 #!/usr/bin/env python3
 """Read blockers.yaml — the human-task ledger — and print it, best-value-first.
 
-  scripts/blockers.py open    # only state: open entries (compact; injected into agent prompts)
+  scripts/blockers.py open    # open entries for the Human Principal/operator
   scripts/blockers.py         # same as 'open'
   scripts/blockers.py all     # every entry with its state, in file order
   scripts/blockers.py lint    # CI gate: exit 1 if any open blocker lacks a runbook (`action:`)
 
-The Chairman is single-threaded and high-latency, so the open queue prints in EV order:
+The Human Principal is single-threaded and high-latency, so the open queue prints in EV order:
 market-contact first (existential — a live product with no checkout/audience), then value
 class (revenue > signal > infra > unclassified), cheapest `effort_minutes` within a class,
 oldest first on ties — a batching sit-down starts at the top and works down. Each line
 carries the entry's age so staleness is visible at a glance.
 
-Market-contact entries (`gates_market_contact: true`) also get a loud banner printed FIRST
-that re-enters every agent wake — the one blocker class that does not go quiet (invariant 2).
+Market-contact entries (`gates_market_contact: true`) get a loud operator-facing banner.
 
-When the open count exceeds `global.unlock_wip_limit` (org-chart.yaml), the queue is
-prefixed with a WIP warning. The queue is injected into every agent's wake prompt, so
-the warning is the enforcement channel — prompt-level, because "critical path ends in a
-human-only unlock" takes judgment no cheap check can make (unlike the subagent cap, which
-subagent_gate.py now enforces in code): agents must not START new work whose critical
-path ends in another human-only unlock (DESIGN.md, invariant 2).
+When the open count exceeds `global.unlock_wip_limit`, the operator view is prefixed with a
+WIP warning. It is decision support, not an agent authorization mechanism.
 
-Prints nothing (exit 0) when there are no matching blockers, so callers can `$(...)` it
-safely. Falls back silently if the file is missing or unparseable.
+Prints nothing when there are no matching blockers. Missing or malformed state fails closed.
 """
 import datetime
 import os
@@ -36,7 +30,7 @@ CHART = os.path.join(REPO, "org-chart.yaml")
 VALUE_RANK = {"revenue": 0, "signal": 1, "infra": 2}
 
 # A runbook shorter than this (whitespace-normalized `action:`) is not actionable — the
-# Chairman can't clear a one-liner. `blockers.py lint` fails on open entries below it.
+# Human Principal can't clear a one-liner. `blockers.py lint` fails on open entries below it.
 RUNBOOK_MIN_CHARS = 40
 
 
@@ -54,14 +48,14 @@ def is_market_contact(b):
     """True for a blocker on the critical path to ANY market contact — a live checkout
     or a real audience. This class is the one exception to record-once-and-go-quiet
     (DESIGN.md invariant 2): while a product is live with no way to pay it and no one
-    told it exists, the ledger surfaces it loudly every wake until the Chairman clears
+    told it exists, the ledger surfaces it loudly every wake until the Human Principal clears
     it. Flagged in blockers.yaml with `gates_market_contact: true`."""
     return bool(b.get("gates_market_contact"))
 
 
 def sort_key(b):
     """EV order: market-contact first (existential — never routine), then value class,
-    then Chairman-effort ascending, then oldest first. Unclassified entries sink below
+    then Human Principal-effort ascending, then oldest first. Unclassified entries sink below
     every classified one; unknown effort sorts last within its class (an unestimated
     unlock is not a quick win until someone says so)."""
     rank = VALUE_RANK.get(str(b.get("value") or "").strip(), len(VALUE_RANK))
@@ -74,7 +68,7 @@ def sort_key(b):
 
 
 def needs_runbook(b):
-    """An OPEN blocker the Chairman can't act on: its `action:` is missing or too thin
+    """An OPEN blocker the Human Principal can't act on: its `action:` is missing or too thin
     to be a runbook and it carries no `runbook:` file pointer. Cleared entries are exempt.
     Enforced by `blockers.py lint` (CI) so every human-only subtask ships with a runbook."""
     if (b.get("state") or "open").strip() != "open":
@@ -120,18 +114,12 @@ def wip_warning(n_open, limit):
         return None
     return (f"WARNING: UNLOCK WIP LIMIT EXCEEDED — {n_open} open human-only blockers "
             f"(global.unlock_wip_limit is {limit}). Do NOT start new work whose critical "
-            f"path ends in another human-only unlock; swarm what is already unblocked "
-            f"(DESIGN.md, invariant 2).")
+            f"path ends in another human-only unlock; review the queue before accepting "
+            f"more Human-gated work.")
 
 
 def market_contact_alert(entries, today):
-    """The one banner that does NOT go quiet. When any open entry is flagged
-    `gates_market_contact`, name each one loudly — a live product with no checkout and/or
-    no audience is the single blocker class the org must never let fade into the ledger.
-    This prints first in `blockers.py open`, so it re-enters every agent's wake prompt
-    each cycle until the Chairman clears it (the deliberate inverse of invariant 2's
-    record-once-and-go-quiet). None when nothing is flagged. Incident 2026-07-11: the org
-    sat org-quiet over a live product with no way to pay it and no one told it existed."""
+    """Name flagged market-contact blockers loudly in the Human operator view."""
     flagged = [b for b in (entries or []) if is_market_contact(b)]
     if not flagged:
         return None
@@ -143,7 +131,7 @@ def market_contact_alert(entries, today):
         return f"  • [{b.get('id', '?')}{agestr}] {summary}"
 
     return ("MARKET-CONTACT BLOCKED — the product is live but a checkout and/or an "
-            "audience is gated on the Chairman. This class does NOT go quiet; until it "
+            "audience is gated on the Human Principal. This class does NOT go quiet; until it "
             "clears, the org ships into a void:\n" + "\n".join(one(b) for b in flagged))
 
 
@@ -164,8 +152,8 @@ def main():
     try:
         import yaml
         data = yaml.safe_load(open(PATH, encoding="utf-8")) or {}
-    except Exception:
-        return
+    except Exception as exc:
+        raise SystemExit(f"blockers.py: cannot read authoritative ledger: {exc}")
     today = datetime.date.today()
     if mode == "lint":
         missing = [b for b in (data.get("blockers") or []) if needs_runbook(b)]

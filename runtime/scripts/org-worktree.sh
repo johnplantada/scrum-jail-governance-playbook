@@ -7,15 +7,15 @@
 # land goes through a throwaway worktree on its own branch, leaving the runtime checkout
 # untouched.
 #
-#   # 1. get a fresh isolated checkout (off the latest origin/main), on your own branch:
+#   # 1. get an isolated checkout from the locally commissioned main ref:
 #   wt=$(scripts/org-worktree.sh new design-s9-amend)     # prints the worktree PATH
 #
 #   # 2. make ALL your edits UNDER $wt (absolute paths), e.g. edit "$wt/DESIGN.md".
 #
-#   # 3. commit + push + open the PR from inside it:
+#   # 3. commit, submit through the controller, and request the PR through pm-gh.sh:
 #   ( cd "$wt" && git add -A && git commit -m "docs: amend DESIGN.md §9" \
-#       && git push -u origin "$(git -C "$wt" branch --show-current)" \
-#       && gh pr create --fill --base main )
+#       && scripts/git-push-branch.sh "$wt" )
+#   scripts/pm-gh.sh pr-create --repo org --topic <topic> --title "Describe the change"
 #
 #   # 4. clean up:
 #   scripts/org-worktree.sh done "$wt"
@@ -32,26 +32,34 @@ cmd="${1:-}"; [ -n "$cmd" ] || usage
 case "$cmd" in
   new)
     suffix="${2:-}"; [ -n "$suffix" ] || usage
-    agent="${AGENT_NAME:-manual}"
+    agent="${AGENT_NAME:-}"
+    case "$agent" in
+      project-orchestrator|commercial-planner|software-implementer|governance-reviewer|policy-reviewer) ;;
+      *) echo "org-worktree: AGENT_NAME must be a canonical executing role" >&2; exit 2 ;;
+    esac
     safe="$(printf '%s' "$suffix" | tr -c 'a-zA-Z0-9._-' '-' | sed 's/^-*//;s/-*$//')"
     branch="agent/${agent}/${safe}"
     path="$WT_BASE/${agent}-${safe}"
     mkdir -p "$WT_BASE"
-    # Diagnostics to stderr; the PATH is the only thing on stdout (so callers can capture it).
-    git fetch -q origin main >&2
-    # Clear any stale worktree/branch at this slot so re-runs are clean.
-    if [ -e "$path" ]; then git worktree remove --force "$path" >&2 2>&1 || true; fi
-    git worktree prune >&2 2>&1 || true
-    git branch -D "$branch" >/dev/null 2>&1 || true
-    git worktree add -q -b "$branch" "$path" origin/main >&2
-    echo "  ✓ isolated worktree on $branch (off origin/main) — edit under it, then commit/push/PR" >&2
+    [ ! -e "$path" ] || { echo "org-worktree: path already exists: $path" >&2; exit 73; }
+    ! git show-ref --verify --quiet "refs/heads/$branch" || {
+      echo "org-worktree: branch already exists: $branch" >&2; exit 73;
+    }
+    git show-ref --verify --quiet refs/heads/main || {
+      echo "org-worktree: commissioned local main ref is missing" >&2; exit 69;
+    }
+    git worktree add -q -b "$branch" "$path" refs/heads/main >&2
+    echo "  ✓ isolated worktree on $branch (off local main) — edit under it, then submit through the controller" >&2
     printf '%s\n' "$path"
     ;;
   done)
     path="${2:-}"; [ -n "$path" ] || usage
-    git worktree remove --force "$path" 2>/dev/null || true
+    base="$(cd "$WT_BASE" 2>/dev/null && pwd -P)" || { echo "org-worktree: worktree base missing" >&2; exit 69; }
+    resolved="$(cd "$(dirname "$path")" 2>/dev/null && printf '%s/%s\n' "$(pwd -P)" "$(basename "$path")")" || exit 2
+    case "$resolved" in "$base"/*) ;; *) echo "org-worktree: refusing path outside $base" >&2; exit 2;; esac
+    git worktree remove "$resolved"
     git worktree prune
-    echo "  ✓ removed worktree $path" >&2
+    echo "  ✓ removed worktree $resolved" >&2
     ;;
   list)
     git worktree list

@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scrum-jail.dev/schemas/organization-v1.json",
+  "title": "Scrum Jail Organization 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "authority", "repositories", "controlRelease", "budgets", "limits", "agents", "workflows"],
+  "properties": {
+    "apiVersion": {"const": "scrum-jail.dev/v1"},
+    "kind": {"const": "Organization"},
+    "metadata": {
+      "type": "object", "additionalProperties": false, "required": ["id"],
+      "properties": {"id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"}}
+    },
+    "authority": {
+      "type": "object", "additionalProperties": false,
+      "required": ["principalRole", "principalGitHub", "upstreamRole"],
+      "properties": {
+        "principalRole": {"const": "human-principal"},
+        "principalGitHub": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}$"},
+        "upstreamRole": {"const": "portfolio-orchestrator"}
+      }
+    },
+    "repositories": {
+      "type": "object", "additionalProperties": false, "required": ["org", "product"],
+      "properties": {
+        "org": {"$ref": "#/$defs/repository"},
+        "product": {"$ref": "#/$defs/repository"}
+      }
+    },
+    "controlRelease": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "sourceTreeSha256"],
+      "properties": {
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "sourceTreeSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "budgets": {
+      "type": "object", "additionalProperties": false,
+      "required": ["organizationDailyTokens"],
+      "properties": {"organizationDailyTokens": {"type": "integer", "minimum": 1}}
+    },
+    "limits": {
+      "type": "object", "additionalProperties": false,
+      "required": ["globalMaxAgents"],
+      "properties": {"globalMaxAgents": {"type": "integer", "minimum": 4}}
+    },
+    "agents": {
+      "type": "array", "minItems": 4, "maxItems": 5, "uniqueItems": true,
+      "items": {"$ref": "#/$defs/agent"},
+      "allOf": [
+        {"contains": {"properties": {"id": {"const": "project-orchestrator"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"id": {"const": "commercial-planner"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"id": {"const": "software-implementer"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"id": {"const": "governance-reviewer"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"id": {"const": "policy-reviewer"}}}, "minContains": 0, "maxContains": 1}
+      ]
+    },
+    "workflows": {
+      "type": "object", "additionalProperties": false,
+      "required": ["hostedExecution"],
+      "properties": {
+        "hostedExecution": {"const": "manual-only"}
+      }
+    }
+  },
+  "$defs": {
+    "repository": {
+      "type": "object", "additionalProperties": false, "required": ["slug", "defaultBranch"],
+      "properties": {
+        "slug": {"type": "string", "pattern": "^(?!\\.{1,2}/)(?![^/]+/\\.{1,2}$)[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+        "defaultBranch": {"type": "string", "minLength": 1, "maxLength": 255}
+      }
+    },
+    "agent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "repositories", "dailyTokenBudget", "workers"],
+      "properties": {
+        "id": {"enum": ["project-orchestrator", "commercial-planner", "software-implementer", "governance-reviewer", "policy-reviewer"]},
+        "repositories": {"type": "array", "items": {"enum": ["org", "product"]}, "uniqueItems": true},
+        "dailyTokenBudget": {"type": "integer", "minimum": 1},
+        "workers": {
+          "type": "object", "additionalProperties": false,
+          "required": ["allowed", "maxPerWake", "maxConcurrent"],
+          "properties": {
+            "allowed": {"type": "array", "items": {"enum": ["researcher", "drafter", "implementer"]}, "uniqueItems": true},
+            "maxPerWake": {"type": "integer", "minimum": 0},
+            "maxConcurrent": {"type": "integer", "minimum": 0}
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"id": {"const": "project-orchestrator"}}},
+          "then": {"properties": {
+            "repositories": {"const": ["org"]},
+            "workers": {"const": {"allowed": [], "maxPerWake": 0, "maxConcurrent": 0}}
+          }}
+        },
+        {
+          "if": {"properties": {"id": {"const": "governance-reviewer"}}},
+          "then": {"properties": {
+            "repositories": {"const": ["org"]},
+            "workers": {"const": {"allowed": [], "maxPerWake": 0, "maxConcurrent": 0}}
+          }}
+        },
+        {
+          "if": {"properties": {"id": {"enum": ["commercial-planner", "policy-reviewer"]}}},
+          "then": {"properties": {
+            "repositories": {"const": ["org"]},
+            "workers": {"properties": {
+              "allowed": {"const": ["researcher", "drafter"]},
+              "maxPerWake": {"minimum": 1},
+              "maxConcurrent": {"minimum": 1}
+            }}
+          }}
+        },
+        {
+          "if": {"properties": {"id": {"const": "software-implementer"}}},
+          "then": {"properties": {
+            "repositories": {"const": ["org", "product"]},
+            "workers": {"properties": {
+              "allowed": {"const": ["researcher", "drafter", "implementer"]},
+              "maxPerWake": {"minimum": 1},
+              "maxConcurrent": {"minimum": 1}
+            }}
+          }}
+        }
+      ]
+    }
+  }
+}

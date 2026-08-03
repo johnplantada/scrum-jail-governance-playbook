@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# github-pm-setup.sh — idempotent provisioning (DESIGN.md §2, the work system): the dept/type
+# github-pm-setup.sh — idempotent provisioning (DESIGN.md §2): canonical role/type
 # labels and the single org Project whose built-in Status field mirrors the org-chart.yaml
 # status canon (pm_stages + holding + terminal) — the one place the list is defined (same
 # canon the linter enforces on prose).
 #
-# Run from the org laptop (needs gh auth with project scope: `gh auth refresh -s project`).
+# HUMAN COMMISSIONING TOOL. Run outside every agent wake from the operator account (needs
+# gh auth with project scope). The controller and agents never invoke this script.
 # Safe to re-run: labels are create-or-update, the project and field are found before created.
 #
 #   scripts/github-pm-setup.sh            # provision org repo labels + the Project
 #   DRY_RUN=1 scripts/github-pm-setup.sh  # print what would happen
 set -euo pipefail
 cd "$(dirname "$0")/.."
-[ -f .env ] && { set -a; . ./.env; set +a; }
 
-# Identity comes from .env — no fallbacks (provisioning the wrong org is worse than a
-# refusal). The owner defaults to the org repo's owner half.
-ORG_REPO="${ORG_GH_REPO:?ORG_GH_REPO not set — cp .env.example .env and fill it in}"
-PRODUCT_REPO="${PRODUCT_GH_REPO:?PRODUCT_GH_REPO not set — cp .env.example .env and fill it in}"
-OWNER="${GITHUB_OWNER:-${ORG_REPO%%/*}}"
+# Repository identities come from the compiled organization document. Operator environment
+# variables cannot redirect commissioning to a different repository.
+ORG_REPO="$(python3 -c 'import json; print(json.load(open("organization.yaml"))["repositories"]["org"]["slug"])')"
+PRODUCT_REPO="$(python3 -c 'import json; print(json.load(open("organization.yaml"))["repositories"]["product"]["slug"])')"
+OWNER="${ORG_REPO%%/*}"
 PROJECT_TITLE="${PM_PROJECT_TITLE:-Org Project}"
 run() { if [ "${DRY_RUN:-0}" = "1" ]; then echo "DRY: $*"; else "$@"; fi; }
 
@@ -38,37 +38,38 @@ echo "statuses (org-chart pm_stages): $stages"
 [ -n "$holding" ] && echo "holding columns (org-chart pm_holding_stages): $holding"
 [ -n "$terminal" ] && echo "terminal-alternates (org-chart pm_terminal_stages): $terminal"
 
-# --- labels: dept routing (the wake signal) + the template types -------------------------
-# The department roster comes from org-chart.yaml (the single source of truth) — adding a
-# department there is enough; re-run this script to create its label. The reference org
+# --- labels: role routing (the wake signal) + the template types -------------------------
+# The role roster comes from org-chart.yaml (the single source of truth) — adding a
+# role there is enough; re-run this script to create its label. The reference org
 # shipped two follow-up commits for labels this script hardcoded; the chart read ends that.
-depts="$(sed -n 's/^  - name:[[:space:]]*\([A-Za-z0-9_-]*\).*/\1/p' org-chart.yaml)"
-[ -n "$depts" ] || { echo "could not read departments from org-chart.yaml" >&2; exit 1; }
+roles="$(sed -n '/^roles:/,$ s/^  - name:[[:space:]]*\([A-Za-z0-9_-]*\).*/\1/p' org-chart.yaml)"
+[ -n "$roles" ] || { echo "could not read roles from org-chart.yaml" >&2; exit 1; }
 palette=(1D76DB 0E8A16 5319E7 006B75 6f42c1 E99695 0052CC C5DEF5)
 for repo in "$ORG_REPO" "$PRODUCT_REPO"; do
   echo "── labels on $repo"
   i=0
-  for d in $depts; do
+  for d in $roles; do
     color="${palette[$((i % ${#palette[@]}))]}"; i=$((i + 1))
-    # dept:warden is ORG-REPO ONLY — the warden's queue and hygiene findings live where
-    # the org lives, and the product repo has no warden to wake.
-    if [ "$d" = "warden" ] && [ "$repo" != "$ORG_REPO" ]; then continue; fi
-    run gh label create "dept:$d" --repo "$repo" --force --color "$color" \
+    # Governance review is org-repo only; it does not own product work intake.
+    if [ "$d" = "governance-reviewer" ] && [ "$repo" != "$ORG_REPO" ]; then continue; fi
+    run gh label create "role:$d" --repo "$repo" --force --color "$color" \
         --description "wake: $d owns this"
   done
-  run gh label create "objective" --repo "$repo" --force --color B60205 \
-      --description "Chairman work injection"
+  if [ "$repo" = "$ORG_REPO" ]; then
+    run gh label create "objective" --repo "$repo" --force --color B60205 \
+        --description "Human Principal work injection"
+  fi
   run gh label create "proposal"  --repo "$repo" --force --color FBCA04 \
-      --description "agent → Chairman: needs a human verdict"
-  # work-item tree kinds (objective → epic → feature → story; scripts/workitems.py).
+      --description "agent → Human Principal: needs a human verdict"
+  # Work-item tree kinds; the controller enforces typed parent edges and closure.
   # `feature` predates the tree (the Feature issue template applies it); --force here
   # just pins its description to the closure rule it now carries.
   run gh label create "epic"      --repo "$repo" --force --color 3E4B9E \
       --description "work-item tree: delivery track under an objective (closes by rollup)"
   run gh label create "feature"   --repo "$repo" --force --color 0052CC \
-      --description "work-item tree: shippable slice under an epic (closes on [DEMO] or done-when)"
+      --description "work-item tree: shippable slice under an epic (closes on merged PR or accepted [DEMO])"
   run gh label create "story"     --repo "$repo" --force --color C2E0C6 \
-      --description "work-item tree: unit of work under a feature (closes on merged PR or done-when)"
+      --description "work-item tree: unit of work under a feature (closes on merged PR or accepted [DEMO])"
 done
 
 # --- the one Project ----------------------------------------------------------------------
@@ -117,22 +118,14 @@ print("mutation($f: ID!) { updateProjectV2Field(input: {fieldId: $f, singleSelec
       " { projectV2Field { ... on ProjectV2SingleSelectField { id } } } }" % opts)')"
     run gh api graphql -f query="$mutation" -F f="$fid" --jq '.data | keys[0]'
   fi
-  legacy="$(gh project field-list "$pn" --owner "$OWNER" --format json \
-            --jq '.fields[] | select(.name == "Stage") | .name' 2>/dev/null || true)"
-  [ -n "$legacy" ] && echo "  ↳ a legacy Stage field exists — the org now runs on Status; delete Stage in the Project UI once nothing references it."
   run gh project link "$pn" --owner "$OWNER" --repo "$ORG_REPO"
   run gh project link "$pn" --owner "$OWNER" --repo "$PRODUCT_REPO"
 fi
 
-# pm-gh.sh caches the board coordinates (state/pm-board.tsv, FIELD-NOTES §14); this run
-# may have just changed them, so a provision always invalidates the cache.
-run rm -f state/pm-board.tsv
-
-# The board number is meant to be PINNED (org-chart global.pm_project_number — warden.py
-# refuses to run without it; un-pinned, pm-gh.sh pays a metered by-title lookup per call).
+# The Project number is desired commissioning data for the installed controller.
 pin="$(sed -n 's/^[[:space:]]*pm_project_number:[[:space:]]*\([0-9][0-9]*\).*/\1/p' org-chart.yaml | head -1)"
 if [ "$pn" != "<new>" ] && [ "${pin:-}" != "$pn" ]; then
-  echo "  WARNING: org-chart global.pm_project_number is ${pin:-unset} but the board is #$pn — pin it"
+  echo "  WARNING: org-chart global.pm_project_number is ${pin:-unset} but the board is #$pn — commission it"
 fi
 
 echo "✓ Phase 2 PM scaffolding ready: labels + project (Status = org-chart pm_stages + pm_holding_stages + pm_terminal_stages)"

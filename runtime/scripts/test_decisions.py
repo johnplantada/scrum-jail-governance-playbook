@@ -9,9 +9,9 @@ from decisions import render, validate
 
 
 def entry(**kw):
-    base = {"id": "spring-store-spend", "type": "spend", "dept": "business",
+    base = {"id": "spring-store-spend", "type": "spend", "role": "commercial-planner",
             "what": "Open the Spring store", "why": "first merch conversion path",
-            "cost_usd": 0, "chairman_minutes": 20, "reversibility": "reversible — close the store",
+            "cost_usd": 0, "principal_minutes": 20, "reversibility": "reversible — close the store",
             "unblocks": ["pm#40"], "proposed": "2026-07-05"}
     base.update(kw)
     return base

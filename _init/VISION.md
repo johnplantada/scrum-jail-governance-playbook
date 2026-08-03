@@ -15,39 +15,42 @@ its output must meet — the mission should be falsifiable against the north sta
 **North star (the acceptance bar):** {{GOAL}}. Every objective answers to it.
 
 ## The org — the lines
-A small governance-gated company; the Chairman (you) holds the gates (`DESIGN.md` invariant 1).
+A small governance-gated company; the Human Principal (you) holds the gates (`DESIGN.md` invariant 1).
 
-**Production chain (first line) — reports to the CEO**
-- **CEO** *(chief-executive)* — sets direction, decomposes the Chairman's objectives into
-  department-owned epics, arbitrates between departments, gates ceremony on shipped output.
+**Production chain (first line) — reports to the Project Orchestrator**
+- **Project Orchestrator** *(objective coordination)* — decomposes Human-created objectives into
+  role-owned epics and resolves delivery dependencies.
   Sets outcomes; never executes, and never opens an objective.
-- **Business** *(demand)* — translates the north star into product requirements and
+- **Commercial Planner** *(commercial planning)* — translates the north star into product requirements and
   owns `[DEMO]` acceptance — the customer's voice.
-- **IT** *(supply)* — builds the product and its pipeline. Opens PRs; never merges to prod.
+- **Software Implementer** *(software delivery)* — builds the product and its pipeline. Opens PRs; never merges to prod.
 
 **Independent organs — report to the Board**
 <!-- CUSTOMIZE: keep, adapt, or delete these depending on your roster. -->
-- **Compliance** *(assurance, optional)* — owns the corpus + citation standard and the
-  independence boundary; reviews assurance-facing output and posts `COMPLIANCE-OK` or withholds
-  with `COMPLIANCE-HOLD`. Its sign-off is a required input to Business's `[DEMO]` acceptance.
+- **Policy Reviewer** *(independent review, optional)* — owns the corpus + citation standard and the
+  independence boundary; reviews policy-facing output and posts a typed review verdict.
+  Its verdict is advisory evidence for Commercial Planner's `[DEMO]` acceptance; an organization
+  that needs a hard policy gate must add an explicit, deterministic control contract.
   It flags; it never authorizes.
-- **Warden** *(hygiene)* — keeps the Chairman action queue true and the board honest from code
-  truth; the deterministic engine (`scripts/warden.py`) does the work, the brain handles
-  judgment residue only.
+- **Governance Monitor** *(deterministic service)* — computes complete tri-state findings and
+  reconciliation plans from controller-owned state.
+- **Governance Reviewer** *(governance judgment)* — handles only ambiguous residue emitted
+  by the monitor.
 
 ## How work flows
-1. **The Chairman injects** an `[OBJECTIVE]` issue (labeled `dept:ceo`) — the label is the wake.
-   The Chairman is the *only* one who may: work intake is a reserved power (DESIGN.md
+1. **The Human Principal injects** an `[OBJECTIVE]` issue (labeled `role:project-orchestrator`) — the label is the wake.
+   The Human Principal is the *only* one who may: work intake is a reserved power (DESIGN.md
    invariant 1). An agent that sees an uncovered pillar opens a `[PROPOSAL]` asking for one.
-2. **The CEO decomposes** into department-owned **epics** and delegates — never into sibling
+2. **The Project Orchestrator decomposes** into role-owned **epics** and delegates — never into sibling
    objectives.
-3. **IT builds** and opens PRs; **Business** defines acceptance.
-4. **The second line reviews** assurance-facing output (if chartered) → `COMPLIANCE-OK` / `COMPLIANCE-HOLD`.
-5. **Business accepts** the `[DEMO]` — only with the second line's sign-off where it applies.
-6. **The Chairman authorizes** money (`decisions.yaml` merge), org-shape (charter), and deploys
-   (`workflow_dispatch`). There is no other path into the gates.
+3. **Software Implementer builds** and opens PRs; **Commercial Planner** defines acceptance.
+4. **Policy Reviewer** reviews policy-facing output when chartered and posts a review verdict.
+5. **Commercial Planner accepts** the `[DEMO]` and records how applicable policy review informed it.
+6. **The Human Principal authorizes and executes** spending, activates org-shape changes, merges
+   PRs, and dispatches deployments. There is no agent path into those capabilities.
 
 ## Growing the org (counter-ratchet — invariant 5)
-A small roster is deliberate; growth must be earned. Charter a new department via a
-`decisions.yaml` PR (the `board-proposals` skill) only when a real bottleneck names it.
-Every new role names the bottleneck it relieves, or it doesn't get chartered.
+A small roster is deliberate. Schema 1.0 permits only the canonical roster and may enable
+the optional Policy Reviewer when a real bottleneck justifies it. Any additional role
+requires a new reviewed schema and control release activated by the Human Principal; a
+workspace decision or mandate cannot create authority.

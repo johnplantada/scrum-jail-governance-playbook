@@ -1,82 +1,80 @@
 # ============================================================
-# {{PRODUCT}} GOVERNANCE — org-chart.yaml
+# {{PRODUCT}} GOVERNANCE — org-chart.yaml (1.0 role schema)
 # ============================================================
-# The single source of truth for WHO exists and what each department may do. GitHub-native:
-# no bot accounts, no channels — the Chairman is a GitHub username, wakes route on dept:*
-# labels (wake-rules.yaml), and authorization is a merge/approval, not a chat reaction.
-# The runtime scripts read this file (runner routing, pm setup stages, the blockers WIP
-# warning, tier→model resolution). Spawn ceilings (max_subagents, global_max_agents) are
-# the declared org-shape limits agents must not cross; can_spend / can_deploy are declared
-# hints — the spend/deploy backstop is capability-absence plus the platform gates
-# (workflow_dispatch-only deploy workflows, CODEOWNERS + branch protection).
-#
-# RULE: every agent has a parent; authority flows DOWN the tree.
-# The Chairman (you, the human) holds the keys. Agents propose; your merge/approval decides.
+# Canonical identities describe capability rather than borrowing human corporate offices.
+# GitHub-native authorization remains a platform act: agents propose; the Human Principal's
+# merge, review, or manual dispatch decides. Work routes on role:* labels.
 
-chairman:
-  github: "{{CHAIRMAN_GITHUB}}"   # decision authority: CODEOWNERS + manual workflow_dispatch of deploys
+schema_version: "1.0"
+
+human_principal:
+  kind: human
+  github: "{{PRINCIPAL_GITHUB}}"
+  authority:
+    - ratify_charter
+    - authorize_spend
+    - deploy_production
+    - authorize_external_action
+    - clear_halt
+
+# This project cell receives portfolio objectives from an external Portfolio Orchestrator.
+# The portfolio runtime is deliberately not embedded in each project-org runtime.
+portfolio_orchestrator:
+  kind: agent
+  scope: portfolio
+  external: true
+  authority:
+    - prioritize_within_ratified_charter
+    - allocate_within_ratified_envelope
+    - recommend_project_objective
+  prohibited:
+    - ratify_charter
+    - commit_spend
+    - deploy_production
+    - perform_external_action
+    - create_project_objective
 
 governance:
-  # The gate vocabulary (ledger language — decisions.yaml `type`, issue/PR prose). Pure
-  # vocabulary, not a signal any bot parses; authorization is the Chairman's merge
-  # (decisions.yaml PR) or manual deploy dispatch (workflow_dispatch).
-  charter: "new top-level department (decisions.yaml type: charter)"
-  sunset: "dissolve a department/team (type: sunset)"
-  fund: "spend up to a stated ceiling (type: spend)"
-  ship: "prod deploy (the Chairman's manual workflow_dispatch)"
-  halt: "whole-org stop — a .halt file; only a human clears it"
-  promote: "raise a department's model tier (type: promote)"
+  charter: "ratify a durable role/authority proposal; effect requires control activation"
+  sunset: "ratify role/service removal; effect requires control activation"
+  fund: "ratify a spending ceiling; payment remains a separate Human execution"
+  ship: "production deploy (the Human Principal's manual workflow_dispatch)"
+  halt: "whole-cell stop — supervisor-owned; only an authenticated operator clears it"
+  promote: "ratify a model-profile change; effect requires control activation"
 
 limits:
-  # Hard ceiling across the entire org. orggen computes it from the roster (every brain +
-  # its full sub-agent fan-out); test_subagent_gate.py fails any chart whose arithmetic
-  # exceeds it, so raising it is a deliberate, reviewed act (a charter PR), never drift.
+  # Every parent role plus its max_concurrent worker fan-out. The supervisor enforces this
+  # transactionally; deterministic services consume no model thread.
   global_max_agents: {{GLOBAL_MAX_AGENTS}}
 
 global:
-  review_interval: {{REVIEW_INTERVAL}}    # wakes per iteration — the [REVIEW] cadence
-  pi_interval: {{PI_INTERVAL}}          # iterations per PI (review_interval × pi_interval = wakes per PI)
-  # Chairman-queue discipline (DESIGN.md invariant 2): once blockers.yaml holds more open
-  # human-only entries than this, agents must not START new work whose critical path ends
-  # in another human-only unlock — scripts/blockers.py prepends the WIP warning to the
-  # queue injected into every wake prompt. Prompt-enforced. 0/absent disables the warning.
+  review_interval: {{REVIEW_INTERVAL}}
+  pi_interval: {{PI_INTERVAL}}
   unlock_wip_limit: {{UNLOCK_WIP_LIMIT}}
-  # Canonical pm workflow statuses, in order (DESIGN.md §2). The ONLY place the list is
-  # defined — github-pm-setup.sh provisions the board's built-in Status field from it, and
-  # docs and mandates must reference it rather than restate it. Each column answers "who
-  # is this waiting on": Awaiting Merge and Awaiting Deploy are the Chairman's two queues,
-  # so his whole to-do is Awaiting Merge + Awaiting Deploy + Blocked.
   pm_stages: [Todo, In Progress, Awaiting Merge, Demo, Awaiting Deploy, Done]
-  # Holding columns — orthogonal PARKED states, NOT points in the pm_stages flow (playbook/safe.md).
-  # Same board Status field, valid move target, kept out of the ordered list, and exempt
-  # from any forward auto-reconcile (a parked item with a PR stays parked).
   pm_holding_stages: [Blocked, On Hold]
-  # Terminal-alternate — "won't do", closed as not-planned via pm-gh.sh drop. Not a flow
-  # position (kept out of any .index() math), not parked (nothing resumes). Dropping an
-  # epic or objective is the Chairman's call alone; agents file a [PROPOSAL] instead.
   pm_terminal_stages: [Dropped]
-  # ── COMMISSIONING PINS — both REQUIRED; the org is not finished until they are set ──
-  # These cannot be stamped: neither the board nor the queue epic exists until you have
-  # created the org repo. Leaving them null is not a soft default — warden.py exits before
-  # doing any work, and the Chairman gets NO queue. That exact omission cost a stamped org
-  # five silent hours (playbook/patterns.md Pattern 14). Set them in RUNBOOK commissioning, then
-  # re-pin here if either is ever recreated.
-  chairman_queue_issue: null   # ← the UNTYPED epic whose sub-issues = what only the human can do
-  pm_project_number: null      # ← the org Project's number (gh project <N>) — pm-gh.sh reads it
-                               #   too; un-pinned, every board call pays a by-title GraphQL
-                               #   lookup (FIELD-NOTES §14)
-  # Pinned API model id per brain tier — the ONE place tier→model resolution lives.
-  # Everything else — ledger, wake banners, budget brownouts, PROMOTE — keeps speaking
-  # in tiers; a PROMOTE changes an AGENT's tier, editing THIS map upgrades what a tier means
-  # org-wide. Update to current model ids when you stamp a new org.
-  model_ids:
-    haiku: claude-haiku-4-5
-    sonnet: claude-sonnet-5
-    opus: claude-opus-4-8
 
-departments:
-{{DEPARTMENTS}}
-  # ── ADD MORE DEPARTMENTS BELOW ────────────────────────────────
-  # A new top-level department is a Board act: a decisions.yaml PR (type: charter) whose
-  # payload is the new block, opened via the board-proposals skill. The Chairman's merge
-  # IS the charter — then the block above gets added in the same change.
+  # Both pins are required commissioning state. The governance monitor refuses to run
+  # without them rather than leaving a silently blocked project cell.
+  principal_queue_issue: null
+  pm_project_number: null
+
+# Provider executables, subscription homes, and concrete model ids are commissioned in
+# the installed controller. This workspace carries only provider-neutral model profiles.
+
+# Deterministic components are services, never agents.
+services:
+  - name: governance-monitor
+    kind: deterministic-service
+    scope: project
+    implementation: scripts/governance_monitor.py
+    schedule: "~4h"
+    reports_to: human-principal
+    judgment_residue_to: governance-reviewer
+    consumes_model_tokens: false
+
+roles:
+{{ROLES}}
+  # Additional roles require a Human Principal-ratified charter change. Use functional
+  # ids that name the artifact or decision the role produces; do not mint executive titles.

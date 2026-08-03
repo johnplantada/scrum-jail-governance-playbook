@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Human-only atomic activation of an installed, organization-bound control release."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import sys
+
+
+def verify_release(release: Path) -> dict:
+    manifest_path = release / "MANIFEST.json"
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise SystemExit("sjg-activate: release manifest is absent or unsafe")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"sjg-activate: invalid release manifest: {exc}")
+    if manifest.get("schemaVersion") != 1:
+        raise SystemExit("sjg-activate: unsupported release manifest")
+    if not isinstance(manifest.get("version"), str) or not isinstance(
+            manifest.get("sourceTreeSha256"), str):
+        raise SystemExit("sjg-activate: incomplete release identity")
+    entries = manifest.get("files")
+    if not isinstance(entries, list):
+        raise SystemExit("sjg-activate: release manifest file list is absent")
+    listed = [str(entry.get("path") or "") for entry in entries if isinstance(entry, dict)]
+    if len(listed) != len(entries) or len(set(listed)) != len(listed):
+        raise SystemExit("sjg-activate: release manifest has invalid or duplicate paths")
+    actual_files = {str(path.relative_to(release)) for path in release.rglob("*")
+                    if path.is_file() and path != manifest_path}
+    if actual_files != set(listed):
+        raise SystemExit("sjg-activate: release contains unlisted or missing files")
+    for directory in [release, *(path for path in release.rglob("*") if path.is_dir())]:
+        if directory.is_symlink() or stat.S_IMODE(directory.stat().st_mode) & 0o222:
+            raise SystemExit(f"sjg-activate: release directory is mutable or unsafe: {directory}")
+    for entry in entries:
+        relative = str(entry.get("path") or "")
+        candidate = (release / relative).resolve(strict=False)
+        if release.resolve() not in candidate.parents or not candidate.is_file() or candidate.is_symlink():
+            raise SystemExit(f"sjg-activate: unsafe or absent release file: {relative}")
+        actual = hashlib.sha256(candidate.read_bytes()).hexdigest()
+        mode = format(stat.S_IMODE(candidate.stat().st_mode), "04o")
+        if actual != entry.get("sha256") or mode != entry.get("mode"):
+            raise SystemExit(f"sjg-activate: release drift: {relative}")
+        if stat.S_IMODE(candidate.stat().st_mode) & 0o222:
+            raise SystemExit(f"sjg-activate: release file is mutable: {relative}")
+    return manifest
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--prefix", required=True)
+    parser.add_argument("--version", required=True)
+    parser.add_argument("--organization", required=True)
+    parser.add_argument("--allow-dirty", action="store_true")
+    args = parser.parse_args(argv)
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", args.version):
+        raise SystemExit("sjg-activate: --version must be semantic x.y.z")
+    prefix = Path(args.prefix)
+    if not prefix.is_absolute():
+        raise SystemExit("sjg-activate: --prefix must be absolute")
+    if prefix == Path("/"):
+        raise SystemExit("sjg-activate: refusing filesystem root as installation prefix")
+    prefix = prefix.resolve()
+    release = (prefix / "releases" / args.version).resolve(strict=True)
+    releases_root = (prefix / "releases").resolve(strict=True)
+    if release.parent != releases_root:
+        raise SystemExit("sjg-activate: release path escapes the installation prefix")
+    manifest = verify_release(release)
+    try:
+        organization = json.loads(Path(args.organization).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"sjg-activate: invalid organization policy: {exc}")
+    expected = organization.get("controlRelease") or {}
+    if expected.get("version") != manifest.get("version"):
+        raise SystemExit("sjg-activate: organization requires a different control version")
+    if expected.get("sourceTreeSha256") != manifest.get("sourceTreeSha256"):
+        raise SystemExit("sjg-activate: organization and control source digests differ")
+    library = release / "lib"
+    sys.path.insert(0, os.fspath(library))
+    try:
+        from sjg_control.policy import PolicyError, compile_policy
+        compile_policy(organization, source_commit=str(manifest.get("sourceCommit") or ""))
+    except (ImportError, PolicyError, TypeError, ValueError) as exc:
+        raise SystemExit(f"sjg-activate: organization policy does not compile: {exc}") from exc
+    finally:
+        sys.path.remove(os.fspath(library))
+    if not args.allow_dirty and manifest.get("releaseQualified") is not True:
+        raise SystemExit("sjg-activate: dirty development release is not activatable")
+    prefix.mkdir(parents=True, exist_ok=True)
+    temporary = prefix / f".current.{os.getpid()}"
+    if temporary.exists() or temporary.is_symlink():
+        raise SystemExit(f"sjg-activate: temporary activation path exists: {temporary}")
+    os.symlink(os.path.relpath(release, prefix), temporary)
+    os.replace(temporary, prefix / "current")
+    print(release)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
