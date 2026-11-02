@@ -440,6 +440,25 @@ class Store:
             (state, json.dumps(response, sort_keys=True), utcnow(), key),
         )
 
+    def commercial_demo_receipt(self, key: str, *, org_id: str,
+                                policy_digest: str) -> dict[str, Any] | None:
+        """Return only a completed comment from this policy's Commercial Planner."""
+        row = self.connection.execute(
+            "SELECT br.arguments_json,br.response_json FROM broker_request br "
+            "JOIN wake_session ws ON ws.session_id=br.session_id "
+            "WHERE br.idempotency_key=? AND br.operation='pm.issue.comment' "
+            "AND br.state='succeeded' AND ws.role='commercial-planner' "
+            "AND ws.org_id=? AND ws.policy_digest=?",
+            (key, org_id, policy_digest),
+        ).fetchone()
+        if row is None:
+            return None
+        response = json.loads(row["response_json"] or "null")
+        if not isinstance(response, dict) or response.get("status") != "ok":
+            return None
+        return {"arguments": json.loads(row["arguments_json"]),
+                "result": response.get("result") or {}}
+
     def reserve_worker(self, session_id: str, worker_type: str,
                        *, cumulative_cap: int, concurrent_cap: int, global_cap: int) -> str:
         with self.immediate() as db:

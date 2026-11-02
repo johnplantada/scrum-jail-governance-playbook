@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 import base64
 import hashlib
 import json
@@ -31,7 +31,8 @@ class ProjectConfig:
 class GitHubBackend:
     def __init__(self, policy: OrganizationPolicy, *, executable: str,
                  environment: dict[str, str] | None = None,
-                 project: ProjectConfig | None = None):
+                 project: ProjectConfig | None = None,
+                 demo_receipt_lookup: Callable[[str], dict[str, Any] | None] | None = None):
         self.policy = policy
         binary = Path(executable)
         if not binary.is_absolute() or not binary.is_file():
@@ -53,6 +54,7 @@ class GitHubBackend:
         self.environment.update({"HOME": str(home), "PATH": "/usr/bin:/bin",
                                  "GH_PROMPT_DISABLED": "1", "GH_NO_UPDATE_NOTIFIER": "1"})
         self.project = project
+        self.demo_receipt_lookup = demo_receipt_lookup
 
     def _run(self, argv: list[str], *, stdin: str | None = None) -> str:
         process = subprocess.run([self.executable, *argv], input=stdin, text=True,
@@ -260,42 +262,125 @@ class GitHubBackend:
                     values.add(" ".join(value.split()).casefold())
         return values
 
+    @classmethod
+    def _acceptance_digest(cls, issue: dict[str, Any]) -> str | None:
+        lines = cls._acceptance_lines(str(issue.get("body") or ""))
+        return hashlib.sha256("\n".join(sorted(lines)).encode()).hexdigest() if lines else None
+
+    @staticmethod
+    def _evidence_fields(body: str) -> dict[str, str] | None:
+        fields: dict[str, str] = {}
+        for line in body.splitlines():
+            match = re.fullmatch(
+                r"\s*(accepted|item|acceptance_digest|pr|head_sha|evidence_run)\s*:\s*(.*?)\s*", line)
+            if match:
+                if match[1] in fields:
+                    return None
+                fields[match[1]] = match[2]
+        return fields
+
+    def _product_demo(self, fields: dict[str, str]) -> bool:
+        repo = self.policy.repository("product").slug
+        pr_match = re.fullmatch(re.escape(repo) + r"#([1-9][0-9]*)", fields.get("pr", ""))
+        run_match = re.fullmatch(
+            r"https://github\.com/" + re.escape(repo) + r"/actions/runs/([1-9][0-9]*)",
+            fields.get("evidence_run", ""))
+        sha = fields.get("head_sha", "")
+        if not pr_match or not run_match or not re.fullmatch(r"[0-9a-f]{40}", sha):
+            return False
+        pr = self._api(f"repos/{repo}/pulls/{pr_match[1]}")
+        if not isinstance(pr, dict) or (pr.get("head") or {}).get("sha") != sha:
+            return False
+        run = self._api(f"repos/{repo}/actions/runs/{run_match[1]}")
+        if not isinstance(run, dict) or not (
+                run.get("status") == "completed" and run.get("conclusion") == "success"
+                and run.get("event") == "workflow_dispatch"
+                and run.get("path") == ".github/workflows/demo-evidence.yml"
+                and run.get("head_branch") == self.policy.repository("product").default_branch
+                and (run.get("repository") or {}).get("full_name") == repo
+                and all((run.get(key) or {}).get("login", "").casefold()
+                        == self.policy.principal_github.casefold()
+                        for key in ("actor", "triggering_actor"))):
+            return False
+        # The workflow dispatches on main and checks out the requested PR head. Its
+        # run.head_sha therefore identifies main; the protected upload step binds
+        # the successful evidence artifact to the PR number and requested head.
+        artifacts = self._api(f"repos/{repo}/actions/runs/{run_match[1]}/artifacts?per_page=100")
+        if not isinstance(artifacts, dict) or not isinstance(artifacts.get("artifacts"), list):
+            return False
+        items = artifacts["artifacts"]
+        total = artifacts.get("total_count")
+        if (type(total) is not int or total != len(items)
+                or not all(isinstance(item, dict) for item in items)):
+            return False  # incomplete enumeration is UNKNOWN, never positive evidence
+        expected = f"demo-evidence-{pr_match[1]}-{sha}"
+        matches = [item for item in items if item.get("name") == expected]
+        return len(matches) == 1 and matches[0].get("expired") is False
+
     def _evidence(self, issue: dict[str, Any], arguments: dict[str, Any]) -> bool:
         issue_number = int(issue["number"])
         issue_repo = self.policy.repository("org").slug
+        digest = self._acceptance_digest(issue)
+        if digest is None:
+            return False
         pr_ref = str(arguments.get("pr") or "")
         if pr_ref:
-            match = re.fullmatch(r"(?:https://github\.com/)?([^/#]+/[^/#]+)(?:/pull/|#)(\d+)", pr_ref)
-            if not match or match.group(1) != self.policy.repository("product").slug:
+            match = re.fullmatch(r"(?:https://github\.com/)?([^/#]+/[^/#]+)(?:/pull/|#)([1-9][0-9]*)", pr_ref)
+            if not match or match[1] != self.policy.repository("product").slug:
                 return False
-            pr = self._api(f"repos/{match.group(1)}/pulls/{int(match.group(2))}")
+            pr = self._api(f"repos/{match[1]}/pulls/{match[2]}")
             if not isinstance(pr, dict) or pr.get("merged") is not True:
                 return False
             body = str(pr.get("body") or "")
             relation = re.compile(
                 rf"(?im)^\s*Relates-to\s+(?:{re.escape(issue_repo)}#{issue_number}|"
                 rf"https://github\.com/{re.escape(issue_repo)}/issues/{issue_number})\s*$")
-            return relation.search(body) is not None
+            fields = self._evidence_fields(body)
+            # This path proves a related merge against current acceptance, not a
+            # successful product demonstration. Product features must use --demo.
+            return (self._kind(self._labels(issue)) == "story" and fields is not None
+                    and fields.get("acceptance_digest") == digest
+                    and relation.search(body) is not None)
         demo = str(arguments.get("demo") or "")
         match = re.fullmatch(
-            r"https://github\.com/([^/]+/[^/]+)/(?:issues|pull)/(\d+)#issuecomment-(\d+)", demo)
-        if match and match.group(1) == issue_repo and int(match.group(2)) == issue_number:
-            comment = self._api(f"repos/{issue_repo}/issues/comments/{int(match.group(3))}")
-            body = str((comment or {}).get("body") or "")
-            acceptance_digest = hashlib.sha256(
-                "\n".join(sorted(self._acceptance_lines(str(issue.get("body") or "")))).encode()
-            ).hexdigest()
-            trusted_attribution = re.match(
-                r"^<!-- sjg-idempotency:[A-Za-z0-9][A-Za-z0-9._:-]{15,127} -->\n"
-                r"\*\*Commercial Planner —\*\* ", body)
-            return (trusted_attribution is not None
-                    and bool(re.search(r"(?m)^\s*\[DEMO\]", body))
-                    and bool(re.search(r"(?im)^\s*accepted\s*:\s*true\s*$", body))
-                    and bool(re.search(
-                        rf"(?im)^\s*item\s*:\s*{re.escape(issue_repo)}#{issue_number}\s*$", body))
-                    and bool(re.search(
-                        rf"(?im)^\s*acceptance_digest\s*:\s*{acceptance_digest}\s*$", body)))
-        return False
+            r"https://github\.com/([^/]+/[^/]+)/issues/([1-9][0-9]*)#issuecomment-([1-9][0-9]*)", demo)
+        if not match or match[1] != issue_repo or int(match[2]) != issue_number:
+            return False
+        comment = self._api(f"repos/{issue_repo}/issues/comments/{match[3]}")
+        if not isinstance(comment, dict):
+            return False
+        body = str(comment.get("body") or "")
+        marker = re.match(
+            r"^<!-- sjg-idempotency:([A-Za-z0-9][A-Za-z0-9._:-]{15,127}) -->\n"
+            r"\*\*Commercial Planner —\*\* ", body)
+        if marker is None or self.demo_receipt_lookup is None:
+            return False
+        receipt = self.demo_receipt_lookup(marker[1])
+        if not receipt:
+            return False
+        args, result = receipt["arguments"], receipt["result"]
+        expected_body = self._idempotent_body(
+            f"**Commercial Planner —** {args.get('body', '—')}", marker[1])
+        author = result.get("comment_author_id")
+        if not (args.get("repository", "org") == "org"
+                and int(args.get("id") or args.get("issue") or 0) == issue_number
+                and result.get("comment_id") == int(match[3])
+                and comment.get("id") == int(match[3])
+                and comment.get("issue_url") == f"https://api.github.com/repos/{issue_repo}/issues/{issue_number}"
+                and type(author) is int and author > 0
+                and (comment.get("user") or {}).get("id") == author
+                and body == expected_body):
+            return False
+        fields = self._evidence_fields(body)
+        if not (fields is not None and fields.get("accepted") == "true"
+                and fields.get("item") == f"{issue_repo}#{issue_number}"
+                and fields.get("acceptance_digest") == digest
+                and re.search(r"(?m)^\s*\[DEMO\]\s*$", body)):
+            return False
+        product_fields = {"pr", "head_sha", "evidence_run"}
+        if self._kind(self._labels(issue)) == "feature" or product_fields & fields.keys():
+            return self._product_demo(fields)
+        return True
 
     def facts(self, operation: str, arguments: dict[str, Any]) -> Facts:
         if operation in {"repo.submit", "repo.status", "worker.run"}:
@@ -443,7 +528,8 @@ class GitHubBackend:
             body = self._idempotent_body(
                 f"**{role.replace('-', ' ').title()} —** {arguments['body']}", idempotency_key)
             result = self._comment(repo.slug, int(issue["number"]), body)
-            return {"comment_id": result["id"]}
+            return {"comment_id": result["id"],
+                    "comment_author_id": (result.get("user") or {}).get("id")}
         if operation == "pm.issue.route":
             issue = self._issue(arguments)
             target = str(arguments["target_role"])

@@ -98,3 +98,37 @@ Add operations by extending the closed operation set, facts model, authorization
 fixed backend, audit record, failure semantics, and adversarial tests together. Never add a
 generic command, URL, HTTP method, GraphQL document, Git ref, provider/model override, or
 arbitrary MCP passthrough.
+
+### Completion evidence trust
+
+A demo comment is evidence only when its idempotency key resolves to a succeeded
+`pm.issue.comment` in the installed controller's durable journal, created by the
+Commercial Planner in the same organization and policy digest. The target issue,
+remote comment ID, original body, and recorded GitHub author ID must all match.
+Text banners, markers, and `author_association` alone confer no authority. Missing
+journal access, legacy receipts without author identity, and policy changes fail
+closed; the Commercial Planner must independently review and post fresh acceptance.
+No trusted controller username is inferred from the Human Principal login.
+
+Nonempty current acceptance criteria and a unique matching acceptance digest are
+required. Features require `--demo`; merged PR linkage alone cannot complete them.
+The `--pr` route for internal stories proves only a related merge and a matching
+acceptance digest in the PR body. It does not certify successful tests or a demo.
+Product work must use the demo route even when represented as a story.
+
+Product demos require a PR number, its current exact head SHA, and a successful,
+completed `demo-evidence.yml` run in the configured product repository. Both the
+original and triggering actors must be the configured Human Principal; the run
+must originate from the configured product default branch through workflow dispatch.
+The run must contain one unexpired artifact named
+`demo-evidence-<PR number>-<current PR head SHA>` with complete artifact enumeration.
+The standard workflow runs on main and checks out the requested PR SHA, so its
+`run.head_sha` identifies main, not necessarily the PR head. The protected workflow's
+fixed artifact name binds the requested SHA; no claim is made that artifact metadata
+alone independently proves the evidence contents. The Planner still reviews those
+contents against acceptance. Adapting that protected workflow requires Human review.
+
+Unknown workflow/run/artifact reads never establish evidence. A missing principal,
+missing identity fields, more than one artifact page, or unsupported workflow layout
+blocks completion until commissioning or a separately reviewed pagination extension.
+These checks do not grant workflow dispatch, merge, deployment, or spending authority.
