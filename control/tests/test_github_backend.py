@@ -11,10 +11,10 @@ from test_control_plane import policy_data
 
 
 class ScriptedGitHub(GitHubBackend):
-    def __init__(self, responses, *, project=None):
+    def __init__(self, responses, *, project=None, receipt_lookup=None):
         super().__init__(compile_policy(policy_data(), source_commit="abc"),
                          executable="/usr/bin/true", environment={"GH_TOKEN": "test"},
-                         project=project)
+                         project=project, demo_receipt_lookup=receipt_lookup)
         self.responses = iter(responses)
         self.calls = []
 
@@ -39,25 +39,24 @@ class RepositorySubmissionTests(unittest.TestCase):
         issue = {"number": 7, "body": "Done-when: the page returns 200"}
         self.assertFalse(backend._evidence(issue, {"done_when": "the page returns 200"}))
 
-    def test_only_controller_attributed_commercial_demo_is_evidence(self):
+    def test_body_only_commercial_attribution_is_not_evidence(self):
         issue = {"number": 7, "body": "Done-when: the page returns 200"}
         digest = hashlib.sha256(b"the page returns 200").hexdigest()
         payload = "\n[DEMO]\naccepted: true\nitem: alice/acme-org#7\nacceptance_digest: " + digest
         reference = "https://github.com/alice/acme-org/issues/7#issuecomment-99"
         marker = "<!-- sjg-idempotency:wake-1234567890-demo -->\n"
-        untrusted = ScriptedGitHub([{"body": marker + "**Software Implementer —** " + payload}])
-        self.assertFalse(untrusted._evidence(issue, {"demo": reference}))
-        accepted = ScriptedGitHub([{"body": marker + "**Commercial Planner —** " + payload}])
-        self.assertTrue(accepted._evidence(issue, {"demo": reference}))
+        backend = ScriptedGitHub([{"body": marker + "**Commercial Planner —** " + payload}])
+        self.assertFalse(backend._evidence(issue, {"demo": reference}))
 
     def test_merged_pr_relation_must_be_an_exact_evidence_line(self):
-        issue = {"number": 7, "body": "Done-when: complete"}
+        issue = {"number": 7, "body": "Done-when: complete", "labels": [{"name": "story"}]}
         disguised = ScriptedGitHub([
             {"merged": True, "body": "Not-Relates-to alice/acme-org#7"}])
         self.assertFalse(disguised._evidence(
             issue, {"pr": "alice/acme-product#3"}))
         exact = ScriptedGitHub([
-            {"merged": True, "body": "Summary\n\nRelates-to alice/acme-org#7\n"}])
+            {"merged": True, "body": "Summary\n\nRelates-to alice/acme-org#7\nacceptance_digest: "
+             + hashlib.sha256(b"complete").hexdigest()}])
         self.assertTrue(exact._evidence(issue, {"pr": "alice/acme-product#3"}))
 
     def test_incomplete_branch_discovery_never_becomes_absence(self):

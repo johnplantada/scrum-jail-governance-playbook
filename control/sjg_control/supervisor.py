@@ -65,7 +65,7 @@ class Supervisor:
                 policy, executable=config.github.executable,
                 environment={"GH_TOKEN": read_github_token(config.github),
                              "HOME": config.github.home, "LANG": "C", "LC_ALL": "C"},
-                project=project,
+                project=project, demo_receipt_lookup=self._demo_receipt,
             )
         self.github = github_backend
         if sources is None:
@@ -78,6 +78,14 @@ class Supervisor:
         self._tick_lock = Lock()
         self.owner = f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:12]}"
         self._prepare_directories()
+
+    def _demo_receipt(self, key: str) -> dict[str, Any] | None:
+        store = Store(self.config.state_database)
+        try:
+            return store.commercial_demo_receipt(
+                key, org_id=self.policy.org_id, policy_digest=self.policy.policy_digest)
+        finally:
+            store.close()
 
     def _prepare_directories(self) -> None:
         state_parent = Path(self.config.state_database).parent

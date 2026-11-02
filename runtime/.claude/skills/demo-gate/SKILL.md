@@ -23,8 +23,19 @@ evidence_run: <run URL bound to that head>
 ```
 
 Then it moves the owned feature to `Awaiting Deploy`. `pm-gh.sh done --demo <comment-url>`
-re-reads the exact issue comment and issue acceptance digest. A stale, unrelated, malformed,
-or incompletely read comment is not evidence.
+re-reads the exact issue comment, current acceptance digest, controller journal receipt,
+original body and recorded author identity. Product features also require the current PR
+head and a completed successful Human-dispatched demo run with the matching unexpired
+`demo-evidence-<PR number>-<head SHA>` artifact. The workflow runs on main; its own run
+head SHA is distinct from the PR checkout SHA. A stale, unrelated, malformed, edited,
+unreceipted or incompletely read comment is not evidence. Old receipts without recorded
+author identity require fresh independent acceptance.
+
+Features cannot use a related merged PR in place of a demo. For internal stories only,
+`done --pr` requires an exact `Relates-to OWNER/ORG#N` line and the current
+`acceptance_digest: <digest>` in the merged PR body. This proves related merge and
+acceptance binding; it does not certify tests or demonstration results. Product work
+represented as a story must still use `--demo`.
 
 This skill never dispatches a workflow, merges, deploys, spends, or treats a green check as
 Human authorization.
